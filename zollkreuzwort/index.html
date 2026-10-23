@@ -1,0 +1,1476 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zoll-Kreuzworträtsel</title>
+<style>
+:root{
+  --bg:#f4f1ea; --panel:#fffdf8; --ink:#1f2933; --muted:#6b7280; --line:#cfc8b8;
+  --cell:#ffffff; --sel:#ffd75e; --word:#fff0b8; --accent:#1d4e89; --ok:#2e7d32; --bad:#c62828;
+  --okbg:#d8f0da; --badbg:#f9d6d6; --V:#b45309; --U:#1d4e89; --Z:#2e7d32; --R:#7b3fa0;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#14171c; --panel:#1d2128; --ink:#e8e6e1; --muted:#9aa3ae; --line:#3a4350;
+  --cell:#262c35; --sel:#b8860b; --word:#4a4220; --accent:#7fb2ee; --ok:#7bd37f; --bad:#ff8a80;
+  --okbg:#1f4a26; --badbg:#5a2424; --V:#f0a04b; --U:#7fb2ee; --Z:#7bd37f; --R:#c9a0ea;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,"Segoe UI",sans-serif}
+header{padding:16px;text-align:center}
+h1{margin:0;font-size:1.5rem}
+header p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px 32px}
+.controls{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:12px}
+.controls label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.controls select,.controls input[type=number]{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--cell);color:var(--ink)}
+.tag{display:inline-block;width:10px;height:10px;border-radius:50%}
+button{font:inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--cell);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media (prefers-color-scheme:dark){button.primary{color:#0b1220}}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+.bar .spacer{flex:1}
+.stat{color:var(--muted);font-variant-numeric:tabular-nums}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:1fr}}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+#active{min-height:2.7em;margin-bottom:10px;padding:8px 10px;border-radius:8px;background:var(--word);font-weight:500}
+#active small{color:var(--muted);font-weight:400}
+#gridbox{overflow:auto;display:flex;justify-content:center}
+#grid{display:grid;gap:2px;touch-action:manipulation;user-select:none}
+.c{position:relative;width:var(--cs);height:var(--cs);background:var(--cell);border:1px solid var(--ink);border-radius:2px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:calc(var(--cs)*.55)}
+.c.empty{background:transparent;border:none;cursor:default}
+.c .n{position:absolute;top:0;left:2px;font-size:calc(var(--cs)*.28);font-weight:600;line-height:1;color:var(--muted)}
+.c.inw{background:var(--word)}
+.c.sel{background:var(--sel);color:#111}
+.c.wrong{background:var(--badbg);color:var(--bad)}
+.c.right{background:var(--okbg)}
+.c.hint{color:var(--accent)}
+.clues{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:80vh;overflow:auto}
+.clues h2{margin:8px 0 6px;font-size:1rem}
+.clues h2:first-child{margin-top:0}
+.clues ol{list-style:none;margin:0;padding:0}
+.clues li{padding:4px 6px;border-radius:6px;cursor:pointer;display:flex;gap:6px;font-size:.92rem}
+.clues li:hover{background:var(--word)}
+.clues li.act{background:var(--sel);color:#111}
+.clues li.done{opacity:.55;text-decoration:line-through}
+.clues li b{min-width:1.6em;text-align:right}
+.clues li .dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:7px}
+#kb{position:fixed;left:-100px;top:0;width:10px;height:10px;opacity:0}
+#win{display:none;margin-top:12px;padding:12px;border-radius:8px;background:var(--okbg);text-align:center;font-weight:600}
+.note{color:var(--muted);font-size:.82rem;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Zoll-Kreuzworträtsel</h1>
+  <p>Verbrauchsteuerrecht · Warenursprung &amp; Präferenzrecht · Zolltarifrecht · Rechtsgrundlagen</p>
+</header>
+<div class="wrap">
+  <div class="controls">
+    <label><input type="checkbox" class="topic" value="V" checked><span class="tag" style="background:var(--V)"></span>Verbrauchsteuern</label>
+    <label><input type="checkbox" class="topic" value="U" checked><span class="tag" style="background:var(--U)"></span>Ursprung &amp; Präferenz</label>
+    <label><input type="checkbox" class="topic" value="Z" checked><span class="tag" style="background:var(--Z)"></span>Zolltarif</label>
+    <label><input type="checkbox" class="topic" value="R" checked><span class="tag" style="background:var(--R)"></span>Rechtsgrundlagen</label>
+    <label>Größe
+      <select id="size">
+        <option value="s">Klein (ca. 10 Begriffe)</option>
+        <option value="m" selected>Mittel (ca. 16 Begriffe)</option>
+        <option value="l">Groß (ca. 24 Begriffe)</option>
+      </select>
+    </label>
+    <label>Rätsel-Nr. <input type="number" id="seed" style="width:110px"></label>
+    <button class="primary" id="new">Neues Zufallsrätsel</button>
+  </div>
+
+  <div class="bar">
+    <button id="check">Prüfen</button>
+    <button id="hintL">Buchstabe zeigen</button>
+    <button id="hintW">Wort zeigen</button>
+    <button id="solve">Lösung</button>
+    <button id="clear">Leeren</button>
+    <span class="spacer"></span>
+    <span class="stat" id="stat"></span>
+  </div>
+
+  <div class="main">
+    <div class="board">
+      <div id="active"></div>
+      <div id="gridbox"><div id="grid"></div></div>
+      <div id="win"></div>
+      <p class="note">Tipp: Klick auf ein Feld wählt es aus, nochmaliger Klick wechselt die Richtung (oder Leertaste). Pfeiltasten bewegen, Umlaute als AE/OE/UE, ß als SS. Mehrteilige Begriffe stehen ohne Leerzeichen, die Klammer zeigt die Wortlängen.</p>
+    </div>
+    <div class="clues">
+      <h2>Waagerecht →</h2><ol id="clueA"></ol>
+      <h2>Senkrecht ↓</h2><ol id="clueD"></ol>
+    </div>
+  </div>
+</div>
+<input id="kb" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="Eingabe">
+
+<script>
+// [Lösung (Leerzeichen = Wortgrenze, Umlaute als AE/OE/UE/SS), Hinweis, Thema]
+const WORDS = [
+// ---- Verbrauchsteuerrecht (V)
+["ENERGIESTEUER","Verbrauchsteuer auf Kraftstoffe, Heizöl und Erdgas","V"],
+["STROMSTEUER","Verbrauchsteuer auf elektrischen Strom","V"],
+["TABAKSTEUER","Verbrauchsteuer auf Zigaretten und Feinschnitt","V"],
+["ALKOHOLSTEUER","Verbrauchsteuer auf Ethylalkohol und Spirituosen (seit 2018 unter diesem Namen)","V"],
+["BIERSTEUER","Verbrauchsteuer, deren Satz sich nach Hektoliter und Stammwürze richtet","V"],
+["SCHAUMWEINSTEUER","Verbrauchsteuer auf Sekt und andere moussierende Getränke","V"],
+["KAFFEESTEUER","Verbrauchsteuer auf Röstkaffee und löslichen Kaffee","V"],
+["ALKOPOPSTEUER","Steuer auf Mischgetränke aus Spirituosen und Limonade","V"],
+["ZWISCHENERZEUGNIS","Alkoholisches Getränk wie Sherry oder Portwein (Steuergegenstand im Schaumweinsteuergesetz)","V"],
+["STEUERLAGER","Ort, an dem Verbrauchsteuerwaren unter Steueraussetzung hergestellt oder gelagert werden","V"],
+["STEUERLAGERINHABER","Inhaber der Erlaubnis zum Betrieb eines Steuerlagers","V"],
+["STEUERAUSSETZUNG","Verfahren, bei dem die Verbrauchsteuer zunächst nicht entsteht","V"],
+["ZUGELASSENER EMPFAENGER","Bewilligter Wirtschaftsbeteiligter, der Waren unter Steueraussetzung beziehen darf","V"],
+["ZUGELASSENER VERSENDER","Bewilligter Wirtschaftsbeteiligter, der Waren unter Steueraussetzung versenden darf","V"],
+["EMCS","EDV-System der EU zur Überwachung verbrauchsteuerpflichtiger Warenbewegungen (Abk.)","V"],
+["EVD","Elektronisches Verwaltungsdokument im EMCS (Abk. ohne Bindestrich)","V"],
+["ARC","Administrativer Referenzcode im EMCS (Abk.)","V"],
+["HAUPTZOLLAMT","Für Verbrauchsteuern örtlich zuständige Bundesbehörde","V"],
+["STEUERZEICHEN","Banderole als Nachweis für die Entrichtung der Tabaksteuer","V"],
+["KLEINVERKAUFSPREIS","Auf der Packung ausgewiesener Preis; Bemessung beim Wertteil der Tabaksteuer","V"],
+["HEKTOLITER","Mengeneinheit von 100 Litern, z. B. bei Bier und Schaumwein","V"],
+["STAMMWUERZE","Extraktgehalt der Bierwürze vor der Gärung","V"],
+["GRAD PLATO","Maßeinheit der Stammwürze","V"],
+["SYSTEMRICHTLINIE","EU-Richtlinie über das allgemeine Verbrauchsteuersystem","V"],
+["VERBRAUCHSTEUER","Steuer auf den Verbrauch bestimmter Waren wie Energie, Alkohol und Tabak","V"],
+["STEUERENTSTEHUNG","Zeitpunkt, in dem der Steueranspruch rechtlich entsteht","V"],
+["STEUERSCHULDNER","Person, die die Steuer zu entrichten hat","V"],
+["ENERGIEERZEUGNISSE","Oberbegriff für Kraft- und Heizstoffe im Energiesteuergesetz","V"],
+["HEIZOEL","Leichtes Mineralöl zum Heizen, niedriger besteuert als Dieselkraftstoff","V"],
+["ERDGAS","Gasförmiger Energieträger, der nach dem Energiesteuergesetz besteuert wird","V"],
+["KOHLE","Fester fossiler Brennstoff, seit 2006 energiesteuerpflichtig","V"],
+["BRANNTWEIN","Destillat; gab der bis 2017 geltenden Steuer und dem Monopol den Namen","V"],
+["DENATURIERUNG","Vergällung von Alkohol, damit er nicht trinkbar ist","V"],
+["VERGAELLUNG","Anderes Wort für die Denaturierung von Alkohol","V"],
+["VERWENDUNGSERLAUBNIS","Erlaubnis zur steuerfreien oder steuerbegünstigten Verwendung bestimmter Waren","V"],
+["STEUERBEFREIUNG","Gesetzlich angeordneter Verzicht auf die Besteuerung","V"],
+["STEUERENTLASTUNG","Erstattung oder Erlass bereits entrichteter Verbrauchsteuer","V"],
+["EIGENERZEUGER","Wer Strom zum Selbstverbrauch erzeugt","V"],
+["VERSORGER","Stromlieferant an Letztverbraucher und Steuerschuldner im Stromsteuerrecht","V"],
+["LETZTVERBRAUCHER","Endabnehmer von Strom","V"],
+["SPIRITUOSEN","Hochprozentige Getränke, Gegenstand der Alkoholsteuer","V"],
+["FEINSCHNITT","Fein geschnittener Rauchtabak zum Selbstdrehen","V"],
+["WASSERPFEIFENTABAK","Tabakware zum Rauchen in der Shisha","V"],
+["ZIGARRE","Tabakware aus gerolltem Tabakblatt","V"],
+["BRAUEREI","Herstellungsbetrieb für Bier","V"],
+["SCHAUMWEIN","Moussierendes Getränk wie Sekt","V"],
+["KRAFTSTOFF","Energieerzeugnis zum Antrieb von Motoren","V"],
+["BIOKRAFTSTOFF","Aus Biomasse hergestellter Kraftstoff","V"],
+["FLUESSIGGAS","Energieerzeugnis, im Alltag auch LPG genannt","V"],
+["VERBRINGEN","Beförderung verbrauchsteuerpflichtiger Waren in einen anderen Mitgliedstaat","V"],
+["KLEINERZEUGER","Betrieb mit geringer Jahresmenge, teils mit ermäßigtem Steuersatz","V"],
+["MINDESTSTEUER","Untergrenze der Tabaksteuer je 1000 Zigaretten","V"],
+["STEUERANMELDUNG","Selbst berechnete Erklärung der geschuldeten Steuer","V"],
+["STEUERBESCHEID","Verwaltungsakt zur Festsetzung der Steuer","V"],
+["VERBRAUCHSTEUERPFLICHTIG","Eigenschaft von Waren wie Bier, Tabak oder Heizöl","V"],
+// ---- Warenursprungs- und Präferenzrecht (U)
+["URSPRUNGSZEUGNIS","Von der IHK ausgestelltes Dokument über den nichtpräferenziellen Ursprung","U"],
+["URSPRUNGSERKLAERUNG","Vom Ausführer auf der Rechnung abgegebene Erklärung zum Präferenzursprung","U"],
+["LIEFERANTENERKLAERUNG","Erklärung des Lieferanten über den Ursprungsstatus gelieferter Waren","U"],
+["WARENVERKEHRSBESCHEINIGUNG","Präferenznachweis, bekannt unter dem Kürzel EUR.1","U"],
+["ERMAECHTIGTER AUSFUEHRER","Bewilligter Ausführer, der Ursprungserklärungen selbst abgeben darf","U"],
+["REGISTRIERTER AUSFUEHRER","Im REX-System erfasster Wirtschaftsbeteiligter","U"],
+["REX","Registered-Exporter-System der EU (Abk.)","U"],
+["KUMULIERUNG","Anrechnung von Material und Verarbeitung aus Partnerländern auf den Ursprung","U"],
+["DIAGONALKUMULIERUNG","Kumulierung zwischen mehr als zwei Partnerländern desselben Abkommensraums","U"],
+["TOLERANZREGEL","Zulässiger Anteil an Nichtursprungsmaterial trotz Listenregel","U"],
+["LISTENREGEL","Ursprungsregel anhand der Liste der erforderlichen Be- oder Verarbeitungen","U"],
+["VOLLSTAENDIG GEWONNEN","Ursprungskriterium für Waren, die z. B. nur im Land geerntet oder gefördert wurden","U"],
+["VORMATERIAL","Vorprodukt, das in ein Enderzeugnis eingeht","U"],
+["FREIHANDELSABKOMMEN","Vertrag zum Abbau von Zöllen zwischen Staaten","U"],
+["PRAEFERENZABKOMMEN","Vertrag, der Zollvorteile gegenüber dem Normalzoll gewährt","U"],
+["PRAEFERENZURSPRUNG","Ursprung, der Anspruch auf eine Zollvergünstigung begründet","U"],
+["PRAEFERENZZOLL","Ermäßigter oder zollfreier Satz aufgrund eines Abkommens","U"],
+["ZOLLPRAEFERENZ","Vorzugsbehandlung bei der Verzollung","U"],
+["URSPRUNGSLAND","Staat, in dem eine Ware ihren Ursprung hat","U"],
+["URSPRUNGSREGEL","Vorschrift, die bestimmt, wann eine Ware als Ursprungsware gilt","U"],
+["URSPRUNGSNACHWEIS","Dokument oder Erklärung zum Beleg des Ursprungs","U"],
+["DIREKTBEFOERDERUNG","Grundsatz: Ware muss unmittelbar zwischen den Abkommenspartnern befördert werden","U"],
+["AB WERK PREIS","Preis der Ware ab Werk, Bezugsgröße für die Wertklausel","U"],
+["WERTKLAUSEL","Regel, die Vormaterial nur bis zu einem Prozentsatz vom Ab-Werk-Preis zulässt","U"],
+["BUA","Bindende Ursprungsauskunft (Abk.)","U"],
+["APS","Allgemeines Präferenzsystem der EU für Entwicklungsländer (Abk.)","U"],
+["PEM","Paneuropa-Mittelmeer-Raum, bekannter Kumulierungsraum (Abk.)","U"],
+["CETA","Handelsabkommen zwischen der EU und Kanada (Abk.)","U"],
+["EFTA","Europäische Freihandelsassoziation (Abk.)","U"],
+["NACHPRUEFUNG","Kontrolle der Echtheit und Richtigkeit von Ursprungsnachweisen","U"],
+["HANDELSRECHNUNG","Dokument, auf dem die Ursprungserklärung abgegeben werden kann","U"],
+["NICHTURSPRUNGSWARE","Ware ohne Ursprungseigenschaft im Sinne eines Abkommens","U"],
+["WARENURSPRUNG","Wirtschaftliche Staatsangehörigkeit einer Ware","U"],
+["WESENTLICHE BEARBEITUNG","Nach dem Zollkodex: letzte wesentliche, wirtschaftlich gerechtfertigte Be- oder Verarbeitung","U"],
+["ZOLLKONTINGENT","Mengenmäßig begrenzte Zollvergünstigung","U"],
+["ZOLLUNION","Zusammenschluss mit gemeinsamem Außenzoll und zollfreiem Binnenhandel","U"],
+["AUSFUEHRER","Wer Waren aus dem Zollgebiet verbringt","U"],
+["EINFUEHRER","Wer Waren in das Zollgebiet verbringt","U"],
+["ERZEUGNIS","Hergestellte Ware","U"],
+["UNZUREICHENDE BEARBEITUNG","Minimale Behandlung wie Verpacken oder Waschen, die keinen Ursprung begründet","U"],
+["LANGZEIT LIEFERANTENERKLAERUNG","Lieferantenerklärung für gleichartige Lieferungen über bis zu zwei Jahre","U"],
+// ---- Zolltarifrecht (Z)
+["ZOLLTARIF","Verzeichnis der Waren und der darauf anwendbaren Zollsätze","Z"],
+["KOMBINIERTE NOMENKLATUR","Achtstelliges Warenverzeichnis der EU auf Basis des HS","Z"],
+["HARMONISIERTES SYSTEM","Internationales sechsstelliges Warenverzeichnis der Weltzollorganisation","Z"],
+["TARIC","Integrierter Zolltarif der Union (Abk.)","Z"],
+["ZOLLTARIFNUMMER","Code, nach dem eine Ware im Zolltarif eingereiht wird","Z"],
+["WARENNUMMER","Numerischer Code zur Identifikation einer Ware im Zolltarif","Z"],
+["EINREIHUNG","Zuordnung einer Ware zu einer Tarifposition","Z"],
+["TARIFIERUNG","Anderes Wort für die Einreihung von Waren","Z"],
+["UNTERPOSITION","Feinere Gliederungsstufe unterhalb der Position","Z"],
+["POSITION","Vierstellige Gliederungsstufe des Zolltarifs","Z"],
+["KAPITEL","Zweistellige Gliederungsstufe des Zolltarifs","Z"],
+["ABSCHNITT","Oberste Gliederungsstufe des Zolltarifs, umfasst mehrere Kapitel","Z"],
+["AUSLEGUNGSREGELN","Allgemeine Vorschriften für die Auslegung der Kombinierten Nomenklatur","Z"],
+["ERLAEUTERUNGEN","Auslegungshilfe zum Harmonisierten System und zur KN","Z"],
+["VZTA","Verbindliche Zolltarifauskunft (Abk.)","Z"],
+["WERTZOLL","Zoll, der prozentual vom Zollwert berechnet wird","Z"],
+["MENGENZOLL","Zoll, der nach Gewicht oder Stückzahl bemessen wird","Z"],
+["ZOLLSATZ","Prozentsatz oder Betrag, mit dem die Ware belastet wird","Z"],
+["DRITTLANDSZOLLSATZ","Normalzollsatz für Waren aus Staaten ohne Abkommen","Z"],
+["ANTIDUMPINGZOLL","Zusatzzoll gegen Einfuhren zu Preisen unter dem Normalwert","Z"],
+["AUSGLEICHSZOLL","Zoll gegen subventionierte Einfuhren","Z"],
+["ZOLLWERT","Bemessungsgrundlage des Wertzolls, meist der Transaktionswert","Z"],
+["ZOLLSCHULD","Verpflichtung zur Entrichtung der Einfuhr- oder Ausfuhrabgaben","Z"],
+["UNIONSZOLLKODEX","Zentrale EU-Verordnung des Zollrechts (Kurzform UZK), wird ab 2027 durch die Zollreform abgelöst","Z"],
+["WARENBESCHREIBUNG","Angabe in der Zollanmeldung, die die Ware näher bezeichnet","Z"],
+["MEISTBEGUENSTIGUNG","WTO-Grundsatz: Zollvorteile für einen Partner gelten für alle Mitglieder","Z"],
+["ZUSATZCODE","Zusätzliche Ziffern im TARIC, z. B. für Antidumpingzölle","Z"],
+["WZO","Weltzollorganisation (Abk.)","Z"],
+["ATLAS","Automatisiertes Tarif- und Lokales Zollabwicklungssystem der deutschen Zollverwaltung","Z"],
+["ZOLLAUSSETZUNG","Befristetes Absenken oder Aussetzen von Zöllen","Z"],
+["ZOLLFREI","Ohne Zollbelastung","Z"],
+["ZOLLGEBIET","Gebiet, in dem das Zollrecht der Union gilt","Z"],
+["ZOLLANMELDUNG","Handlung zur Überführung von Waren in ein Zollverfahren","Z"],
+["ZOLLVERFAHREN","Rechtlicher Rahmen für Waren, z. B. Überlassung zum zollrechtlich freien Verkehr","Z"],
+["AEO","Zugelassener Wirtschaftsbeteiligter (Abk.)","Z"],
+["NOMENKLATUR","Systematisches Warenverzeichnis","Z"],
+["TARIFPOSITION","Vierstellige Einheit des Warenverzeichnisses","Z"],
+["GEMEINSAMER ZOLLTARIF","Einheitlicher Außenzolltarif der EU","Z"],
+["ZOLLKONTINGENT UNION","Erst-Kommt-erst-Mahlt-Verfahren für begrenzte Mengen zu ermäßigtem Zoll","Z"],
+["EINFUHRABGABEN","Zölle und andere bei der Einfuhr erhobene Abgaben","Z"],
+["BESCHAFFENHEIT","Eigenschaft der Ware, die für die Einreihung entscheidend sein kann","Z"],
+["TEXTILIEN","Waren aus Spinnstoffen, in den Abschnitten XI des Zolltarifs erfasst","Z"],
+// ---- Erweiterung: Verbrauchsteuerrecht (V)
+["STEUERGEGENSTAND","Ware oder Leistung, die der Steuer unterliegt","V"],
+["STEUERSATZ","Betrag oder Prozentsatz, mit dem die Steuer berechnet wird","V"],
+["STEUERGEBIET","Gebiet, in dem eine Steuer erhoben wird","V"],
+["HERSTELLER","Wer verbrauchsteuerpflichtige Waren herstellt","V"],
+["STEUERFREIHEIT","Zustand, in dem für eine Ware keine Steuer anfällt","V"],
+["SICHERHEITSLEISTUNG","Bürgschaft oder Hinterlegung zur Absicherung der Steuer bei Beförderung unter Steueraussetzung","V"],
+["BUERGSCHAFT","Einstehen eines Dritten für die Steuerschuld","V"],
+["BEGLEITDOKUMENT","Papier oder elektronische Unterlage, die die Ware bei der Beförderung begleitet","V"],
+["EMPFAENGER","Person, die Waren aus einem anderen Steuerlager entgegennimmt","V"],
+["ENERGIESTEUERGESETZ","Gesetz zur Besteuerung von Mineralöl, Erdgas und Kohle","V"],
+["STROMSTEUERGESETZ","Gesetz zur Besteuerung des Stromverbrauchs","V"],
+["TABAKSTEUERGESETZ","Gesetz zur Besteuerung von Zigaretten, Zigarren und Rauchtabak","V"],
+["BIERSTEUERGESETZ","Rechtsgrundlage für die Besteuerung von Bier","V"],
+["ALKOHOLSTEUERGESETZ","Seit 2018 gültige Rechtsgrundlage für die Besteuerung von Alkohol","V"],
+["KAFFEESTEUERGESETZ","Rechtsgrundlage für die Besteuerung von Kaffee","V"],
+["DIESEL","Kraftstoff für Selbstzünder-Motoren","V"],
+["BENZIN","Ottokraftstoff","V"],
+["KEROSIN","Flugturbinenkraftstoff, in der gewerblichen Luftfahrt steuerbefreit","V"],
+["SCHWEROEL","Dickflüssiges Mineralöl, z. B. als Schiffs- oder Heizstoff","V"],
+["MINERALOEL","Erdöl und daraus gewonnene Erzeugnisse","V"],
+["BIOETHANOL","Aus Pflanzen gewonnener Alkohol als Kraftstoffbeimischung","V"],
+["BIODIESEL","Aus Pflanzenölen gewonnener Dieselersatz","V"],
+["PROPAN","Bestandteil von Flüssiggas zum Heizen","V"],
+["EIGENVERBRAUCH","Nutzung selbst erzeugter Ware im eigenen Betrieb","V"],
+["STROMERZEUGER","Betreiber einer Anlage zur Stromerzeugung","V"],
+["NETZBETREIBER","Unternehmen, das das Stromnetz betreibt","V"],
+["ZIGARILLO","Kleine, dünne Zigarre","V"],
+["RAUCHTABAK","Tabak zum Selbstdrehen oder für die Pfeife","V"],
+["TABAKWAREN","Oberbegriff für Zigaretten, Zigarren und Rauchtabak","V"],
+["PFEIFENTABAK","Rauchtabak für die Pfeife","V"],
+["BANDEROLE","Papierstreifen, der als Steuerzeichen um die Packung geklebt wird","V"],
+["WEIN","Nicht schäumendes Getränk aus Trauben, in Deutschland mit Steuersatz null","V"],
+["SEKT","Deutscher Schaumwein","V"],
+["BRENNEREI","Betrieb zur Herstellung von Alkohol durch Destillation","V"],
+["ABFINDUNGSBRENNEREI","Kleinbrennerei, die den Alkohol pauschal versteuert","V"],
+["ETHANOL","Chemischer Name des Trinkalkohols","V"],
+["ALKOHOLGEHALT","Anteil des Alkohols am Getränk","V"],
+["VOLUMENPROZENT","Einheit, in der der Alkoholgehalt angegeben wird","V"],
+["AUSSENPRUEFUNG","Prüfung des Betriebs vor Ort durch die Zollverwaltung","V"],
+["RECHTSBEHELF","Einspruch oder Klage gegen einen Steuerbescheid","V"],
+["ERSTATTUNG","Rückzahlung zu Unrecht gezahlter Steuer","V"],
+["STEUERERKLAERUNG","Amtliche Mitteilung des Steuerpflichtigen über seine Besteuerungsgrundlagen","V"],
+["ERLAUBNIS","Behördliche Zulassung, z. B. zum Betrieb eines Steuerlagers","V"],
+["BEWILLIGUNG","Behördliche Gestattung eines Verfahrens, z. B. als zugelassener Empfänger","V"],
+["NACHVERSTEUERUNG","Nachträgliche Erhebung der Steuer, wenn die Begünstigung entfällt","V"],
+["ZWECKENTFREMDUNG","Nicht begünstigte Verwendung steuerbegünstigter Waren","V"],
+["STEUERBEGUENSTIGUNG","Ermäßigter Satz oder Befreiung unter bestimmten Voraussetzungen","V"],
+["UEBERWACHUNG","Kontrolle der Steuerlager durch das Hauptzollamt","V"],
+["BESTANDSAUFNAHME","Mengenmäßige Erfassung der Vorräte im Steuerlager","V"],
+["STEUERAUFSICHT","Überwachung der Steuerpflichtigen durch die Zollverwaltung","V"],
+// ---- Erweiterung: Ursprung & Präferenz (U)
+["ABKOMMEN","Völkerrechtlicher Vertrag zwischen Staaten, z. B. zum Handel","U"],
+["HERKUNFTSLAND","Staat, aus dem eine Ware stammt","U"],
+["VORZUGSZOLL","Anderes Wort für Präferenzzoll","U"],
+["ZOLLVORTEIL","Ersparnis durch einen ermäßigten oder entfallenden Zoll","U"],
+["NICHTPRAEFERENZIELL","Art des Ursprungs, der keinen Zollvorteil, sondern z. B. Statistik oder Handelspolitik betrifft","U"],
+["HANDELSPOLITIK","Maßnahmen eines Staates oder der EU zur Regelung des Außenhandels","U"],
+["SCHUTZMASSNAHME","Handelspolitisches Instrument gegen stark steigende Einfuhren","U"],
+["UNIONSWARE","Ware mit Unionszollstatus","U"],
+["UNIONSURSPRUNG","Ursprung in der Europäischen Union","U"],
+["DRITTLAND","Staat außerhalb der Europäischen Union","U"],
+["ASSOZIATIONSABKOMMEN","Abkommen mit enger politischer und wirtschaftlicher Anbindung","U"],
+["PSR","Produktspezifische Ursprungsregel (Abk.)","U"],
+["TARIFSPRUNG","Ursprungskriterium: Endprodukt und Vormaterial gehören zu verschiedenen Tarifpositionen","U"],
+["WERTANTEIL","Anteil des Nichtursprungsmaterials am Preis der Ware","U"],
+["HANDELSABKOMMEN","Vertrag über den Warenaustausch zwischen Vertragsparteien","U"],
+["EXPORTEUR","Anderes Wort für Ausführer","U"],
+["IMPORTEUR","Anderes Wort für Einführer","U"],
+["VERWALTUNGSZUSAMMENARBEIT","Amtshilfe der Zollbehörden bei der Prüfung von Ursprungsnachweisen","U"],
+["AUSSTELLER","Wer einen Nachweis oder eine Bescheinigung ausfertigt","U"],
+["GUELTIGKEIT","Zeitraum, in dem ein Ursprungsnachweis anerkannt wird","U"],
+["DUPLIKAT","Zweitschrift eines abhanden gekommenen Nachweises","U"],
+["ZOLLBEHOERDE","Amtsstelle, die Zollrecht anwendet und Nachweise prüft","U"],
+["ABKOMMENSPARTNER","Staat, mit dem ein Handelsabkommen besteht","U"],
+["VERTRAGSPARTEI","Staat oder Staatenbund, der ein Abkommen geschlossen hat","U"],
+["GSP","Englische Abkürzung für das Allgemeine Präferenzsystem","U"],
+["EBA","Initiative „Alles außer Waffen“ für die am wenigsten entwickelten Länder (Abk.)","U"],
+["EPA","Wirtschaftspartnerschaftsabkommen der EU mit Entwicklungsregionen (Abk.)","U"],
+["MERCOSUR","Südamerikanischer Wirtschaftsraum, mit dem die EU 2026 ein Abkommen unterzeichnet hat (Handelsteil vorläufig angewendet)","U"],
+["EWR","Europäischer Wirtschaftsraum (Abk.)","U"],
+["SCHWEIZ","Nicht-EU-Staat, mit dem die EU seit 1972 ein Freihandelsabkommen hat","U"],
+["TUERKEI","Land mit einer Zollunion für gewerbliche Waren mit der EU","U"],
+["NORWEGEN","EFTA-Staat und Mitglied des Europäischen Wirtschaftsraums","U"],
+["BREXIT","Austritt des Vereinigten Königreichs aus der EU, der Ursprungsregeln im Handel neu prägte","U"],
+["BEARBEITUNG","Produktionsschritt an einer Ware","U"],
+["VERARBEITUNG","Umwandlung von Material in ein neues Erzeugnis","U"],
+["UMVERPACKUNG","Beispiel für eine unzureichende Behandlung ohne Ursprungswirkung","U"],
+["NACHWEISPFLICHT","Pflicht, den Ursprung durch Dokumente zu belegen","U"],
+["AUFBEWAHRUNGSFRIST","Zeitraum, in dem Ursprungsunterlagen vorzuhalten sind","U"],
+["LIEFERANT","Wer Vormaterial oder Waren liefert und Lieferantenerklärungen abgibt","U"],
+["ZOLLRUECKVERGUETUNG","Erstattung von Zöllen auf Vormaterial, bei Kumulierung eingeschränkt","U"],
+["ENTWICKLUNGSLAND","Staat, für den das Allgemeine Präferenzsystem Zollvorteile vorsieht","U"],
+["BILATERALE KUMULIERUNG","Kumulierung nur zwischen zwei Abkommenspartnern","U"],
+["VOLLKUMULIERUNG","Kumulierung auch von Bearbeitungen, die allein nicht für den Ursprung ausreichen","U"],
+["STEMPEL","Wird von der Zollstelle auf der Warenverkehrsbescheinigung angebracht","U"],
+["ANTRAG","Voraussetzung für die Ausstellung einer Warenverkehrsbescheinigung","U"],
+["SELBSTERKLAERUNG","Ursprungsnachweis ohne behördliche Bestätigung","U"],
+["PRUEFUNGSVERFAHREN","Verfahren zur Nachprüfung von Ursprungsnachweisen","U"],
+["PROTOKOLL","Teil eines Abkommens, der die Ursprungsregeln enthält","U"],
+["HERKUNFT","Geografischer Ursprung","U"],
+["WIRTSCHAFTSRAUM","Gebiet mit gemeinsamen Handelsregeln mehrerer Staaten","U"],
+// ---- Erweiterung: Zolltarifrecht (Z)
+["TARIFSTELLE","Konkrete Stelle im Zolltarif, an der eine Ware eingereiht wird","Z"],
+["TARIFNUMMER","Zifferncode einer Tarifstelle","Z"],
+["WARENKUNDE","Lehre von Beschaffenheit und Eigenschaften der Waren","Z"],
+["ZOLLTARIFAUSKUNFT","Behördliche Auskunft zur Einreihung einer Ware","Z"],
+["EUGH","Gerichtshof der Europäischen Union (Abk.)","Z"],
+["ZOLLSTATISTIK","Erfassung der Warenströme über die Grenze","Z"],
+["STATISTISCHE WARENNUMMER","Code für die Außenhandelsstatistik","Z"],
+["BINDUNGSDAUER","Dreijähriger Zeitraum, für den eine verbindliche Zolltarifauskunft gilt","Z"],
+["VERORDNUNG","Unmittelbar geltender EU-Rechtsakt, z. B. zur Kombinierten Nomenklatur","Z"],
+["DURCHFUEHRUNGSVERORDNUNG","Rechtsakt, der EU-Recht näher ausgestaltet, z. B. Einreihungsverordnung","Z"],
+["ANMERKUNG","Rechtlich verbindlicher Text zu Abschnitten und Kapiteln des Zolltarifs","Z"],
+["KONTINGENT","Mengenmäßige Grenze für Einfuhren zu besonderen Bedingungen","Z"],
+["ZUSATZZOLL","Zusätzlicher Zoll auf bestimmte Einfuhren","Z"],
+["STRAFZOLL","Umgangssprachlich: zusätzlicher Zoll als handelspolitische Reaktion","Z"],
+["SCHUTZZOLL","Zoll zum Schutz der heimischen Industrie","Z"],
+["FINANZZOLL","Zoll, der vor allem Einnahmen erzielen soll","Z"],
+["ZOLLSENKUNG","Verringerung eines Zollsatzes","Z"],
+["ZOLLERHOEHUNG","Anhebung eines Zollsatzes","Z"],
+["ZOLLABBAU","Schrittweise Verringerung der Zölle bis auf null","Z"],
+["ZOLLSCHRANKE","Zollbedingtes Hindernis im Handel","Z"],
+["KONVENTIONALER ZOLLSATZ","Vertraglich mit der WTO vereinbarter Normalzollsatz","Z"],
+["SPEZIFISCHER ZOLL","Anderes Wort für Mengenzoll","Z"],
+["ADVALOREM","Lateinisch „nach dem Wert“: Bezeichnung für prozentuale Zölle","Z"],
+["MISCHZOLL","Kombination aus Wert- und Mengenzoll","Z"],
+["WARENKLASSIFIKATION","Systematische Einteilung von Waren in Gruppen","Z"],
+["ROHSTOFF","Unbearbeiteter Ausgangsstoff, z. B. Erz oder Holz","Z"],
+["HALBFERTIGWARE","Ware, die noch weiterverarbeitet wird","Z"],
+["FERTIGWARE","Fertig hergestelltes Erzeugnis","Z"],
+["UNVOLLSTAENDIGE WARE","Wird bei wesentlichem Charakter wie die vollständige Ware eingereiht","Z"],
+["WARENZUSAMMENSTELLUNG","Set aus verschiedenen Waren in Aufmachung für den Einzelverkauf","Z"],
+["MISCHUNG","Gemenge verschiedener Stoffe, das nach dem Stoff mit wesentlichem Charakter eingereiht wird","Z"],
+["VERPACKUNG","Umschließung der Ware, nach eigener Auslegungsregel eingereiht","Z"],
+["WESENTLICHER CHARAKTER","Maßstab bei der Einreihung von Mischungen und Sets","Z"],
+["EINFUHRZOLL","Abgabe auf Waren, die ins Zollgebiet gelangen","Z"],
+["AUSFUHRZOLL","Abgabe auf Waren, die das Zollgebiet verlassen","Z"],
+["ZOLLBEFREIUNG","Gesetzlicher Verzicht auf die Erhebung von Zoll","Z"],
+["ZOLLERMAESSIGUNG","Verringerter Zollsatz für bestimmte Waren","Z"],
+["ZOLLWERTERKLAERUNG","Anmeldung der Angaben zur Ermittlung des Zollwerts","Z"],
+["TRANSAKTIONSWERT","Für die Ware tatsächlich gezahlter oder zu zahlender Preis, Basis des Zollwerts","Z"],
+["INCOTERMS","Internationale Handelsklauseln, die den Zollwert beeinflussen","Z"],
+["NACHERHEBUNG","Nachträgliche Forderung zu wenig erhobener Abgaben","Z"],
+["ZOLLAUSKUNFT","Rat der Behörde zu zollrechtlichen Fragen","Z"],
+["HARMONISIERUNG","Angleichung der Nomenklaturen verschiedener Staaten","Z"],
+["ZOLLVERWALTUNGSGESETZ","Deutsches Gesetz zur Zollverwaltung (Abk. ZollVG)","Z"],
+["EINFUHRVERBOT","Gesetzliches Verbot, bestimmte Waren einzuführen","Z"],
+["EINFUHRUMSATZSTEUER","Neben dem Zoll bei der Einfuhr erhobene Steuer","Z"],
+["BEMESSUNGSGRUNDLAGE","Wert oder Menge, auf die der Zollsatz angewendet wird","Z"],
+["TARIFPRAEFERENZ","Zollvergünstigung nach einem Zolltarif","Z"],
+["ZOLLTARIFIERUNG","Zuordnung einer Ware zu einer Zolltarifnummer","Z"],
+["MENGENEINHEIT","Zusätzliche Einheit im Zolltarif, z. B. Stück oder Kilogramm","Z"],
+// ---- Erweiterung 2: Verbrauchsteuerrecht (V)
+["STEUERSCHULD","Verpflichtung, einen bestimmten Steuerbetrag zu zahlen","V"],
+["STEUERFESTSETZUNG","Behördliche Bestimmung der Höhe der Steuer","V"],
+["STEUERENTRICHTUNG","Zahlung der geschuldeten Steuer","V"],
+["FAELLIGKEIT","Zeitpunkt, zu dem die Steuer gezahlt werden muss","V"],
+["SAEUMNISZUSCHLAG","Aufschlag bei verspäteter Zahlung","V"],
+["VERZINSUNG","Zinsen auf Steuernachforderungen oder Erstattungen","V"],
+["STEUERHINTERZIEHUNG","Straftat: Steuern werden durch falsche oder fehlende Angaben verkürzt","V"],
+["STEUERSTRAFTAT","Verstoß gegen Steuergesetze, der strafrechtlich verfolgt wird","V"],
+["SCHMUGGEL","Heimliches Verbringen von Waren ohne Verzollung und Versteuerung","V"],
+["ZIGARETTENSCHMUGGEL","Illegale Einfuhr von Zigaretten ohne Abgabenentrichtung","V"],
+["STEUERHEHLEREI","Absatz von Waren, auf die Steuern hinterzogen wurden","V"],
+["ZOLLFAHNDUNG","Ermittlungsbehörde der Zollverwaltung bei Steuerstraftaten","V"],
+["ABGABENORDNUNG","Allgemeines Verfahrensgesetz des Steuerrechts (Abk. AO)","V"],
+["VERWENDER","Wer steuerbegünstigte Waren zu einem begünstigten Zweck einsetzt","V"],
+["PRODUZIERENDES GEWERBE","Unternehmensgruppe mit Steuerermäßigungen bei Energie und Strom","V"],
+["ERNEUERBARE ENERGIE","Strom aus Wind, Sonne oder Wasser, unter Voraussetzungen steuerbefreit","V"],
+["KRAFTWERK","Anlage zur Stromerzeugung","V"],
+["PHOTOVOLTAIK","Stromerzeugung aus Sonnenlicht","V"],
+["WINDKRAFT","Stromerzeugung durch Windräder","V"],
+["BLOCKHEIZKRAFTWERK","Anlage für gekoppelte Strom- und Wärmeerzeugung","V"],
+["KRAFTWAERMEKOPPLUNG","Gleichzeitige Erzeugung von Strom und Wärme","V"],
+["AGRARDIESEL","Dieselkraftstoff in der Landwirtschaft, seit 2026 wieder mit vollem Erstattungssatz von 21,48 Cent je Liter","V"],
+["SCHIFFFAHRT","Gewerbliche Nutzung von Wasserfahrzeugen, steuerlich teils begünstigt","V"],
+["LUFTFAHRT","Gewerbliche Fliegerei, deren Kraftstoff energiesteuerbefreit ist","V"],
+["BIOGAS","Aus Biomasse gewonnenes Gas","V"],
+["AUTOGAS","Flüssiggas als Fahrzeugkraftstoff","V"],
+["HEIZSTOFF","Energieerzeugnis, das zum Heizen verwendet wird","V"],
+["TREIBSTOFF","Anderes Wort für Kraftstoff","V"],
+["SCHMIERSTOFF","Mineralölprodukt zur Verringerung der Reibung","V"],
+["BIOMASSE","Organische Stoffe als Grundlage für Biokraftstoffe","V"],
+["PFLANZENOEL","Aus Ölsaaten gewonnener, biogener Kraftstoff","V"],
+["GASOEL","Dieselähnliches Mineralöl, auch als Heizöl verwendet","V"],
+["KENNZEICHNUNG","Markierung von Heizöl durch Farbstoffe zur Unterscheidung vom Kraftstoff","V"],
+["MARKIERSTOFF","Zusatz zur Kennzeichnung von Heizöl","V"],
+["TANKSTELLE","Verkaufsstelle für Kraftstoff","V"],
+["TANKLAGER","Anlage zur Lagerung von Mineralöl","V"],
+["RAFFINERIE","Anlage zur Verarbeitung von Rohöl, typisches Steuerlager","V"],
+["ROHOEL","Unverarbeitetes Erdöl","V"],
+["PIPELINE","Rohrleitung für Öl oder Gas","V"],
+["TANKWAGEN","Straßenfahrzeug zur Beförderung von Flüssigkeiten","V"],
+["ZAEHLER","Gerät zur Messung des Stromverbrauchs","V"],
+["MEGAWATTSTUNDE","Bezugsgröße des Stromsteuersatzes","V"],
+["LITER","Mengeneinheit für Flüssigkeiten","V"],
+["STUECK","Zählmaß, z. B. bei Zigaretten","V"],
+["KILOGRAMM","Gewichtseinheit, z. B. bei Kaffee und Rauchtabak","V"],
+["SCHACHTEL","Übliche Verpackung für Zigaretten","V"],
+["WARNHINWEIS","Gesundheitsbezogene Aufschrift auf Tabakpackungen","V"],
+["ERHITZTER TABAK","Tabakerzeugnis, das erhitzt, aber nicht verbrannt wird","V"],
+["LIQUID","Flüssigkeit für E-Zigaretten, als Substitut tabaksteuerpflichtig","V"],
+["SHISHA","Wasserpfeife","V"],
+["KAUTABAK","Tabakware zum Kauen","V"],
+["SCHNUPFTABAK","Tabakware zum Schnupfen","V"],
+["TABAKBLATT","Rohstoff für Zigarren und Rauchtabak","V"],
+["WHISKY","Getreidebrand aus Schottland oder Irland","V"],
+["WODKA","Klarer Branntwein aus Getreide oder Kartoffeln","V"],
+["RUM","Zuckerrohrbrand","V"],
+["GIN","Wacholderbrand","V"],
+["LIKOER","Süße Spirituose","V"],
+["OBSTBRAND","Destillat aus vergorenem Obst","V"],
+["KORN","Klarer Getreidebrand","V"],
+["WEINBRAND","Destillat aus Wein","V"],
+["COGNAC","Französischer Weinbrand","V"],
+["BRANNTWEINSTEUER","Frühere Bezeichnung der Alkoholsteuer","V"],
+["BRANNTWEINMONOPOL","Frühere staatliche Regelung der Alkoholverwertung","V"],
+["NEUTRALALKOHOL","Reiner Ethylalkohol als Ausgangsstoff","V"],
+["GAERUNG","Umwandlung von Zucker in Alkohol durch Hefe","V"],
+["WUERZE","Zuckerhaltige Flüssigkeit vor der Gärung im Brauprozess","V"],
+["HOPFEN","Würzpflanze, die Bier bitter macht","V"],
+["MALZ","Gekeimtes Getreide für die Bierherstellung","V"],
+["BRAUMEISTER","Leiter der Bierherstellung","V"],
+["KLEINBRAUEREI","Brauerei mit geringer Jahresmenge und ermäßigtem Satz","V"],
+["BIERMISCHGETRAENK","Bier mit Limonade, z. B. Radler","V"],
+["PROSECCO","Italienischer Schaumwein","V"],
+["CHAMPAGNER","Schaumwein aus der Champagne","V"],
+["KELLEREI","Betrieb zur Herstellung von Wein","V"],
+["SHERRY","Spanischer Likörwein","V"],
+["PORTWEIN","Likörwein aus Portugal","V"],
+["STEUERLAGERERLAUBNIS","Genehmigung zum Betrieb eines Steuerlagers","V"],
+["LAGERBUCH","Aufzeichnung der Warenbewegungen im Steuerlager","V"],
+["BEFOERDERUNG","Transport von Waren von einem Ort zum anderen","V"],
+["EINGANGSMELDUNG","Meldung des Empfängers im EMCS nach Eintreffen der Ware","V"],
+["MITGLIEDSTAAT","Staat, der der Europäischen Union angehört","V"],
+["BESTIMMUNGSORT","Ort, an den Waren geliefert werden","V"],
+["VERSANDORT","Ort, von dem eine Beförderung ausgeht","V"],
+["STREITKRAEFTE","Truppen, die Waren unter bestimmten Voraussetzungen steuerfrei beziehen","V"],
+["REISEVERKEHR","Mitgebrachte Waren Privater, bis zu Freimengen abgabenfrei","V"],
+["REISEFREIMENGE","Menge, die Reisende steuerfrei mitführen dürfen","V"],
+["PRIVATGEBRAUCH","Eigenbedarf, kein gewerblicher Zweck","V"],
+["FERNVERKAUF","Versandhandel mit Verbrauchsteuerwaren an Privatkunden","V"],
+["VERSANDHANDEL","Verkauf von Waren per Post oder Internet","V"],
+["UMSATZSTEUER","Steuer auf Lieferungen und Leistungen, zusätzlich zur Verbrauchsteuer","V"],
+["DOPPELBESTEUERUNG","Mehrfache Erhebung derselben Steuer","V"],
+["INDIREKTE STEUER","Steuer, die der Hersteller zahlt und über den Preis weitergibt","V"],
+["LENKUNGSSTEUER","Steuer mit verhaltenssteuernder Wirkung","V"],
+["OEKOSTEUER","Umgangssprachlich für Energie- und Stromsteuer","V"],
+["GESUNDHEITSSCHUTZ","Ziel von Tabak- und Alkoholsteuern neben den Einnahmen","V"],
+["WARENBEWEGUNG","Transport und Lieferung von Waren","V"],
+["ABGABENRECHT","Rechtsgebiet für Steuern, Zölle und andere Abgaben","V"],
+["ENERGIEWENDE","Umstieg auf erneuerbare Energieträger","V"],
+["EMISSION","Ausstoß von Schadstoffen, z. B. CO2","V"],
+["VERBRAUCHER","Endabnehmer von Waren","V"],
+["WARENEINGANG","Eintreffen von Waren im Betrieb","V"],
+["MINERALOELSTEUER","Frühere Bezeichnung der Energiesteuer auf Öl","V"],
+["VERKAUFSPREIS","Preis, zu dem eine Ware verkauft wird","V"],
+// ---- Erweiterung 2: Ursprung & Präferenz (U)
+["URSPRUNGSKRITERIUM","Bedingung, die eine Ware erfüllen muss, um als Ursprungsware zu gelten","U"],
+["URSPRUNGSPRUEFUNG","Kontrolle, ob eine Ware die Ursprungsregeln erfüllt","U"],
+["URSPRUNGSANGABE","Hinweis auf das Herkunftsland einer Ware","U"],
+["URSPRUNGSAUSKUNFT","Verbindliche Information der Behörde zum Ursprung einer Ware","U"],
+["URSPRUNGSSTATUS","Eigenschaft einer Ware, Ursprungsware zu sein oder nicht","U"],
+["URSPRUNGSWARE","Ware, die die Ursprungsregeln erfüllt","U"],
+["RECHNUNGSERKLAERUNG","Ursprungsnachweis, der auf der Rechnung abgegeben wird","U"],
+["ERKLAERUNGSTEXT","Vorgeschriebener Text einer Ursprungserklärung","U"],
+["ZOLLFREIHEIT","Zustand, in dem für Ursprungswaren kein Zoll anfällt","U"],
+["ZOLLSATZREDUKTION","Schrittweise Verringerung des Zollsatzes nach Abkommen","U"],
+["UEBERGANGSFRIST","Zeitraum, in dem Zollsenkungen schrittweise eintreten","U"],
+["MEISTBEGUENSTIGT","Behandlung wie der günstigste Handelspartner","U"],
+["GEGENSEITIGKEIT","Prinzip, dass beide Vertragsparteien gleiche Vorteile gewähren","U"],
+["ZOLLPARTNER","Staat, mit dem Zollvergünstigungen vereinbart wurden","U"],
+["VORLAGEPFLICHT","Pflicht, den Ursprungsnachweis bei der Abfertigung vorzulegen","U"],
+["NACHTRAEGLICHE VORLAGE","Späteres Einreichen des Ursprungsnachweises","U"],
+["RUECKERSTATTUNG","Erstattung des gezahlten Zolls, wenn nachträglich Präferenz gewährt wird","U"],
+["ERZEUGERLAND","Staat, in dem die Ware hergestellt wurde","U"],
+["WARENKREISLAUF","Weg einer Ware vom Rohstoff zum Endprodukt","U"],
+["HERSTELLERERKLAERUNG","Angaben des Herstellers zur Produktion einer Ware","U"],
+["BEZUGSQUELLE","Lieferant oder Herkunft von Materialien","U"],
+["DOKUMENTATION","Gesamtheit der Unterlagen zum Nachweis des Ursprungs","U"],
+["PRODUKTIONSSTUFE","Einzelner Schritt in der Herstellung einer Ware","U"],
+["REGISTRIERUNGSNUMMER","Nummer im REX-System","U"],
+["EORI","Registrierungs- und Identifikationsnummer von Wirtschaftsbeteiligten (Abk.)","U"],
+["WERTGRENZE","Betrag, bis zu dem auch ohne Registrierung eine Ursprungserklärung genügt","U"],
+["BEARBEITUNGSLISTE","Aufstellung der Be- und Verarbeitungen, die Ursprung begründen","U"],
+["DE MINIMIS","Lateinisch für geringfügig: Toleranz für Nichtursprungsmaterial","U"],
+["KUMULIERUNGSRAUM","Gruppe von Staaten, innerhalb derer kumuliert werden darf","U"],
+["PEM UEBEREINKOMMEN","Regionales Übereinkommen über Präferenzursprungsregeln","U"],
+["TRANSITLAND","Land, durch das die Ware nur durchgeführt wird","U"],
+["UMLADUNG","Beispiel für eine im Durchfuhrland zulässige Behandlung der Ware","U"],
+["FREIZONE","Zollrechtlich besonders behandeltes Gebiet","U"],
+["FREIHAFEN","Hafen mit besonderem Zollstatus","U"],
+["AUSFUHRLAND","Staat, aus dem die Ware ausgeführt wird","U"],
+["EINFUHRLAND","Staat, in den die Ware eingeführt wird","U"],
+["BESTIMMUNGSLAND","Staat, in dem die Ware verbleiben soll","U"],
+["VERSANDLAND","Staat, aus dem eine Sendung abgeht","U"],
+["ZOLLSTELLE","Amtsstelle, die Bescheinigungen stempelt","U"],
+["AUSGANGSZOLLSTELLE","Stelle, an der die Ware das Zollgebiet verlässt","U"],
+["EINGANGSZOLLSTELLE","Stelle, an der die Ware das Zollgebiet erreicht","U"],
+["AMTSHILFE","Unterstützung einer Behörde durch eine andere","U"],
+["URSPRUNGSBETRUG","Falsche Angaben zum Ursprung, um Zoll zu sparen","U"],
+["FAELSCHUNG","Herstellung unechter Dokumente","U"],
+["ZOLLSCHULDNER","Wer den Zoll zu zahlen hat","U"],
+["VERJAEHRUNG","Ablauf der Frist, in der Zoll nacherhoben werden darf","U"],
+["AMTSBLATT","Veröffentlichung von EU-Rechtsakten","U"],
+["KOMMISSION","EU-Organ, das Handelsabkommen verhandelt","U"],
+["WTO","Welthandelsorganisation (Abk.)","U"],
+["GATT","Allgemeines Zoll- und Handelsabkommen (Abk.)","U"],
+["HANDELSBLOCK","Zusammenschluss von Staaten mit gemeinsamer Handelspolitik","U"],
+["BINNENMARKT","Raum ohne Zollgrenzen innerhalb der EU","U"],
+["JAPAN","Ostasiatischer Staat mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["KANADA","Partner des Abkommens CETA","U"],
+["SUEDKOREA","Asiatischer Staat mit Freihandelsabkommen mit der EU seit 2011","U"],
+["VIETNAM","Südostasiatischer Staat mit Freihandelsabkommen mit der EU","U"],
+["SINGAPUR","Stadtstaat mit Freihandelsabkommen mit der EU","U"],
+["MEXIKO","Lateinamerikanischer Staat mit Handelsabkommen mit der EU","U"],
+["CHILE","Südamerikanischer Staat mit Assoziationsabkommen mit der EU","U"],
+["UKRAINE","Osteuropäischer Staat mit vertieftem Freihandelsabkommen mit der EU","U"],
+["ISRAEL","Staat im Nahen Osten mit Assoziationsabkommen mit der EU","U"],
+["MAROKKO","Nordafrikanischer Staat mit Assoziationsabkommen mit der EU","U"],
+["TUNESIEN","Nordafrikanischer Staat mit Assoziationsabkommen mit der EU","U"],
+["AEGYPTEN","Staat am Nil mit Assoziationsabkommen mit der EU","U"],
+["SERBIEN","Westbalkanstaat mit Stabilisierungsabkommen mit der EU","U"],
+["ALBANIEN","Westbalkanstaat mit Stabilisierungsabkommen mit der EU","U"],
+["MOLDAU","Osteuropäischer Staat mit vertieftem Freihandelsabkommen mit der EU","U"],
+["GEORGIEN","Kaukasusstaat mit vertieftem Freihandelsabkommen mit der EU","U"],
+["NEUSEELAND","Pazifischer Staat mit Freihandelsabkommen mit der EU","U"],
+["ISLAND","EFTA-Staat im Nordatlantik","U"],
+["LIECHTENSTEIN","EFTA-Kleinstaat zwischen Schweiz und Österreich","U"],
+["SUEDAFRIKA","Staat im südlichen Afrika mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["KOLUMBIEN","Andenstaat mit Handelsabkommen mit der EU","U"],
+["PERU","Andenstaat mit Handelsabkommen mit der EU","U"],
+["ECUADOR","Andenstaat mit Handelsabkommen mit der EU","U"],
+["KARIBIK","Inselregion mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["ANDENSTAATEN","Länder entlang der südamerikanischen Gebirgskette","U"],
+["WARENEIGENSCHAFT","Merkmal einer Ware, z. B. Ursprung oder Zollstatus","U"],
+["ZERTIFIKAT","Amtliche Bescheinigung","U"],
+["BESCHEINIGUNG","Amtliches Dokument, das einen Sachverhalt bestätigt","U"],
+["STAATSGEBIET","Gebiet, über das ein Staat Hoheit ausübt","U"],
+["UEBERSEEGEBIET","Außereuropäisches Gebiet eines Mitgliedstaats","U"],
+["ANTIDUMPING","Handelspolitische Maßnahme gegen Preisunterbietung","U"],
+["SUBVENTION","Staatliche Beihilfe, gegen die Ausgleichszölle möglich sind","U"],
+["QUOTE","Mengenmäßige Beschränkung","U"],
+["EINFUHRLIZENZ","Genehmigung zur Einfuhr bestimmter Waren","U"],
+["AUSFUHRGENEHMIGUNG","Behördliche Erlaubnis zur Ausfuhr bestimmter Waren","U"],
+["ZERTIFIZIERUNG","Verfahren zur Erteilung eines Zertifikats","U"],
+["HANDELSKAMMER","Institution, die Ursprungszeugnisse ausstellt","U"],
+["IHK","Industrie- und Handelskammer (Abk.)","U"],
+["SACHKUNDE","Fachwissen, z. B. bei der Ursprungsbestimmung","U"],
+["KALKULATION","Berechnung der Kosten und Preise, z. B. für Wertklauseln","U"],
+["MATERIALANTEIL","Prozentsatz des Materials am Gesamtwert","U"],
+["STUECKLISTE","Aufstellung aller Teile eines Erzeugnisses","U"],
+["PRODUKTION","Herstellung von Waren","U"],
+["FERTIGUNG","Industrielle Herstellung","U"],
+["WERTSCHOEPFUNG","Wertzuwachs durch Be- und Verarbeitung","U"],
+["WIRTSCHAFTSBETEILIGTER","Person, die an Zoll- und Außenhandelsvorgängen beteiligt ist","U"],
+["ZUGELASSENER WIRTSCHAFTSBETEILIGTER","Status für besonders zuverlässige Unternehmen","U"],
+["EXPORT","Ausfuhr von Waren","U"],
+["IMPORT","Einfuhr von Waren","U"],
+["PRAEFERENZBERECHNUNG","Kalkulation, ob eine Ware die Wertgrenzen einhält","U"],
+["WARENSENDUNG","Einzelne Lieferung von Waren","U"],
+// ---- Erweiterung 2: Zolltarifrecht (Z)
+["ALLGEMEINE VORSCHRIFTEN","Regeln zur Auslegung des Zolltarifs, kurz AV","Z"],
+["WORTLAUT","Maßgeblich bei der Einreihung: der Text der Positionen und Anmerkungen","Z"],
+["ZWECKBESTIMMUNG","Vorgesehene Verwendung, die die Einreihung beeinflussen kann","Z"],
+["EINREIHUNGSVERORDNUNG","EU-Rechtsakt zur Einreihung einer bestimmten Ware","Z"],
+["WARENGRUPPE","Zusammenfassung ähnlicher Waren","Z"],
+["POSITIONSNUMMER","Vierstellige Nummer einer Tarifposition","Z"],
+["GLIEDERUNG","Aufbau des Zolltarifs in Abschnitte, Kapitel und Positionen","Z"],
+["SYSTEMATIK","Planmäßige Ordnung des Warenverzeichnisses","Z"],
+["TIERE","Warenkategorie: lebende Tiere","Z"],
+["FLEISCH","Warenkategorie im Zolltarif, z. B. Rind oder Schwein","Z"],
+["FISCH","Warenkategorie im Zolltarif, auch Krebstiere","Z"],
+["MILCH","Warenkategorie: Milch und Milcherzeugnisse","Z"],
+["GETREIDE","Warenkategorie: Weizen, Roggen, Gerste und Co.","Z"],
+["OELSAATEN","Warenkategorie: Samen und Früchte zur Ölgewinnung","Z"],
+["ZUCKER","Warenkategorie: Rohr- und Rübenzucker","Z"],
+["KAKAO","Warenkategorie: Kakaobohnen und Schokolade","Z"],
+["KAFFEE","Warenkategorie: Bohnen, geröstet oder nicht","Z"],
+["GEWUERZE","Warenkategorie: Pfeffer, Zimt und Vanille","Z"],
+["OBST","Warenkategorie: Früchte und Nüsse","Z"],
+["GEMUESE","Warenkategorie: pflanzliche Nahrungsmittel wie Kartoffeln","Z"],
+["SALZ","Warenkategorie: Natriumchlorid","Z"],
+["ERZE","Warenkategorie: Metallhaltiges Gestein","Z"],
+["ARZNEIWAREN","Warenkategorie: Medikamente","Z"],
+["KUNSTSTOFFE","Warenkategorie: Polymere und Waren daraus","Z"],
+["KAUTSCHUK","Warenkategorie: Gummi und Waren daraus","Z"],
+["LEDER","Warenkategorie: gegerbte Tierhäute","Z"],
+["HOLZ","Warenkategorie: Rohholz und Holzwaren","Z"],
+["KORK","Warenkategorie: Rinde der Korkeiche","Z"],
+["PAPIER","Warenkategorie: Pappe und Papierwaren","Z"],
+["BUECHER","Warenkategorie: gedruckte Erzeugnisse","Z"],
+["SEIDE","Warenkategorie: Faser des Seidenspinners","Z"],
+["WOLLE","Warenkategorie: Haare von Schaf und Co.","Z"],
+["BAUMWOLLE","Warenkategorie: Faser der Baumwollpflanze","Z"],
+["KLEIDUNG","Warenkategorie: Bekleidung","Z"],
+["SCHUHE","Warenkategorie: Fußbekleidung","Z"],
+["KERAMIK","Warenkategorie: gebrannte Tonwaren","Z"],
+["GLAS","Warenkategorie: Glaswaren","Z"],
+["EDELMETALLE","Warenkategorie: Gold, Silber, Platin","Z"],
+["EISEN","Warenkategorie: Eisen und Stahl","Z"],
+["STAHL","Legierung aus Eisen und Kohlenstoff","Z"],
+["KUPFER","Warenkategorie: Metall mit roter Farbe","Z"],
+["ALUMINIUM","Warenkategorie: Leichtmetall","Z"],
+["WERKZEUGE","Warenkategorie: Handwerkzeuge","Z"],
+["MASCHINEN","Warenkategorie: mechanische Geräte","Z"],
+["FAHRZEUGE","Warenkategorie: Autos, Fahrräder und Co.","Z"],
+["UHREN","Warenkategorie: Zeitmessgeräte","Z"],
+["MOEBEL","Warenkategorie: Einrichtungsgegenstände","Z"],
+["SPIELWAREN","Warenkategorie: Spielzeug","Z"],
+["ZOLLWERTMETHODE","Verfahren zur Ermittlung des Zollwerts","Z"],
+["HINZURECHNUNG","Aufschlag auf den Zollwert für bestimmte Kosten","Z"],
+["LIZENZGEBUEHR","Entgelt für Nutzungsrechte, das den Zollwert erhöhen kann","Z"],
+["FRACHTKOSTEN","Transportkosten, die bis zur EU-Grenze den Zollwert erhöhen","Z"],
+["VERSICHERUNG","Kostenposition, die bis zur EU-Grenze zum Zollwert zählt","Z"],
+["ANMELDER","Wer die Zollanmeldung abgibt","Z"],
+["ZOLLVERTRETER","Wer Zollanmeldungen im Auftrag anderer abgibt","Z"],
+["ABFERTIGUNG","Zollamtliche Behandlung einer Ware","Z"],
+["GESTELLUNG","Mitteilung an den Zoll, dass Waren eingetroffen sind","Z"],
+["UEBERLASSUNG","Freigabe der Ware durch den Zoll","Z"],
+["BESCHAU","Zollamtliche Prüfung der Ware","Z"],
+["PROBENAHME","Entnahme einer Warenprobe zur Analyse","Z"],
+["ZOLLLABOR","Einrichtung zur Untersuchung von Warenproben","Z"],
+["ZOLLKRIMINALAMT","Bundesbehörde zur Bekämpfung von Zolldelikten","Z"],
+["GENERALZOLLDIREKTION","Oberste Behörde der deutschen Zollverwaltung","Z"],
+["BUNDESFINANZHOF","Oberstes deutsches Gericht in Steuer- und Zollsachen","Z"],
+["FINANZGERICHT","Gericht der ersten Instanz in Zollstreitigkeiten","Z"],
+["ZOLLRECHT","Gesamtheit der Vorschriften über Zölle","Z"],
+["ZOLLUEBERWACHUNG","Kontrolle des Warenverkehrs durch den Zoll","Z"],
+["VORANMELDUNG","Frühzeitige Meldung vor Ankunft der Ware","Z"],
+["SUMMARISCHE ANMELDUNG","Zollanmeldung vor Ankunft der Waren (ENS)","Z"],
+["VERSANDVERFAHREN","Zollverfahren für die Beförderung nicht verzollter Waren","Z"],
+["ZOLLLAGERVERFAHREN","Verfahren zur Lagerung von Waren ohne Verzollung","Z"],
+["AKTIVE VEREDELUNG","Verarbeitung von Nichtunionswaren in der EU unter Zollaussetzung","Z"],
+["PASSIVE VEREDELUNG","Verarbeitung von Unionswaren außerhalb der EU","Z"],
+["ENDVERWENDUNG","Zollverfahren mit Zollbefreiung bei bestimmter Verwendung","Z"],
+["AUSFUHRVERFAHREN","Zollverfahren für die Warenausfuhr","Z"],
+["UEBERFUEHRUNG","Zuführung einer Ware zu einem Zollverfahren","Z"],
+["ZOLLLAGER","Zugelassener Ort für die Lagerung nicht verzollter Waren","Z"],
+["BEWERTUNG","Ermittlung des Wertes einer Ware","Z"],
+["EINFUHRVORSCHRIFT","Regel für das Verbringen von Waren in die EU","Z"],
+["VERBRINGUNGSVERBOT","Verbot, bestimmte Waren in ein Gebiet zu bringen","Z"],
+["ARTENSCHUTZ","Schutz bedrohter Tiere und Pflanzen, beeinflusst Einfuhrregeln","Z"],
+["NACHFOLGEVERORDNUNG","Rechtsakt, der eine frühere Verordnung ersetzt","Z"],
+["TARIFAENDERUNG","Neufassung von Zollsätzen oder Nomenklatur","Z"],
+["JAHRESWECHSEL","Zeitpunkt, zu dem die KN regelmäßig angepasst wird","Z"],
+["ZOLLTARIFANPASSUNG","Aktualisierung des Zolltarifs","Z"],
+["ELEKTRONIK","Warenkategorie: Elektrische Geräte","Z"],
+["FAHRRAD","Warenkategorie: Zweirad ohne Motor","Z"],
+["SCHIFFE","Warenkategorie: Wasserfahrzeuge","Z"],
+["FLUGZEUGE","Warenkategorie: Luftfahrzeuge","Z"],
+["OPTIK","Warenkategorie: Linsen und Instrumente","Z"],
+["WAFFEN","Warenkategorie: Munition und Co.","Z"],
+["KUNSTWERKE","Warenkategorie: Gemälde und Skulpturen","Z"],
+["ANTIQUITAETEN","Warenkategorie: über hundert Jahre alte Gegenstände","Z"],
+["TEXTILWAREN","Warenkategorie: Gewebe und Gewirke","Z"],
+["NAHRUNGSMITTEL","Warenkategorie: Lebensmittel","Z"],
+["GETRAENKE","Warenkategorie: Flüssigkeiten zum Trinken","Z"],
+["ZUBEREITUNG","Herstellung durch Mischen oder Kochen, Einreihungsbegriff","Z"],
+["STOFFE","Warenkategorie: gewebtes Material","Z"],
+["TEILE","Bestandteile von Maschinen, oft gesondert eingereiht","Z"],
+["ZUBEHOER","Zusätzliche Teile zu einer Hauptware","Z"],
+["SAMMELPOSITION","Auffangposition für nicht näher genannte Waren","Z"],
+["RESTPOSITION","Position für sonstige Waren","Z"],
+["ABGRENZUNG","Unterscheidung benachbarter Tarifpositionen","Z"],
+["GRENZFALL","Ware, deren Einreihung schwierig ist","Z"],
+// ---- Erweiterung 3: Verbrauchsteuerrecht (V)
+["ERLAUBNISINHABER","Person, der die Behörde eine verbrauchsteuerrechtliche Erlaubnis erteilt hat","V"],
+["ANZEIGEPFLICHT","Pflicht, bestimmte Vorgänge der Behörde mitzuteilen","V"],
+["BUCHFUEHRUNGSPFLICHT","Pflicht, Geschäftsvorfälle ordnungsgemäß zu erfassen","V"],
+["AUFZEICHNUNGSPFLICHT","Pflicht, Mengen und Bewegungen steuerpflichtiger Waren festzuhalten","V"],
+["AUFBEWAHRUNGSPFLICHT","Pflicht, Unterlagen für eine bestimmte Zeit vorzuhalten","V"],
+["ZUVERLAESSIGKEIT","Persönliche Voraussetzung für die Erteilung von Erlaubnissen","V"],
+["STEUERVERGUETUNG","Rückzahlung der Steuer auf Antrag, z. B. nach dem Energiesteuergesetz","V"],
+["STEUERERSTATTUNG","Rückzahlung zu viel gezahlter Steuer","V"],
+["STEUERERLASS","Verzicht auf die Steuer aus Billigkeitsgründen","V"],
+["STEUERSTUNDUNG","Hinausschieben der Fälligkeit der Steuer","V"],
+["AUSSETZUNGSVERFAHREN","Verfahren, in dem Waren ohne Entstehen der Steuer bewegt werden","V"],
+["FREIER VERKEHR","Verbrauchsteuerlich: Ware ist versteuert und darf im Steuergebiet gehandelt werden","V"],
+["STEUERTATBESTAND","Sachverhalt, an den das Gesetz die Steuerpflicht knüpft","V"],
+["ENERGIEGEHALT","Brennwert eines Energieerzeugnisses, Grundlage des Steuersatzes bei Erdgas","V"],
+["BRENNSTOFF","Stoff, der zur Wärmeerzeugung verbrannt wird","V"],
+["KOKS","Kohlenstoffreicher Brennstoff aus Steinkohle","V"],
+["BRAUNKOHLE","Weicher, wasserreicher fossiler Brennstoff","V"],
+["STEINKOHLE","Harte, energiereiche Kohle","V"],
+["LEICHTOEL","Mineralöl mit niedrigem Siedebereich","V"],
+["NAPHTHA","Rohbenzin als Rohstoff der chemischen Industrie","V"],
+["ETHYLALKOHOL","Chemisch exakte Bezeichnung des Trinkalkohols","V"],
+["METHANOL","Giftiger, einfachster Alkohol","V"],
+["ADDITIV","Zusatzstoff zu Kraftstoffen","V"],
+["BEIMISCHUNG","Zugabe von Biokomponenten zu fossilem Kraftstoff","V"],
+["THGQUOTE","Treibhausgasminderungsquote für Kraftstoffanbieter","V"],
+["BEHG","Brennstoffemissionshandelsgesetz (Abk.), Grundlage des nationalen CO2-Preises","V"],
+["EMISSIONSHANDEL","Handel mit Rechten zum Ausstoß von Treibhausgasen","V"],
+["KLIMASCHUTZ","Politisches Ziel, das Lenkungssteuern auf Energie rechtfertigt","V"],
+["BINNENSCHIFFFAHRT","Schifffahrt auf Flüssen und Kanälen","V"],
+["SCHIENENVERKEHR","Bahnverkehr, bei dem Strom steuerlich ermäßigt sein kann","V"],
+["ELEKTROMOBILITAET","Nutzung strombetriebener Fahrzeuge","V"],
+["LADEPUNKT","Einrichtung zum Laden von Elektrofahrzeugen","V"],
+["STROMSPEICHER","Anlage, die Strom zwischenspeichert","V"],
+["NETZSTROM","Aus dem öffentlichen Netz bezogener Strom","V"],
+["ENERGIEVERSORGER","Unternehmen, das Strom oder Gas liefert","V"],
+["ENERGIEINTENSIV","Eigenschaft von Unternehmen mit besonders hohem Energieeinsatz","V"],
+["ENERGIEMANAGEMENT","System zur Steigerung der Energieeffizienz im Betrieb","V"],
+["ZIGARETTENHUELSE","Leere Hülse zum Selbststopfen von Zigaretten","V"],
+["ROLLTABAK","Tabak zum Selbstdrehen von Zigaretten","V"],
+["WERTTEIL","Teil der Tabaksteuer, der sich nach dem Kleinverkaufspreis richtet","V"],
+["MENGENTEIL","Fester Steuerbetrag je Stück bei Zigaretten","V"],
+["TABAKERZEUGNIS","Oberbegriff für Waren aus Tabak","V"],
+["NIKOTIN","Suchtstoff in Tabak und manchen Liquids","V"],
+["SUBSTITUT","Ersatzprodukt für Tabakwaren, das der Tabaksteuer unterliegt","V"],
+["EZIGARETTE","Elektronisches Gerät zum Verdampfen von Liquids","V"],
+["GROSSHANDEL","Handelsstufe zwischen Hersteller und Einzelhandel","V"],
+["EINZELHANDEL","Handelsstufe, die an Endverbraucher verkauft","V"],
+["VERSCHLUSSBRENNEREI","Brennerei, die unter amtlichem Verschluss arbeitet","V"],
+["OBSTBRENNEREI","Betrieb, der aus Obst Alkohol brennt","V"],
+["KLEINBRENNEREI","Brennerei mit geringer Jahreserzeugung","V"],
+["ALKOHOLHERSTELLER","Betrieb, der Alkohol erzeugt","V"],
+["WEINSTEUER","In Deutschland mit dem Satz null belegte Steuer auf stillen Wein","V"],
+["STILLER WEIN","Nicht schäumender Wein","V"],
+["LIKOERWEIN","Wein mit zugesetztem Alkohol","V"],
+["OBSTWEIN","Wein aus Obst statt aus Trauben","V"],
+["APFELWEIN","Vergorener Apfelsaft","V"],
+["BIERAUSSTOSS","Jahresproduktion einer Brauerei","V"],
+["STAFFELSATZ","Ermäßigter Steuersatz nach Jahresausstoß","V"],
+["MENGENSTAFFEL","Nach Jahresmenge gestaffelte Steuersätze","V"],
+["ROESTKAFFEE","Gerösteter Kaffee, Steuergegenstand der Kaffeesteuer","V"],
+["KAFFEEROESTEREI","Betrieb, der Rohkaffee röstet","V"],
+["LOESLICHER KAFFEE","Instantkaffee, ebenfalls kaffeesteuerpflichtig","V"],
+["ROHKAFFEE","Ungerösteter Kaffee, der noch nicht der Kaffeesteuer unterliegt","V"],
+["KAFFEEEXTRAKT","Konzentrat aus Röstkaffee","V"],
+["ABSENDER","Person, die Waren auf den Weg bringt","V"],
+["LAGERFUEHRUNG","Dokumentation aller Zu- und Abgänge im Lager","V"],
+["INVENTUR","Bestandsaufnahme der vorhandenen Waren","V"],
+["SCHWUND","Natürlicher Verlust bei Lagerung oder Beförderung","V"],
+["VERNICHTUNG","Zerstörung von Waren unter behördlicher Aufsicht","V"],
+["UNTERGANG","Vollständiger Verlust einer Ware","V"],
+["ABLEHNUNG","Zurückweisung der Ware durch den Empfänger im EMCS","V"],
+["BEFOERDERER","Wer Waren transportiert","V"],
+["FRACHTFUEHRER","Transportunternehmer","V"],
+["UMLEITUNG","Änderung des Bestimmungsorts während der Beförderung","V"],
+["TEILUNG","Aufteilung einer Beförderung in mehrere Sendungen","V"],
+["SEED","Register der EU für Wirtschaftsbeteiligte im Verbrauchsteuerbereich (Abk.)","V"],
+["VERWALTUNGSAKT","Behördliche Einzelfallentscheidung mit Außenwirkung","V"],
+["WIDERRUF","Zurücknahme einer Erlaubnis für die Zukunft","V"],
+["AUFLAGE","Nebenbestimmung zu einer Erlaubnis","V"],
+["BEFRISTUNG","Zeitliche Begrenzung einer Erlaubnis","V"],
+["EINSPRUCH","Rechtsbehelf gegen einen Steuerbescheid","V"],
+["BERICHTIGUNG","Korrektur einer fehlerhaften Anmeldung oder Festsetzung","V"],
+["NACHFORDERUNG","Spätere Forderung zu wenig gezahlter Steuer","V"],
+["STEUERPFLICHT","Verpflichtung, eine Steuer zu entrichten","V"],
+["STEUERPFLICHTIGER","Wer Steuern zu zahlen oder Erklärungen abzugeben hat","V"],
+["ABFUELLUNG","Füllen von Getränken in Behältnisse","V"],
+["KENNZEICHNUNGSPFLICHT","Pflicht zur Angabe bestimmter Informationen auf der Ware","V"],
+["VERBRAUCHSTEUERNUMMER","Kennung eines Wirtschaftsbeteiligten im Verbrauchsteuerverfahren","V"],
+["ERMAESSIGUNG","Verringerung des Steuersatzes","V"],
+["PAUSCHALIERUNG","Vereinfachte Steuerberechnung mit festem Betrag","V"],
+["GENUSSMITTEL","Waren wie Alkohol, Tabak und Kaffee","V"],
+// ---- Erweiterung 3: Ursprung & Präferenz (U)
+["EVFTA","Freihandelsabkommen zwischen der EU und Vietnam (Abk.)","U"],
+["JEFTA","Freihandelsabkommen zwischen der EU und Japan (Abk.)","U"],
+["SADC","Südafrikanische Entwicklungsgemeinschaft (Abk.), Partner von Wirtschaftspartnerschaftsabkommen","U"],
+["CARIFORUM","Karibische Staatengruppe mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["ASEAN","Verband südostasiatischer Staaten","U"],
+["OCT","Überseeische Länder und Gebiete (Abk.)","U"],
+["UNTERPOSITIONSWECHSEL","Ursprungskriterium: Wechsel der Unterposition durch die Verarbeitung","U"],
+["POSITIONSWECHSEL","Ursprungskriterium: Wechsel der vierstelligen Tarifposition","U"],
+["KAPITELWECHSEL","Ursprungskriterium: Wechsel des zweistelligen Kapitels","U"],
+["SPEZIFISCHE BEARBEITUNG","Vorgeschriebene Be- oder Verarbeitung für den Ursprung","U"],
+["MAXIMALANTEIL","Höchstanteil an Nichtursprungsmaterial","U"],
+["ENDERZEUGNIS","Fertiges Produkt am Ende der Herstellung","U"],
+["ZWISCHENPRODUKT","Erzeugnis einer mittleren Produktionsstufe","U"],
+["KOMPONENTE","Einzelner Bestandteil eines Produkts","U"],
+["BAUTEIL","Teil, das in ein größeres Erzeugnis eingebaut wird","U"],
+["ERSATZTEIL","Teil zum Austausch eines defekten Teils","U"],
+["NEUTRALE ELEMENTE","Energie, Anlagen und Werkzeuge, die bei der Ursprungsprüfung unbeachtlich sind","U"],
+["FUNGIBLE WAREN","Austauschbare Waren, bei denen buchmäßige Trennung möglich ist","U"],
+["BUCHMAESSIGE TRENNUNG","Getrennte Erfassung von Ursprungs- und Nichtursprungsmaterial in der Buchführung","U"],
+["SET","Zusammenstellung von Waren, deren Ursprung vom Anteil der Nichtursprungsteile abhängt","U"],
+["VERPACKUNGSMATERIAL","Beim Ursprung der Ware meist unbeachtlich","U"],
+["TERRITORIALITAETSPRINZIP","Grundsatz: Be- und Verarbeitung muss im Gebiet des Partners erfolgen","U"],
+["RUECKWAREN","Waren, die nach der Ausfuhr unverändert zurückkehren","U"],
+["ATR","Warenverkehrsbescheinigung für den Handel mit der Türkei (Abk.)","U"],
+["AUSKUNFTSBLATT","Zusatzdokument zum Antrag auf eine Warenverkehrsbescheinigung","U"],
+["PRUEFERGEBNIS","Ergebnis einer Ursprungsprüfung","U"],
+["VERSAGUNG","Verweigerung der Präferenzbehandlung nach Prüfung","U"],
+["ERSATZNACHWEIS","Neuer Ursprungsnachweis bei Teilung oder Umladung einer Sendung","U"],
+["TEILSENDUNG","Aufgeteilte Lieferung einer größeren Warenmenge","U"],
+["AUSFUHRNACHWEIS","Beleg über das Verlassen des Zollgebiets","U"],
+["ABD","Ausfuhrbegleitdokument (Abk.)","U"],
+["MRN","Registriernummer einer Zollanmeldung (Abk.)","U"],
+["NICHTUNIONSWARE","Ware ohne Unionsstatus","U"],
+["ZOLLSTATUS","Eigenschaft einer Ware als Unionsware oder Nichtunionsware","U"],
+["STATUSNACHWEIS","Beleg über den Zollstatus einer Ware","U"],
+["OLAF","Europäisches Amt für Betrugsbekämpfung (Abk.)","U"],
+["EUROSTAT","Statistikamt der Europäischen Union","U"],
+["DELEGIERTE VERORDNUNG","EU-Rechtsakt, der das Basisgesetz ergänzt oder ändert","U"],
+["RICHTLINIE","EU-Rechtsakt, der in nationales Recht umgesetzt werden muss","U"],
+["BESCHLUSS","Verbindlicher EU-Rechtsakt, gerichtet an bestimmte Adressaten","U"],
+["EMPFEHLUNG","Unverbindlicher EU-Rechtsakt","U"],
+["AEUV","Vertrag über die Arbeitsweise der Europäischen Union (Abk.)","U"],
+["PRAEFERENZBEHANDLUNG","Anwendung eines Vorzugszollsatzes auf eine Ursprungsware","U"],
+["PRAEFERENZNACHWEIS","Beleg für den präferenziellen Ursprung","U"],
+["PRAEFERENZBERECHTIGT","Eigenschaft einer Ware, einen Zollvorteil beanspruchen zu dürfen","U"],
+["ANWENDUNGSBEREICH","Sachlicher oder räumlicher Geltungsbereich eines Abkommens","U"],
+["GELTUNGSBEREICH","Gebiet und Waren, für die ein Abkommen gilt","U"],
+["INKRAFTTRETEN","Zeitpunkt, ab dem ein Abkommen oder Gesetz gilt","U"],
+["VORLAEUFIGE ANWENDUNG","Anwendung eines Abkommens vor Abschluss aller Ratifizierungen","U"],
+["RATIFIZIERUNG","Förmliche Bestätigung eines völkerrechtlichen Vertrags","U"],
+["UNTERZEICHNUNG","Erster förmlicher Schritt zur Bindung an einen Vertrag","U"],
+["VERHANDLUNG","Gespräche zwischen den Parteien über den Inhalt eines Abkommens","U"],
+["KUENDIGUNG","Beendigung eines Abkommens durch eine Partei","U"],
+["MODERNISIERUNG","Überarbeitung eines bestehenden Abkommens","U"],
+["REVISION","Überarbeitung von Regeln","U"],
+["UEBERGANGSBESTIMMUNG","Regel für die Zeit nach einer Rechtsänderung","U"],
+["SCHUTZKLAUSEL","Regel zur zeitweisen Aussetzung von Zollvorteilen bei Marktstörungen","U"],
+["HANDELSHEMMNIS","Hindernis für den Warenaustausch","U"],
+["HANDELSSCHUTZ","Instrumente wie Antidumping- und Ausgleichszölle","U"],
+["WESTBALKAN","Region in Südosteuropa mit Stabilisierungsabkommen mit der EU","U"],
+["MITTELMEERRAUM","Region mit vielen Assoziierungsabkommen mit der EU","U"],
+["LATEINAMERIKA","Region mit mehreren Handelsabkommen mit der EU","U"],
+["ALGERIEN","Nordafrikanischer Staat mit Assoziationsabkommen mit der EU","U"],
+["JORDANIEN","Staat im Nahen Osten mit Assoziationsabkommen mit der EU","U"],
+["LIBANON","Staat im Nahen Osten mit Assoziationsabkommen mit der EU","U"],
+["KOSOVO","Westbalkanstaat mit Stabilisierungsabkommen mit der EU","U"],
+["MONTENEGRO","Westbalkanstaat mit Stabilisierungsabkommen mit der EU","U"],
+["NORDMAZEDONIEN","Westbalkanstaat mit Stabilisierungsabkommen mit der EU","U"],
+["ANDORRA","Kleinstaat mit Zollunion für gewerbliche Waren mit der EU","U"],
+["SAN MARINO","Kleinstaat mit Zollunion mit der EU","U"],
+["FAEROER","Inselgruppe mit Freihandelsabkommen mit der EU","U"],
+["KENIA","Ostafrikanischer Staat mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["KAMERUN","Zentralafrikanischer Staat mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["ELFENBEINKUESTE","Westafrikanischer Staat mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["GHANA","Westafrikanischer Staat mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["MADAGASKAR","Inselstaat im Indischen Ozean mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["MAURITIUS","Inselstaat im Indischen Ozean mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["SEYCHELLEN","Inselstaat im Indischen Ozean mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["SIMBABWE","Staat im südlichen Afrika mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["FIDSCHI","Pazifischer Inselstaat mit Wirtschaftspartnerschaftsabkommen mit der EU","U"],
+["ZENTRALAMERIKA","Region mit Assoziierungsabkommen mit der EU","U"],
+["COSTA RICA","Zentralamerikanischer Staat mit Assoziierungsabkommen mit der EU","U"],
+["PANAMA","Zentralamerikanischer Staat mit Assoziierungsabkommen mit der EU","U"],
+["GUATEMALA","Zentralamerikanischer Staat mit Assoziierungsabkommen mit der EU","U"],
+["HONDURAS","Zentralamerikanischer Staat mit Assoziierungsabkommen mit der EU","U"],
+["NICARAGUA","Zentralamerikanischer Staat mit Assoziierungsabkommen mit der EU","U"],
+["EL SALVADOR","Zentralamerikanischer Staat mit Assoziierungsabkommen mit der EU","U"],
+// ---- Erweiterung 3: Zolltarifrecht (Z)
+["GENAUERE BESCHREIBUNG","Auslegungsgrundsatz: Die genauere Warenbezeichnung geht vor","Z"],
+["AEHNLICHSTE WARE","Auslegungsgrundsatz: Einreihung bei der Ware, der sie am ähnlichsten ist","Z"],
+["LETZTE POSITION","Auslegungsgrundsatz: Bei Gleichwertigkeit gilt die in der Reihenfolge zuletzt genannte Position","Z"],
+["BEHAELTNISSE","Verpackungen, die nach eigener Auslegungsregel eingereiht werden","Z"],
+["VERBINDLICHE AUSKUNFT","Behördliche Auskunft, die die Verwaltung bindet","Z"],
+["WARENAUFMACHUNG","Äußere Gestaltung der Ware, relevant für die Einreihung","Z"],
+["ZUSAMMENSETZUNG","Stoffliche Zusammensetzung einer Ware","Z"],
+["WERKSTOFF","Material, aus dem eine Ware besteht","Z"],
+["STOFFGEMISCH","Gemenge mehrerer Stoffe","Z"],
+["EIGENMASSE","Zolltechnisch: Nettogewicht der Ware ohne Verpackung","Z"],
+["ROHMASSE","Zolltechnisch: Bruttogewicht einschließlich Verpackung","Z"],
+["ZUSATZMASSEINHEIT","Besondere Mengeneinheit anstelle der Eigenmasse","Z"],
+["KAPITELANMERKUNG","Verbindliche Erläuterung zu einem Kapitel des Zolltarifs","Z"],
+["ABSCHNITTSANMERKUNG","Verbindliche Erläuterung zu einem Abschnitt des Zolltarifs","Z"],
+["ZUSAETZLICHE ANMERKUNG","Ergänzende Regel der Kombinierten Nomenklatur","Z"],
+["EZT","Elektronischer Zolltarif der deutschen Zollverwaltung (Abk.)","Z"],
+["TARIFKONTINGENT","Kontingent mit ermäßigtem Zollsatz bis zu einer bestimmten Menge","Z"],
+["KONTINGENTSMENGE","Zollbegünstigte Höchstmenge eines Kontingents","Z"],
+["WINDHUNDVERFAHREN","Verteilung eines Kontingents nach der Reihenfolge der Annahme der Anmeldungen","Z"],
+["AUSSCHOEPFUNG","Vollständiger Verbrauch einer Kontingentsmenge","Z"],
+["ORDNUNGSNUMMER","Nummer eines Zollkontingents","Z"],
+["EINTRITTSPREIS","Preisschwelle im Einfuhrpreissystem für Obst und Gemüse","Z"],
+["EINFUHRPREISSYSTEM","System, das Obst- und Gemüseeinfuhren nach dem Preis belastet","Z"],
+["AGRARERZEUGNISSE","Landwirtschaftliche Produkte, oft mit besonderen Zollregeln","Z"],
+["ZOLLSCHULDENTSTEHUNG","Zeitpunkt, in dem die Zollschuld rechtlich entsteht","Z"],
+["ERLOESCHEN","Ende der Zollschuld, z. B. durch Entrichtung","Z"],
+["ZOLLERSTATTUNG","Rückzahlung zu viel erhobener Zölle","Z"],
+["ZOLLBUERGSCHAFT","Sicherheit durch einen Bürgen für die Zollschuld","Z"],
+["GESAMTSICHERHEIT","Sicherheit, die mehrere Vorgänge abdeckt","Z"],
+["REFERENZBETRAG","Betrag, nach dem sich die Höhe einer Sicherheit richtet","Z"],
+["ZAHLUNGSAUFSCHUB","Aufschub der Entrichtung von Abgaben","Z"],
+["ABGABENBESCHEID","Mitteilung der festgesetzten Zölle und Steuern","Z"],
+["BUCHUNG","Eintragung des Abgabenbetrags in die Zollbuchführung","Z"],
+["VERZUGSZINS","Zins bei verspäteter Zahlung","Z"],
+["ZOLLBEWILLIGUNG","Behördliche Gestattung für ein besonderes Zollverfahren","Z"],
+["ANSCHREIBEVERFAHREN","Vereinfachte Anmeldung durch Eintrag in die Buchführung","Z"],
+["CCI","Zentrale Zollabwicklung bei der Einfuhr (Abk.)","Z"],
+["ENS","Summarische Eingangsanmeldung (Abk.)","Z"],
+["VORABANMELDUNG","Meldung von Sendungsdaten vor Ankunft der Ware","Z"],
+["ZOLLKONTROLLE","Prüfung von Waren und Papieren durch den Zoll","Z"],
+["RISIKOANALYSE","Auswertung von Daten, um kontrollwürdige Sendungen zu erkennen","Z"],
+["RISIKOMANAGEMENT","Systematischer Umgang mit Kontrollrisiken im Zoll","Z"],
+["ZOLLPRUEFUNG","Prüfung beim Unternehmen nach der Überlassung der Waren","Z"],
+["BANANEN","Frisches Obst mit eigenem Zollregime der EU","Z"],
+["KAESE","Milcherzeugnis mit eigener Tarifposition","Z"],
+["BUTTER","Milchfett, eigene Tarifposition","Z"],
+["EIER","Geflügelerzeugnis mit Zollkontingenten","Z"],
+["HONIG","Bienenprodukt mit eigener Tarifposition","Z"],
+["REIS","Getreideart mit eigenem Zollregime","Z"],
+["WEIZEN","Wichtigste Getreideart im Tarif","Z"],
+["MAIS","Getreideart, z. B. aus der Ukraine importiert","Z"],
+["SOJA","Ölsaat und Eiweißpflanze","Z"],
+["TOMATEN","Gemüse mit saisonal wechselnden Zollsätzen","Z"],
+["ORANGEN","Zitrusfrucht mit saisonalen Zollsätzen","Z"],
+["KARTOFFELN","Knollengemüse mit eigener Tarifposition","Z"],
+["FAHRRAEDER","Zweiräder, für China früher mit Antidumpingzoll belegt","Z"],
+["SOLARMODULE","Photovoltaikpaneele, Gegenstand von Handelsschutzmaßnahmen","Z"],
+["BATTERIEN","Speicher für elektrische Energie","Z"],
+["ELEKTROFAHRZEUGE","Fahrzeuge mit Elektroantrieb, eigene Tarifposition","Z"],
+["STAHLERZEUGNISSE","Waren aus Stahl, Gegenstand von Schutzmaßnahmen","Z"],
+["BEFESTIGUNGSELEMENTE","Schrauben, Muttern und Co., Gegenstand von Antidumpingzöllen","Z"],
+["ITA","Informationstechnologieabkommen der WTO (Abk.), regelt zollfreie IT-Waren","Z"],
+["NAHRUNGSERGAENZUNGSMITTEL","Produkte, für die das HS 2028 Änderungen vorsieht","Z"],
+["KUNSTSTOFFABFALL","Umweltbezogener Schwerpunkt der HS-Revision 2028","Z"],
+["ALTMETALL","Metallabfälle, mit besonderen Regeln im Tarif","Z"],
+["HSREVISION","Turnusmäßige Überarbeitung des Harmonisierten Systems","Z"],
+["KORRELATIONSTABELLE","Gegenüberstellung alter und neuer Warennummern","Z"],
+["VERRECHNUNGSPREIS","Preis für Lieferungen zwischen verbundenen Unternehmen","Z"],
+["VERBUNDENE UNTERNEHMEN","Unternehmen mit Beziehungen, die den Zollwert beeinflussen können","Z"],
+["BEISTELLUNG","Vom Käufer kostenlos gelieferte Waren, dem Zollwert hinzuzurechnen","Z"],
+["EINKAUFSPROVISION","Vergütung an Einkaufsvertreter, nicht dem Zollwert hinzuzurechnen","Z"],
+["VERMITTLUNGSPROVISION","Provision an Verkaufsvertreter, die dem Zollwert hinzuzurechnen ist","Z"],
+["SKONTO","Preisnachlass bei schneller Zahlung","Z"],
+["RABATT","Preisnachlass, der den Zollwert mindern kann","Z"],
+["TRANSPORTKOSTEN","Beförderungskosten bis zum Verbringungsort, Teil des Zollwerts","Z"],
+["VERLADEKOSTEN","Kosten für Be- und Entladen, Teil des Zollwerts","Z"],
+["WEITERVERKAUFSERLOES","Grundlage der deduktiven Zollwertmethode","Z"],
+["DEDUKTIVE METHODE","Zollwertermittlung ausgehend vom Weiterverkaufspreis","Z"],
+["RECHNERISCHER WERT","Zollwertermittlung aus Herstellungskosten","Z"],
+["GLEICHARTIGE WAREN","Waren ähnlicher Beschaffenheit, Grundlage einer Zollwertmethode","Z"],
+["IDENTISCHE WAREN","Gleiche Waren, Grundlage einer Zollwertmethode","Z"],
+["UMRECHNUNGSKURS","Wechselkurs für die Zollwertberechnung","Z"],
+["NCTS","Neues EDV-gestütztes Versandverfahren (Abk.)","Z"],
+["AES","Ausfuhrsystem der EU (Abk.)","Z"],
+["EBTI","Informationssystem für verbindliche Tarifauskünfte (Abk.)","Z"],
+["UCC","Englische Abkürzung für den Unionszollkodex","Z"],
+["TAXUD","Generaldirektion Steuern und Zollunion der Kommission (Abk.)","Z"],
+["CBAM","CO2-Grenzausgleichsmechanismus der EU (Abk.), seit 2026 in der definitiven Phase","Z"],
+["GRENZAUSGLEICH","Ausgleich der CO2-Kosten bei Einfuhren","Z"],
+["EUCA","Geplante EU-Zollbehörde (Abk.)","Z"],
+["PAUSCHALZOLL","Fester Zollbetrag auf Kleinsendungen, übergangsweise seit 1. Juli 2026","Z"],
+["KLEINSENDUNG","Warensendung mit geringem Wert, früher bis 150 Euro zollfrei","Z"],
+["ZOLLFREIGRENZE","Frühere Wertgrenze von 150 Euro, bis 30. Juni 2026 zollfrei","Z"],
+["BEARBEITUNGSGEBUEHR","Geplante EU-Gebühr für Kleinsendungen","Z"],
+["ONLINEHANDEL","Verkauf von Waren über das Internet","Z"],
+["ZOLLRECHTSREFORM","Neufassung des EU-Zollrechts ab 2027","Z"],
+["PRAEFERENZRECHT","Rechtsgebiet für Zollvergünstigungen","Z"],
+["PARAGUAY","Mercosur-Staat, mit dem die EU ein Abkommen geschlossen hat","U"],
+["URUGUAY","Mercosur-Staat, mit dem die EU ein Abkommen geschlossen hat","U"],
+["ARGENTINIEN","Mercosur-Staat, mit dem die EU ein Abkommen geschlossen hat","U"],
+["BRASILIEN","Größter Mercosur-Staat","U"],
+["INDIEN","Staat, mit dem die EU 2026 die Verhandlungen über ein Freihandelsabkommen abgeschlossen hat","U"],
+["INDONESIEN","Südostasiatischer Inselstaat, mit dem die EU ein Wirtschaftsabkommen (CEPA) ausgehandelt hat","U"],
+["PARLAMENT","EU-Organ, dessen Zustimmung Handelsabkommen benötigen","U"],
+["RAT","EU-Organ der Mitgliedstaaten, das über Abkommen beschließt","U"],
+["WARENHANDEL","Austausch von Gütern zwischen Staaten","U"],
+["AUSSENHANDEL","Handel eines Landes mit dem Ausland","U"],
+["AUSSENWIRTSCHAFT","Wirtschaftliche Beziehungen eines Landes zum Ausland","U"],
+["HANDELSBILANZ","Gegenüberstellung von Ein- und Ausfuhren","U"],
+["ZOLLEINNAHMEN","Aufkommen aus Zöllen","U"],
+["EIGENMITTEL","Zölle zählen zu den traditionellen ... der EU","U"],
+["VERTRAGSTEXT","Wortlaut eines Abkommens","U"],
+["ANHANG","Teil eines Abkommens mit Detailregeln","U"],
+["NACHWEISFUEHRUNG","Erbringen des Ursprungsbelegs","U"],
+["VORLAGEFRIST","Zeitraum, in dem der Ursprungsnachweis vorgelegt werden muss","U"],
+["ANERKENNUNG","Akzeptanz eines Nachweises durch die Behörde","U"],
+["TARIFIERUNGSFEHLER","Falsche Einreihung einer Ware","Z"],
+["EINREIHUNGSKRITERIUM","Merkmal, das für die Einreihung entscheidend ist","Z"],
+["KLASSIFIZIERUNG","Einordnung von Waren in Klassen","Z"],
+["TARIFBEZEICHNUNG","Warenbezeichnung im Zolltarif","Z"],
+["VERZOLLUNG","Entrichtung der Zölle bei der Einfuhr","Z"],
+["ZOLLABFERTIGUNG","Zollamtliche Behandlung einer Sendung","Z"],
+["ZOLLWERTERMITTLUNG","Feststellung des Zollwerts","Z"],
+["ZOLLTARIFRECHT","Rechtsgebiet rund um Einreihung und Zollsätze","Z"],
+["EINFUHRSTATISTIK","Erfassung der eingeführten Waren","Z"],
+["ZOLLSATZERMITTLUNG","Feststellung des anzuwendenden Zollsatzes","Z"],
+// ---- Rechtsgrundlagen (R)
+["UZK","Abkürzung des Unionszollkodex, Verordnung (EU) Nr. 952/2013","R"],
+["UZKDA","Delegierte Verordnung zum Unionszollkodex (Abk.)","R"],
+["UZKIA","Durchführungsverordnung zum Unionszollkodex (Abk.)","R"],
+["UZKTDA","Übergangs-Delegierte Verordnung zum Unionszollkodex (Abk.)","R"],
+["ZOLLTARIFVERORDNUNG","Verordnung (EWG) Nr. 2658/87 über die zolltarifliche und statistische Nomenklatur","R"],
+["ZOLLBEFREIUNGSVERORDNUNG","Verordnung (EG) Nr. 1186/2009 über das Zollbefreiungssystem der Union","R"],
+["APSVERORDNUNG","Verordnung (EU) Nr. 978/2012 zum Allgemeinen Präferenzsystem","R"],
+["ANTIDUMPINGVERORDNUNG","Grundverordnung (EU) 2016/1036 zum Schutz gegen gedumpte Einfuhren","R"],
+["EINFUHRREGELUNG","Verordnung (EU) 2015/478 über die gemeinsame Einfuhrregelung","R"],
+["AUSFUHRREGELUNG","Verordnung (EU) 2015/479 über die gemeinsame Ausfuhrregelung","R"],
+["DUALUSE","Güter mit doppeltem Verwendungszweck, geregelt in der Verordnung (EU) 2021/821","R"],
+["AUSFUHRABGABEN","Zölle und Abgaben, die bei der Ausfuhr erhoben werden","R"],
+["ZOLLVG","Zollverwaltungsgesetz (Abk.)","R"],
+["ZOLLV","Zollverordnung (Abk.)","R"],
+["AWG","Außenwirtschaftsgesetz (Abk.)","R"],
+["AWV","Außenwirtschaftsverordnung (Abk.)","R"],
+["FGO","Finanzgerichtsordnung (Abk.)","R"],
+["FVG","Finanzverwaltungsgesetz (Abk.)","R"],
+["ZFDG","Zollfahndungsdienstgesetz (Abk.)","R"],
+["OWIG","Ordnungswidrigkeitengesetz (Abk.)","R"],
+["USTG","Umsatzsteuergesetz (Abk.)","R"],
+["AEAO","Anwendungserlass zur Abgabenordnung (Abk.)","R"],
+["VSF","Vorschriftensammlung der Bundesfinanzverwaltung (Abk.)","R"],
+["BMF","Bundesministerium der Finanzen (Abk.)","R"],
+["ITZBUND","IT-Dienstleister des Bundes, Betreiber des Zollverfahrens ATLAS","R"],
+["BUNDESGESETZBLATT","Verkündungsorgan für Bundesgesetze","R"],
+["EURLEX","Rechtsportal der Europäischen Union","R"],
+["ENERGIESTG","Energiesteuergesetz (Abk.)","R"],
+["ENERGIESTV","Energiesteuer-Durchführungsverordnung (Abk.)","R"],
+["STROMSTG","Stromsteuergesetz (Abk.)","R"],
+["STROMSTV","Stromsteuer-Durchführungsverordnung (Abk.)","R"],
+["TABSTG","Tabaksteuergesetz (Abk.)","R"],
+["TABSTV","Tabaksteuerverordnung (Abk.)","R"],
+["ALKSTG","Alkoholsteuergesetz (Abk.)","R"],
+["ALKSTV","Alkoholsteuerverordnung (Abk.)","R"],
+["BIERSTG","Biersteuergesetz (Abk.)","R"],
+["BIERSTV","Biersteuerverordnung (Abk.)","R"],
+["SCHAUMWZWSTG","Schaumwein- und Zwischenerzeugnissteuergesetz (Abk.)","R"],
+["SCHAUMWZWSTV","Schaumwein- und Zwischenerzeugnissteuerverordnung (Abk.)","R"],
+["KAFFEESTG","Kaffeesteuergesetz (Abk.)","R"],
+["KAFFEESTV","Kaffeesteuerverordnung (Abk.)","R"],
+["ALKOPOPSTG","Alkopopsteuergesetz (Abk.)","R"],
+["ENERGIESTEUERRICHTLINIE","Richtlinie 2003/96/EG zur Besteuerung von Energieerzeugnissen und Strom","R"],
+["ALKOHOLSTRUKTUR","Richtlinie 92/83/EWG zur Struktur der Verbrauchsteuern auf Alkohol","R"],
+["TABAKSTRUKTUR","Richtlinie 2011/64/EU zur Struktur der Verbrauchsteuern auf Tabak","R"],
+["TPD","Englische Abkürzung der Tabakproduktrichtlinie 2014/40/EU","R"],
+["RED","Erneuerbare-Energien-Richtlinie der EU (Abk.)","R"],
+["EEG","Erneuerbare-Energien-Gesetz (Abk.)","R"],
+["ENWG","Energiewirtschaftsgesetz (Abk.)","R"],
+["KWKG","Kraft-Wärme-Kopplungsgesetz (Abk.)","R"],
+["NACHSCHAU","Kontrollbefugnis der Zollbehörde in Geschäftsräumen ohne vorherige Ankündigung","R"],
+["URSPRUNGSPROTOKOLL","Teil eines Abkommens, der die Ursprungsregeln enthält","R"],
+["TCA","Handels- und Kooperationsabkommen zwischen EU und Vereinigtem Königreich (Abk.)","R"],
+["SAA","Stabilisierungs- und Assoziierungsabkommen (Abk.)","R"],
+["DCFTA","Vertieftes und umfassendes Freihandelsabkommen der EU (Abk.)","R"],
+["ZOLLWERTUEBEREINKOMMEN","WTO-Übereinkommen zur Anwendung des Artikels VII des GATT","R"],
+["INLAENDERBEHANDLUNG","GATT-Grundsatz: Eingeführte Waren dürfen nicht schlechter behandelt werden als inländische","R"],
+["ZOLLBINDUNG","Verpflichtung gegenüber der WTO, Zölle nicht über vereinbarte Höchstsätze anzuheben","R"],
+["HSUEBEREINKOMMEN","Internationales Übereinkommen über das Harmonisierte System","R"],
+["KYOTOUEBEREINKOMMEN","Revidiertes Übereinkommen zur Vereinfachung und Harmonisierung der Zollverfahren","R"],
+["ISTANBULER ABKOMMEN","Übereinkommen über die vorübergehende Verwendung von Waren","R"],
+["TIR","Internationales Zollverfahren für Straßentransporte","R"],
+["ATACARNET","Warenpass für die vorübergehende Verwendung, z. B. von Messegut","R"],
+["HANDELSERLEICHTERUNG","WTO-Übereinkommen zur Vereinfachung von Zollverfahren","R"],
+["BANNBRUCH","Strafbare Verletzung von Ein-, Aus- oder Durchfuhrverboten (§ 372 AO)","R"],
+["GEWERBSMAESSIG","Merkmal beim Schmuggel, das die Strafe verschärft (§ 373 AO)","R"],
+["BANDENSCHMUGGEL","Schmuggel durch eine Gruppe, die sich zur fortgesetzten Tat verbunden hat","R"],
+["SELBSTANZEIGE","Strafbefreiende Erklärung nach § 371 AO","R"],
+["LEICHTFERTIGKEIT","Grobe Fahrlässigkeit, Voraussetzung der leichtfertigen Steuerverkürzung","R"],
+["STRAFBEFREIUNG","Wegfall der Strafe, z. B. durch Selbstanzeige","R"],
+["FESTSETZUNGSFRIST","Frist, innerhalb derer eine Steuer festgesetzt werden darf","R"],
+["VERJAEHRUNGSFRIST","Zeitraum, nach dem Ansprüche nicht mehr durchsetzbar sind","R"],
+["HINTERZIEHUNGSZINSEN","Zinsen auf hinterzogene Steuern nach § 235 AO","R"],
+["ZWANGSGELD","Beugemittel, um eine Handlung der Behörde durchzusetzen","R"],
+["VOLLSTRECKUNG","Zwangsweise Durchsetzung von Steuerforderungen","R"],
+["AUFRECHNUNG","Verrechnung von Forderung und Gegenforderung","R"],
+["HAFTUNG","Einstehen für fremde Steuerschulden","R"],
+["GESAMTSCHULDNER","Mehrere Personen, die jeweils für dieselbe Schuld einstehen","R"],
+["EINSPRUCHSFRIST","Ein Monat nach Bekanntgabe des Bescheids","R"],
+["RECHTSBEHELFSBELEHRUNG","Hinweis im Bescheid auf Rechtsmittel und Fristen","R"],
+["BETRETUNGSRECHT","Recht der Zollbeamten, Geschäftsräume zu betreten","R"],
+["AUSKUNFTSPFLICHT","Pflicht, der Behörde Informationen zu geben","R"],
+["MITWIRKUNGSPFLICHT","Pflicht des Beteiligten, zur Aufklärung des Sachverhalts beizutragen","R"],
+["BEWEISLAST","Wer eine Tatsache nachweisen muss","R"],
+["SCHAETZUNG","Ermittlung der Besteuerungsgrundlagen, wenn Angaben fehlen (§ 162 AO)","R"],
+["VORABENTSCHEIDUNG","Verfahren, in dem der EuGH Auslegungsfragen nationaler Gerichte beantwortet","R"],
+["BFH","Bundesfinanzhof (Abk.)","R"],
+["EUG","Gericht der Europäischen Union (Abk.)","R"],
+["URTEIL","Gerichtliche Entscheidung nach mündlicher Verhandlung","R"],
+["RECHTSPRECHUNG","Gesamtheit der Gerichtsentscheidungen","R"],
+["RUNDSCHREIBEN","Schreiben des Ministeriums zur einheitlichen Rechtsanwendung","R"],
+["MERKBLATT","Behördliche Informationsschrift","R"],
+["ERLASS","Verwaltungsanweisung einer oberen Behörde","R"],
+["DIENSTVORSCHRIFT","Interne Anweisung der Verwaltung an ihre Beamten","R"],
+["RECHTSGRUNDLAGE","Norm, auf die sich eine behördliche Maßnahme stützt","R"],
+["RECHTSQUELLE","Ursprung verbindlicher Rechtsnormen","R"],
+["RECHTSAKT","Verbindliche Handlung eines EU-Organs","R"],
+["BASISRECHTSAKT","Grundlegender EU-Rechtsakt, den andere Rechtsakte ergänzen","R"],
+["PRIMAERRECHT","Verträge der EU als oberste Rechtsebene","R"],
+["SEKUNDAERRECHT","Rechtsakte, die aufgrund der EU-Verträge erlassen werden","R"],
+["UNIONSRECHT","Gesamtheit des Rechts der Europäischen Union","R"],
+["VOELKERRECHT","Recht zwischen Staaten","R"],
+["NATIONALRECHT","Recht eines einzelnen Staates","R"],
+["ANWENDUNGSVORRANG","EU-Recht geht entgegenstehendem nationalen Recht vor","R"],
+["UMSETZUNGSFRIST","Zeitraum, in dem Mitgliedstaaten eine Richtlinie umsetzen müssen","R"],
+["UMSETZUNG","Übertragung von EU-Richtlinien in nationales Recht","R"],
+["ERMAECHTIGUNG","Befugnis der Regierung, Rechtsverordnungen zu erlassen","R"],
+["GESETZESVORBEHALT","Eingriffe in Rechte bedürfen einer gesetzlichen Grundlage","R"],
+["VERHAELTNISMAESSIGKEIT","Grundsatz, dass Maßnahmen geeignet, erforderlich und angemessen sein müssen","R"],
+["VERTRAUENSSCHUTZ","Schutz des Bürgers vor rückwirkender Verschlechterung durch den Staat","R"],
+["GLEICHBEHANDLUNG","Gleiche Fälle sind gleich zu behandeln","R"],
+["BUNDESTAG","Gesetzgebungsorgan des Bundes","R"],
+["BUNDESRAT","Vertretung der Länder bei der Gesetzgebung des Bundes","R"],
+["BUNDESFINANZMINISTERIUM","Oberste Bundesbehörde für Steuern und Zoll","R"],
+];
+// Hinweis: Eintrag "ZOLLKONTINGENT UNION" bewusst entfernt (unklar) – siehe Filter unten
+const BAD = new Set(["ZOLLKONTINGENT UNION","TEXTILIEN","BESCHAFFENHEIT"]);
+
+const TOPICS = {V:"Verbrauchsteuern",U:"Ursprung & Präferenz",Z:"Zolltarif",R:"Rechtsgrundlagen"};
+const SIZES = {s:{grid:13,words:10},m:{grid:17,words:16},l:{grid:21,words:24}};
+
+// ---------- Zufall
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuffle(arr,rng){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+// ---------- Generator
+function generate(seed,topics,sizeKey){
+  const {grid:maxSize,words:target}=SIZES[sizeKey];
+  const rng=mulberry32(seed);
+  const seen=new Set();
+  const pool=[];
+  for(const [a,c,t] of WORDS){
+    if(BAD.has(a)||!topics.includes(t))continue;
+    const norm=a.replace(/ /g,"");
+    if(norm.length>maxSize||norm.length<3||seen.has(norm))continue;
+    seen.add(norm);
+    pool.push({raw:a,ans:norm,clue:c,topic:t});
+  }
+  let best=null;
+  const score=r=>r.placed.length*100+r.crossTotal*6-((r.r1-r.r0+1)*(r.c1-r.c0+1))*0.05;
+  for(let attempt=0;attempt<8;attempt++){
+    const cand=shuffle(pool,rng).slice(0,target*3);
+    // Start mit einem langen Wort (gute Kreuzungsbasis)
+    cand.sort((a,b)=>(b.ans.length+rng()*3)-(a.ans.length+rng()*3));
+    const first=cand.splice(Math.floor(rng()*Math.min(4,cand.length)),1)[0];
+    cand.unshift(first);
+    const res=tryBuild(cand,target,maxSize,rng);
+    if(!best||score(res)>score(best))best=res;
+  }
+  return normalise(best);
+}
+function tryBuild(cand,target,maxSize,rng){
+  const cells=new Map(); // "r,c" -> {ch, A:idx|undefined, D:idx}
+  const placed=[];
+  let r0=0,r1=0,c0=0,c1=0;
+  const key=(r,c)=>r+","+c;
+  const get=(r,c)=>cells.get(key(r,c));
+  function check(w,r,c,dir){
+    const dr=dir==="D"?1:0,dc=dir==="A"?1:0;
+    const L=w.ans.length;
+    if(get(r-dr,c-dc)||get(r+dr*L,c+dc*L))return -1;
+    let cross=0;
+    const nr0=Math.min(r0,r),nr1=Math.max(r1,r+dr*(L-1)),nc0=Math.min(c0,c),nc1=Math.max(c1,c+dc*(L-1));
+    if(placed.length&&(nr1-nr0+1>maxSize||nc1-nc0+1>maxSize))return -1;
+    for(let i=0;i<L;i++){
+      const rr=r+dr*i,cc=c+dc*i,cell=get(rr,cc);
+      if(cell){
+        if(cell.ch!==w.ans[i]||cell[dir]!==undefined)return -1;
+        cross++;
+      }else{
+        if(get(rr+dc,cc+dr)||get(rr-dc,cc-dr))return -1;
+      }
+    }
+    return cross;
+  }
+  function put(w,r,c,dir){
+    const dr=dir==="D"?1:0,dc=dir==="A"?1:0,idx=placed.length;
+    for(let i=0;i<w.ans.length;i++){
+      const rr=r+dr*i,cc=c+dc*i;
+      let cell=get(rr,cc);
+      if(!cell){cell={ch:w.ans[i]};cells.set(key(rr,cc),cell)}
+      cell[dir]=idx;
+    }
+    placed.push({...w,r,c,dir});
+    r0=Math.min(r0,r);c0=Math.min(c0,c);
+    r1=Math.max(r1,r+dr*(w.ans.length-1));c1=Math.max(c1,c+dc*(w.ans.length-1));
+  }
+  put(cand[0],0,0,"A");
+  // Greedy: in jedem Schritt das Wort mit den meisten Kreuzungen setzen -> dichtes, verzweigtes Netz
+  let remaining=cand.slice(1),crossTotal=0;
+  while(placed.length<target&&remaining.length){
+    let bestScore=0,bestOpt=null,bestIdx=-1;
+    for(let k=0;k<remaining.length;k++){
+      const w=remaining[k];
+      for(const [pos,cell] of cells){
+        const [pr,pc]=pos.split(",").map(Number);
+        for(let i=0;i<w.ans.length;i++){
+          if(w.ans[i]!==cell.ch)continue;
+          for(const dir of ["A","D"]){
+            if(cell[dir]!==undefined)continue;
+            const r=dir==="D"?pr-i:pr,c=dir==="A"?pc-i:pc;
+            const x=check(w,r,c,dir);
+            if(x<=0)continue;
+            const sc=x*10+rng()*6-Math.abs(w.ans.length-7)*0.3;
+            if(sc>bestScore){bestScore=sc;bestOpt={r,c,dir,x};bestIdx=k}
+          }
+        }
+      }
+    }
+    if(!bestOpt)break;
+    put(remaining[bestIdx],bestOpt.r,bestOpt.c,bestOpt.dir);
+    crossTotal+=bestOpt.x;
+    remaining.splice(bestIdx,1);
+  }
+  return {placed,r0,c0,r1,c1,crossTotal};
+}
+function normalise(res){
+  const rows=res.r1-res.r0+1,cols=res.c1-res.c0+1;
+  const words=res.placed.map(w=>({...w,r:w.r-res.r0,c:w.c-res.c0}));
+  const grid=Array.from({length:rows},()=>Array(cols).fill(null));
+  words.forEach((w,i)=>{
+    for(let k=0;k<w.ans.length;k++){
+      const r=w.r+(w.dir==="D"?k:0),c=w.c+(w.dir==="A"?k:0);
+      if(!grid[r][c])grid[r][c]={ch:w.ans[k],num:0};
+      grid[r][c][w.dir]=i;
+    }
+  });
+  let n=0;
+  const starts=words.map((w,i)=>({i,r:w.r,c:w.c})).sort((a,b)=>a.r-b.r||a.c-b.c);
+  const numAt=new Map();
+  for(const s of starts){
+    const k=s.r+","+s.c;
+    if(!numAt.has(k))numAt.set(k,++n);
+    words[s.i].num=numAt.get(k);
+    grid[s.r][s.c].num=numAt.get(k);
+  }
+  return {rows,cols,words,grid};
+}
+function lenLabel(w){
+  const parts=w.raw.split(" ").map(p=>p.length);
+  return parts.length>1?"("+parts.join(", ")+")":"("+w.ans.length+")";
+}
+
+// ---------- UI-Zustand
+let P=null, user=[], mark=[], sel={r:0,c:0}, dir="A", hints=0, t0=0, timer=null, finished=false;
+const $=s=>document.querySelector(s);
+const gridEl=$("#grid"), kb=$("#kb");
+
+function newPuzzle(seedIn){
+  const topics=[...document.querySelectorAll(".topic:checked")].map(x=>x.value);
+  if(!topics.length){alert("Bitte mindestens ein Thema auswählen.");return}
+  const seed=seedIn!=null?seedIn:Math.floor(Math.random()*900000)+100000;
+  $("#seed").value=seed;
+  P=generate(seed,topics,$("#size").value);
+  user=P.grid.map(row=>row.map(()=>""));
+  mark=P.grid.map(row=>row.map(()=>""));
+  hints=0;finished=false;$("#win").style.display="none";
+  const first=P.words.find(w=>w.num===1&&w.dir==="A")||P.words[0];
+  sel={r:first.r,c:first.c};dir=first.dir;
+  t0=Date.now();clearInterval(timer);timer=setInterval(tick,1000);
+  build();focusKb();
+}
+function build(){
+  gridEl.style.gridTemplateColumns=`repeat(${P.cols},var(--cs))`;
+  gridEl.innerHTML="";
+  P.grid.forEach((row,r)=>row.forEach((cell,c)=>{
+    const d=document.createElement("div");
+    d.className="c"+(cell?"":" empty");
+    d.id=`c${r}_${c}`;
+    if(cell){
+      if(cell.num){const n=document.createElement("span");n.className="n";n.textContent=cell.num;d.appendChild(n)}
+      const s=document.createElement("span");s.className="ch";d.appendChild(s);
+      d.addEventListener("click",()=>clickCell(r,c));
+    }
+    gridEl.appendChild(d);
+  }));
+  for(const D of ["A","D"]){
+    const ol=$("#clue"+D);ol.innerHTML="";
+    P.words.map((w,i)=>({w,i})).filter(x=>x.w.dir===D).sort((a,b)=>a.w.num-b.w.num).forEach(({w,i})=>{
+      const li=document.createElement("li");li.id="cl"+i;
+      li.innerHTML=`<span class="dot" style="background:var(--${w.topic})" title="${TOPICS[w.topic]}"></span><b>${w.num}.</b><span>${w.clue} <small style="color:var(--muted)">${lenLabel(w)}</small></span>`;
+      li.addEventListener("click",()=>{sel={r:w.r,c:w.c};dir=w.dir;render();focusKb()});
+      ol.appendChild(li);
+    });
+  }
+  fitCells();render();
+}
+function fitCells(){
+  if(!P)return;
+  const avail=Math.min($("#gridbox").clientWidth||600,720)-4;
+  const cs=Math.max(18,Math.min(40,Math.floor((avail-(P.cols-1)*2)/P.cols)));
+  gridEl.style.setProperty("--cs",cs+"px");
+}
+addEventListener("resize",fitCells);
+
+function wordIdx(r,c,d){const cell=P.grid[r][c];return cell?cell[d]:undefined}
+function clickCell(r,c){
+  if(sel.r===r&&sel.c===c){
+    const o=dir==="A"?"D":"A";
+    if(wordIdx(r,c,o)!==undefined)dir=o;
+  }else{
+    sel={r,c};
+    if(wordIdx(r,c,dir)===undefined)dir=dir==="A"?"D":"A";
+  }
+  render();focusKb();
+}
+function cellsOf(w){
+  return Array.from({length:w.ans.length},(_,k)=>[w.r+(w.dir==="D"?k:0),w.c+(w.dir==="A"?k:0)]);
+}
+function curWord(){const i=wordIdx(sel.r,sel.c,dir);return i===undefined?null:{i,w:P.words[i]}}
+
+function render(){
+  const cw=curWord();
+  const inw=new Set(cw?cellsOf(cw.w).map(([r,c])=>r+","+c):[]);
+  P.grid.forEach((row,r)=>row.forEach((cell,c)=>{
+    if(!cell)return;
+    const el=document.getElementById(`c${r}_${c}`);
+    el.querySelector(".ch").textContent=user[r][c];
+    el.className="c"+(inw.has(r+","+c)?" inw":"")+(sel.r===r&&sel.c===c?" sel":"")+(mark[r][c]?" "+mark[r][c]:"");
+  }));
+  P.words.forEach((w,i)=>{
+    const li=document.getElementById("cl"+i);if(!li)return;
+    const full=cellsOf(w).every(([r,c])=>user[r][c]===P.grid[r][c].ch);
+    li.className=(cw&&cw.i===i?"act":"")+(full?" done":"");
+  });
+  $("#active").innerHTML=cw?`<b>${cw.w.num} ${dir==="A"?"waagerecht →":"senkrecht ↓"}</b> ${cw.w.clue} <small>${lenLabel(cw.w)} · ${TOPICS[cw.w.topic]}</small>`:"";
+  const act=document.getElementById("cl"+(cw?cw.i:""));
+  if(act&&cw)act.scrollIntoView({block:"nearest"});
+  const filled=user.flat().filter(Boolean).length,total=P.grid.flat().filter(Boolean).length;
+  $("#stat").textContent=`${filled}/${total} Felder · Hilfen: ${hints} · ${fmt()}`;
+}
+function fmt(){const s=Math.floor((Date.now()-t0)/1000);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function tick(){if(!finished)$("#stat").textContent=$("#stat").textContent.replace(/\d\d:\d\d$/,fmt())}
+function focusKb(){try{kb.focus({preventScroll:true})}catch(e){kb.focus()}}
+
+function step(d,forward=true){
+  let {r,c}=sel;const s=forward?1:-1;
+  const dr=d==="D"?s:0,dc=d==="A"?s:0;
+  r+=dr;c+=dc;
+  if(P.grid[r]&&P.grid[r][c]&&wordIdx(r,c,d)!==undefined&&wordIdx(r,c,d)===wordIdx(sel.r,sel.c,d)){sel={r,c};return true}
+  return false;
+}
+function move(dr,dc){
+  let {r,c}=sel;
+  const nd=dr?"D":"A";
+  for(let n=0;n<40;n++){
+    r+=dr;c+=dc;
+    if(r<0||c<0||r>=P.rows||c>=P.cols)return;
+    if(P.grid[r][c]){
+      sel={r,c};
+      if(wordIdx(r,c,nd)!==undefined)dir=nd;
+      else if(wordIdx(r,c,dir)===undefined)dir=nd==="A"?"D":"A";
+      render();return;
+    }
+  }
+}
+function typeChar(ch){
+  user[sel.r][sel.c]=ch;mark[sel.r][sel.c]="";
+  step(dir,true);
+  render();checkWin();
+}
+function backspace(){
+  if(user[sel.r][sel.c]){user[sel.r][sel.c]="";mark[sel.r][sel.c]=""}
+  else if(step(dir,false)){user[sel.r][sel.c]="";mark[sel.r][sel.c]=""}
+  render();
+}
+const MAP={"Ä":"AE","Ö":"OE","Ü":"UE","ß":"SS","ẞ":"SS"};
+function handleText(t){
+  for(const ch of t.toUpperCase()){
+    const rep=MAP[ch]||ch;
+    for(const x of rep)if(/[A-Z]/.test(x))typeChar(x);
+  }
+}
+kb.addEventListener("keydown",e=>{
+  if(!P||e.ctrlKey||e.metaKey||e.altKey)return;
+  const k=e.key;
+  if(k==="ArrowRight"){move(0,1)}
+  else if(k==="ArrowLeft"){move(0,-1)}
+  else if(k==="ArrowDown"){move(1,0)}
+  else if(k==="ArrowUp"){move(-1,0)}
+  else if(k==="Backspace"){backspace()}
+  else if(k==="Delete"){user[sel.r][sel.c]="";mark[sel.r][sel.c]="";render()}
+  else if(k===" "||k==="Enter"){const o=dir==="A"?"D":"A";if(wordIdx(sel.r,sel.c,o)!==undefined){dir=o;render()}}
+  else if(k==="Tab"){
+    const i=curWord()?curWord().i:0,n=P.words.length,j=(i+(e.shiftKey?n-1:1))%n;
+    sel={r:P.words[j].r,c:P.words[j].c};dir=P.words[j].dir;render();
+  }
+  else if(k.length===1&&/[A-Za-zÄÖÜäöüß]/.test(k)){handleText(k)}
+  else return;
+  e.preventDefault();
+});
+kb.addEventListener("input",()=>{const v=kb.value;kb.value="";if(v)handleText(v)});
+
+// ---------- Aktionen
+function checkWin(){
+  if(finished)return;
+  const ok=P.grid.every((row,r)=>row.every((cell,c)=>!cell||user[r][c]===cell.ch));
+  if(ok){
+    finished=true;clearInterval(timer);
+    const w=$("#win");w.style.display="block";
+    w.textContent=`🎉 Gelöst in ${fmt()} mit ${hints} Hilfe(n)! Klicke auf „Neues Zufallsrätsel“ für das nächste.`;
+  }
+}
+$("#check").onclick=()=>{
+  P.grid.forEach((row,r)=>row.forEach((cell,c)=>{
+    if(cell&&user[r][c])mark[r][c]=user[r][c]===cell.ch?"right":"wrong";
+  }));
+  render();focusKb();
+};
+$("#hintL").onclick=()=>{
+  const cell=P.grid[sel.r][sel.c];
+  if(cell&&user[sel.r][sel.c]!==cell.ch){user[sel.r][sel.c]=cell.ch;mark[sel.r][sel.c]="hint";hints++}
+  render();checkWin();focusKb();
+};
+$("#hintW").onclick=()=>{
+  const cw=curWord();if(!cw)return;
+  cellsOf(cw.w).forEach(([r,c])=>{if(user[r][c]!==P.grid[r][c].ch){user[r][c]=P.grid[r][c].ch;mark[r][c]="hint"}});
+  hints+=3;render();checkWin();focusKb();
+};
+$("#solve").onclick=()=>{
+  if(!confirm("Lösung wirklich anzeigen?"))return;
+  P.grid.forEach((row,r)=>row.forEach((cell,c)=>{if(cell){user[r][c]=cell.ch;mark[r][c]="hint"}}));
+  finished=true;clearInterval(timer);hints+=99;render();
+};
+$("#clear").onclick=()=>{
+  if(!confirm("Alle Eingaben löschen?"))return;
+  user=P.grid.map(row=>row.map(()=>""));mark=P.grid.map(row=>row.map(()=>""));
+  hints=0;finished=false;$("#win").style.display="none";
+  t0=Date.now();clearInterval(timer);timer=setInterval(tick,1000);render();focusKb();
+};
+$("#new").onclick=()=>{
+  const s=parseInt($("#seed").value,10);
+  // Neue Zufallszahl, außer der Nutzer hat bewusst eine eigene eingetragen und noch nicht benutzt
+  newPuzzle(null);
+};
+$("#seed").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){const s=parseInt($("#seed").value,10);if(s)newPuzzle(s)}
+});
+$("#seed").addEventListener("change",()=>{const s=parseInt($("#seed").value,10);if(s)newPuzzle(s)});
+document.querySelectorAll(".topic,#size").forEach(el=>el.addEventListener("change",()=>newPuzzle(null)));
+
+newPuzzle(null);
+</script>
+</body>
+</html>
