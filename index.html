@@ -5,16 +5,69 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Meine HTML-Spiele</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;background:#111;color:#eee}
-a{color:#7cf}
+:root{
+  --bg:#0f1220;--card:#1a1e33;--card-hover:#232845;--text:#eef0ff;--muted:#9aa0c3;
+  --accent:#7c5cff;--accent2:#27d3c3;--border:#2a2f4f;
+}
+@media (prefers-color-scheme:light){
+  :root{--bg:#f4f5fb;--card:#fff;--card-hover:#f0eeff;--text:#1b1e33;--muted:#62678a;--border:#e1e3f0}
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:radial-gradient(900px 500px at 15% -10%,rgba(124,92,255,.25),transparent 60%),
+             radial-gradient(800px 500px at 100% 0%,rgba(39,211,195,.18),transparent 60%),var(--bg);
+  color:var(--text);
+}
+main{max-width:860px;margin:0 auto;padding:56px 16px 40px}
+header{text-align:center;margin-bottom:40px}
+h1{
+  margin:0 0 8px;font-size:clamp(2rem,6vw,3.2rem);letter-spacing:-.02em;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+header p{margin:0;color:var(--muted);font-size:1.05rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.game{
+  display:flex;flex-direction:column;gap:12px;padding:22px;text-decoration:none;color:inherit;
+  background:var(--card);border:1px solid var(--border);border-radius:18px;
+  transition:transform .15s,background .15s,border-color .15s,box-shadow .15s;
+}
+.game:hover,.game:focus-visible{
+  transform:translateY(-4px);background:var(--card-hover);border-color:var(--accent);
+  box-shadow:0 12px 30px rgba(124,92,255,.25);outline:none;
+}
+.icon{
+  width:54px;height:54px;border-radius:14px;display:grid;place-items:center;font-size:1.8rem;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+}
+.game h2{margin:0;font-size:1.25rem}
+.game p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.4}
+.play{margin-top:auto;font-weight:600;color:var(--accent2);font-size:.95rem}
+footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
 </style>
 </head>
 <body>
-<h1>Meine HTML-Spiele</h1>
-<ul>
-  <li><a href="rummikub/">Rummikub</a></li>
-  <li><a href="zollkreuzwort/">Zollkreuzwort</a></li>
-</ul>
-
+<main>
+  <header>
+    <h1>Meine HTML-Spiele</h1>
+    <p>Direkt im Browser spielen. Keine Installation nötig.</p>
+  </header>
+  <div class="grid">
+    <a class="game" href="rummikub/">
+      <div class="icon">🎲</div>
+      <h2>Rummikub</h2>
+      <p>Der Brettspiel-Klassiker mit Zahlensteinen, auch im Mehrspielermodus.</p>
+      <span class="play">Spielen →</span>
+    </a>
+    <a class="game" href="zollkreuzwort/">
+      <div class="icon">🧩</div>
+      <h2>Zollkreuzwort</h2>
+      <p>Ein Kreuzworträtsel rund um den Zoll.</p>
+      <span class="play">Spielen →</span>
+    </a>
+  </div>
+  <footer>Weitere Spiele folgen.</footer>
+</main>
 </body>
 </html>
