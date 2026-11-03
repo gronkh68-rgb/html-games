@@ -24,7 +24,25 @@
 .die i.on{background:#1b1e33}
 .die.roll{animation:shake .3s infinite}
 @keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
-.turn{font-weight:700;font-size:1.1rem}
+.turn{font-weight:800;font-size:1.4rem;text-align:center;padding:14px 8px;margin:-6px -6px 10px;background:var(--pc,#888);color:#000;letter-spacing:.08em;text-transform:uppercase}
+.turn.bump{animation:bump .55s}
+@keyframes bump{0%{transform:scale(1.1);filter:brightness(1.7)}100%{transform:none;filter:none}}
+#board{border:2px solid var(--pc,var(--border));box-shadow:0 0 22px var(--pc,transparent)}
+.cell{fill:rgba(255,255,255,.1);stroke:rgba(255,255,255,.35);stroke-width:1.5}
+.cell.start{fill:var(--c);stroke:#fff;stroke-width:2.5}
+.cell.lane{fill:var(--c);fill-opacity:.55;stroke:#fff;stroke-opacity:.7}
+.cell.bc{fill:rgba(0,0,0,.35);stroke:var(--c);stroke-width:2}
+.cell.off{opacity:.35}
+.basebox{fill:var(--c);fill-opacity:.12;stroke:var(--c);stroke-opacity:.5;stroke-width:2}
+.basebox.off{fill-opacity:.04;stroke-opacity:.2}
+.basebox.act{fill-opacity:.35;stroke-opacity:1;stroke-width:4;animation:basepulse .9s infinite alternate}
+@keyframes basepulse{from{fill-opacity:.2}to{fill-opacity:.5}}
+.piece .ring{fill:none;stroke:var(--c);stroke-width:3;opacity:0;transform-box:fill-box}
+.piece.mine .ring{opacity:.9}
+.scores div.act{color:var(--text);font-weight:700}
+.rules{font-size:.85rem;color:var(--muted);line-height:1.5}
+.rules summary{cursor:pointer;color:var(--text);font-weight:700}
+.rules ul{margin:8px 0 0;padding-left:18px}
 .scores div{display:flex;justify-content:space-between;padding:3px 0;color:var(--muted)}
 </style>
 </head>
@@ -54,6 +72,13 @@
           </div>
         </div>
         <div class="panel scores" id="scores"></div>
+        <details class="panel rules"><summary>Regeln</summary><ul>
+          <li>Mit einer 6 kommt eine Figur aus dem Haus. Das ist Pflicht, solange eine im Haus ist.</li>
+          <li>Wer eine 6 würfelt, würfelt nochmal.</li>
+          <li>Solange noch Figuren im Haus sind, muss die Figur auf dem Startfeld zuerst weiterziehen.</li>
+          <li>Ohne Figur auf dem Feld darf man dreimal würfeln.</li>
+          <li>Wer auf eine fremde Figur zieht, wirft sie raus. Im Ziel darf man nicht überspringen.</li>
+        </ul></details>
         <button class="btn alt" id="again">Neues Spiel</button>
       </div>
     </div>
@@ -65,7 +90,7 @@
 </div>
 
 <script>
-const COLORS=[{n:'Rot',c:'#e5484d'},{n:'Blau',c:'#3b82f6'},{n:'Grün',c:'#2fb457'},{n:'Gelb',c:'#f2c230'}];
+const COLORS=[{n:'Rot',c:'#ff2a55'},{n:'Blau',c:'#2e9bff'},{n:'Grün',c:'#2dffb3'},{n:'Gelb',c:'#fcee09'}];
 const CELL=50, NS='http://www.w3.org/2000/svg';
 const $=id=>document.getElementById(id);
 
@@ -121,8 +146,18 @@ function legalMoves(p,roll){
     if(own.some(q=>q===to||(q>=40&&q>pos&&q<to)))return;
     moves.push({i,to});
   });
-  const clear=moves.find(m=>own[m.i]===0);
-  return clear?[clear]:moves;
+  if(own.includes(-1)){
+    // Noch Figuren im Haus: Startfeld muss freigemacht werden, bei einer 6 muss eine Figur raus.
+    const onStart=own.indexOf(0);
+    if(onStart>=0){
+      const m=moves.find(m=>m.i===onStart);
+      if(m)return [m];
+    }else if(roll===6){
+      const out=moves.filter(m=>own[m.i]===-1);
+      if(out.length)return out;
+    }
+  }
+  return moves;
 }
 function wins(p){return pieces[p].every(q=>q>=40);}
 
@@ -132,30 +167,36 @@ function el(tag,attrs,parent){
   for(const k in attrs)e.setAttribute(k,attrs[k]);
   if(parent)parent.appendChild(e);return e;
 }
+const octa=(x,y,r)=>{const k=r*.42;return [[x-k,y-r],[x+k,y-r],[x+r,y-k],[x+r,y+k],[x+k,y+r],[x-k,y+r],[x-r,y+k],[x-r,y-k]].map(a=>a.join(',')).join(' ');};
+function cellEl(svg,c,r,cls,color,rad=20){
+  const e=el('polygon',{points:octa(cx(c),cx(r),rad),class:'cell '+cls},svg);
+  if(color)e.style.setProperty('--c',color);
+  return e;
+}
 function drawBoard(){
   const svg=$('board');svg.innerHTML='';
-  // Basen
   [0,1,2,3].forEach(p=>{
     const [x0,y0]=[[0,0],[9,0],[9,9],[0,9]][p];
-    el('rect',{x:x0*CELL+4,y:y0*CELL+4,width:2*CELL-8,height:2*CELL-8,rx:18,fill:COLORS[p].c,opacity:active.includes(p)?.28:.1},svg);
+    const r=el('rect',{x:x0*CELL+4,y:y0*CELL+4,width:2*CELL-8,height:2*CELL-8,rx:6,class:'basebox'+(active.includes(p)?'':' off'),id:'base-'+p},svg);
+    r.style.setProperty('--c',COLORS[p].c);
   });
-  const track=new Set(TRACK.map(([c,r])=>c+','+r));
   TRACK.forEach(([c,r],i)=>{
-    const start=i%10===0;
-    const owner=start?i/10:-1;
-    el('circle',{cx:cx(c),cy:cx(r),r:19,fill:start?COLORS[owner].c:'rgba(255,255,255,.14)',stroke:start?'#fff':'rgba(255,255,255,.35)','stroke-width':start?2.5:1.5,opacity:start&&!active.includes(owner)?.4:1},svg);
+    const start=i%10===0,owner=start?i/10:-1;
+    const e=cellEl(svg,c,r,start?'start':'',start?COLORS[owner].c:null);
+    if(start&&!active.includes(owner))e.classList.add('off');
   });
   [0,1,2,3].forEach(p=>{
-    LANE[p].forEach(([c,r])=>el('circle',{cx:cx(c),cy:cx(r),r:17,fill:COLORS[p].c,opacity:.55,stroke:'#fff','stroke-width':1.5},svg));
-    BASE[p].forEach(([c,r])=>el('circle',{cx:cx(c),cy:cx(r),r:17,fill:'rgba(0,0,0,.25)',stroke:COLORS[p].c,'stroke-width':2},svg));
+    LANE[p].forEach(([c,r])=>cellEl(svg,c,r,'lane',COLORS[p].c,18));
+    BASE[p].forEach(([c,r])=>cellEl(svg,c,r,'bc',COLORS[p].c,18));
   });
-  // Pfeile an den Startfeldern (kleine Punkte) - Mitte: Titel
   const t=el('text',{x:275,y:285,'text-anchor':'middle','font-size':16,'font-weight':700,fill:'rgba(255,255,255,.35)'},svg);
   t.textContent='MÄDN';
   const layer=el('g',{id:'pieces'},svg);
   active.forEach(p=>{
     for(let i=0;i<4;i++){
-      const g=el('g',{class:'piece',id:`pc-${p}-${i}`},layer);
+      const g=el('g',{class:'piece',id:`pc-${p}-${i}`,'data-p':p},layer);
+      g.style.setProperty('--c',COLORS[p].c);
+      el('circle',{class:'ring',r:24},g);
       el('circle',{class:'main',r:17,fill:COLORS[p].c},g);
       el('circle',{r:7,fill:'rgba(255,255,255,.35)',cx:-4,cy:-5},g);
       g.addEventListener('click',()=>onPieceClick(p,i));
@@ -177,10 +218,18 @@ function setDie(v){
 function setMsg(t){$('msg').innerHTML=t;}
 function chip(p){return `<span class="chip" style="background:${COLORS[p].c}"></span>`;}
 function showTurn(p){
-  $('turn').innerHTML=`${chip(p)}${COLORS[p].n} ist dran`;
+  const t=$('turn');
+  t.textContent=`${COLORS[p].n} ist dran${isHuman(p)?'':' (PC)'}`;
+  t.style.setProperty('--pc',COLORS[p].c);
+  $('game').style.setProperty('--pc',COLORS[p].c);
+  t.classList.remove('bump');void t.offsetWidth;t.classList.add('bump');
+  document.querySelectorAll('.basebox').forEach(b=>b.classList.remove('act'));
+  const bb=$('base-'+p);if(bb)bb.classList.add('act');
+  document.querySelectorAll('.piece').forEach(g=>g.classList.toggle('mine',+g.dataset.p===p));
+  showScores();
 }
 function showScores(){
-  $('scores').innerHTML=active.map(p=>`<div><span>${chip(p)}${COLORS[p].n}${isHuman(p)?'':' (PC)'}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
+  $('scores').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${COLORS[p].n}${isHuman(p)?'':' (PC)'}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
 }
 function markMovable(p,moves){
   document.querySelectorAll('.piece.can').forEach(g=>g.classList.remove('can'));

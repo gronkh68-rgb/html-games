@@ -1,4 +1,4 @@
-/* Optionales Design "DEUKRO Cyber". Umschalter unten links, Auswahl wird im Browser gemerkt. */
+/* Design "DEUKRO Cyber" (Voreinstellung). Umschalter unten links, Auswahl wird im Browser gemerkt. */
 (function () {
   var KEY = 'html-games-style', FX = 'html-games-fx';
   var script = document.currentScript;
@@ -28,7 +28,7 @@
     if (off) root.setAttribute('data-fx', 'off'); else root.removeAttribute('data-fx');
   }
 
-  apply(get(KEY) === 'cyber');
+  apply(get(KEY) !== 'standard'); // Cyber ist die Voreinstellung
   applyFx(get(FX) === 'off');
 
   addEventListener('DOMContentLoaded', function () {

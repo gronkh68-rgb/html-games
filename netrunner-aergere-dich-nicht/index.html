@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Netrunner ärgere dich nicht</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+#stage{position:fixed;inset:0;touch-action:none}
+#stage canvas{display:block;width:100%;height:100%}
+.hud{position:fixed;z-index:20;pointer-events:none}
+.hud .panel,.hud .btn,.hud a,.hud summary,.hud select{pointer-events:auto}
+.hud .panel{margin:0;padding:12px 14px;background:rgba(16,19,28,.82);backdrop-filter:blur(4px)}
+#topleft{left:10px;top:10px;display:flex;flex-direction:column;gap:8px;max-width:260px}
+#topleft h1{margin:0;font-size:1.05rem}
+#banner{left:50%;top:10px;transform:translateX(-50%);min-width:min(86vw,340px);text-align:center;padding:12px 22px;margin:0;
+  background:var(--pc,#888);color:#000;font-weight:900;font-size:1.25rem;letter-spacing:.08em;text-transform:uppercase;
+  box-shadow:0 0 26px var(--pc,transparent);pointer-events:none}
+#banner small{display:block;font-size:.7rem;font-weight:700;letter-spacing:.14em;opacity:.8}
+#banner.bump{animation:bump .6s}
+@keyframes bump{0%{transform:translateX(-50%) scale(1.15);filter:brightness(1.7)}100%{transform:translateX(-50%);filter:none}}
+#side{right:10px;top:10px;width:270px;display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 60px);overflow:auto}
+#plist div{display:flex;justify-content:space-between;gap:10px;padding:3px 0;color:var(--muted);font-size:.9rem}
+#plist div.act{color:var(--text);font-weight:700}
+#plist .meta{white-space:nowrap}
+.diebox{display:flex;align-items:center;gap:14px}
+.die{width:64px;height:64px;flex:none;border-radius:12px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);
+  display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:8px;gap:1px;cursor:pointer}
+.die i{border-radius:50%;margin:2px}
+.die i.on{background:#10131c}
+.die.roll{animation:shake .3s infinite}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+#msg{font-size:.95rem;min-height:2.6em}
+#log{font-size:.78rem;color:var(--muted);margin-top:6px;max-height:120px;overflow:auto;line-height:1.35}
+#log div{padding:1px 0;border-top:1px solid rgba(255,255,255,.06)}
+#legend{left:10px;bottom:52px;max-width:290px}
+#legend summary{cursor:pointer;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+#legend .it{display:flex;gap:10px;align-items:flex-start;padding:5px 0;font-size:.82rem;line-height:1.35;color:var(--muted)}
+#legend .g{flex:none;width:30px;height:24px;display:grid;place-items:center;font-weight:900;font-size:.8rem;color:#000}
+#camBar{left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;pointer-events:auto}
+#camBar .btn{padding:6px 12px;font-size:.78rem}
+#eventCard{left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
+  background:rgba(5,6,11,.9);border:2px solid #ffa31a;padding:16px 26px;box-shadow:0 0 30px rgba(255,163,26,.5)}
+#eventCard b{display:block;font-size:2.4rem;color:#ffa31a}
+#eventCard span{letter-spacing:.12em;text-transform:uppercase;font-weight:800}
+#slots .row select{min-width:130px}
+#nogl{padding:24px;text-align:center}
+@media (max-width:760px){
+  #topleft{max-width:none;flex-direction:row;align-items:center}
+  #topleft h1{display:none}
+  #banner{top:54px;font-size:1rem;padding:8px 14px}
+  #side{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:44vh;flex-direction:row;flex-wrap:wrap}
+  #side .panel{flex:1 1 150px;padding:8px 10px}
+  #plist{flex:1 1 100%!important;display:flex;flex-wrap:wrap;gap:2px 14px}
+  #plist div{gap:6px;font-size:.78rem}
+  #camBar{top:118px;bottom:auto;left:8px;right:8px;transform:none;justify-content:flex-start}
+  #camBar .btn{padding:4px 8px;font-size:.68rem}
+  #styleSwitch{bottom:auto!important;top:10px!important;left:auto!important;right:8px!important}
+  #log{display:none}
+  #legend{display:none}
+}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="nogl" class="panel" hidden>Dein Browser unterstützt WebGL nicht, deshalb kann die 3D-Karte nicht angezeigt werden.</div>
+
+<div id="hud" hidden>
+  <div class="hud" id="topleft">
+    <a class="back" href="../">← Spiele</a>
+    <h1>Netrunner ärgere dich nicht</h1>
+  </div>
+  <div class="hud panel" id="banner"></div>
+  <aside class="hud" id="side">
+    <div class="panel" id="plist"></div>
+    <div class="panel">
+      <div class="diebox">
+        <div class="die" id="die" title="Würfeln"></div>
+        <button class="btn" id="rollBtn" disabled>Würfeln</button>
+      </div>
+    </div>
+    <div class="panel"><div id="msg"></div><div id="log"></div></div>
+  </aside>
+  <details class="hud panel" id="legend"><summary>Felder</summary><div id="legendBody"></div></details>
+  <div class="hud" id="camBar">
+    <button class="btn alt" id="camIso">Schräg</button>
+    <button class="btn alt" id="camTop">Von oben</button>
+    <button class="btn alt" id="followBtn">Kamera folgt: an</button>
+    <button class="btn alt" id="glowBtn">Glow: an</button>
+    <button class="btn alt" id="againBtn">Neues Spiel</button>
+  </div>
+  <div class="hud" id="eventCard" hidden><span>Hack-Terminal</span><b id="eventNum"></b><span id="eventTxt"></span></div>
+</div>
+
+<div class="overlay" id="setup">
+  <div class="box" style="max-width:460px;text-align:left;width:100%">
+    <h2 style="text-align:center">Netrunner ärgere dich nicht</h2>
+    <p style="text-align:center;margin-bottom:14px">Bis zu 6 Runner auf einer 3D-Hexkarte. Wähle die Spieler.</p>
+    <div id="slots"></div>
+    <div class="row"><label style="min-width:90px">Karte</label>
+      <select id="specials"><option value="1">Mit Sonderfeldern</option><option value="0">Klassisch (ohne Sonderfelder)</option></select></div>
+    <div class="row" style="justify-content:center;margin-top:16px"><button class="btn" id="start">Spiel starten</button></div>
+    <p id="setupErr" style="color:#ff7b7b;margin:10px 0 0;text-align:center;font-size:.9rem"></p>
+  </div>
+</div>
+<div class="overlay" id="winBox" hidden>
+  <div class="box"><h2 id="winTitle"></h2><p>Netrunner-Sieg!</p><button class="btn" id="winBtn">Neues Spiel</button></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/MaskPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const SPEED=+new URLSearchParams(location.search).get('speed')||1;
+
+// ====================== Konstanten / Geometrie ======================
+const R=7, TL=6*R, LN=4, SIZE=1;                       // Ring-Radius, Ringlänge, Zielfelder
+const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const PLAYERS=[
+  {n:'Gelb',c:0xfcee09},{n:'Cyan',c:0x00f0ff},{n:'Pink',c:0xff2fa8},
+  {n:'Grün',c:0x2dff7a},{n:'Violett',c:0x9a6bff},{n:'Orange',c:0xff8a1f}];
+const hexCss=c=>'#'+c.toString(16).padStart(6,'0');
+const CORNER_SETS={2:[0,3],3:[0,2,4],4:[0,1,3,4],5:[0,1,2,3,4],6:[0,1,2,3,4,5]};
+const TYPES={
+  boost :{g:'+3',c:0x3dff8a,t:'Overclock',d:'3 Felder vor.'},
+  ice   :{g:'−3',c:0xff3b5c,t:'ICE-Falle',d:'3 Felder zurück.'},
+  portal:{g:'◎', c:0xb57bff,t:'Datenlink',d:'Springt zum Gegenstück.'},
+  swap  :{g:'⇄', c:0x00e5ff,t:'Tausch',d:'Platz mit dem am weitesten vorn liegenden Gegner tauschen.'},
+  safe  :{g:'◈', c:0xbde8ff,t:'Sicherer Knoten',d:'Hier wirst du nicht geschlagen. Ein besetzter Knoten ist für andere gesperrt.'},
+  event :{g:'?', c:0xffa31a,t:'Hack-Terminal',d:'Würfle die gezeigte Zahl: Treffer +6 Felder, sonst −2.'},
+  lag   :{g:'II',c:0xff4fd8,t:'Lag',d:'Du setzt die nächste Runde aus.'}
+};
+const ringCells=()=>{const res=[];let h=[-R*1,R*1];
+  for(let i=0;i<6;i++)for(let j=0;j<R;j++){res.push(h);h=[h[0]+DIRS[i][0],h[1]+DIRS[i][1]];}
+  return res;};
+const RING=ringCells();
+const axis=k=>DIRS[(4+k)%6];
+const laneCell=(k,j)=>{const a=axis(k),m=R-1-j;return [a[0]*m,a[1]*m];};
+const hex2w=([q,r],y=0)=>new THREE.Vector3(SIZE*Math.sqrt(3)*(q+r/2),y,SIZE*1.5*r);
+const H_RING=.3,H_LANE=.3;
+
+// ====================== Spielzustand ======================
+let cfg=[],active=[],corner=[],startIdx=[],pieces=[],skip=[],cellType=[],portals=[];
+let cur=-1,token=0,pick=null,rollWait=null,lastRoll=0,follow=true,glow=true,useSpecials=true,logLines=[];
+const CANCEL={};
+const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms/SPEED));
+const isHuman=p=>cfg[p]==='human';
+const absIdx=(p,pos)=>(startIdx[p]+pos)%TL;
+const chip=p=>`<span class="chip" style="background:${hexCss(PLAYERS[p].c)}"></span>`;
+const nm=p=>`${chip(p)}<b>${PLAYERS[p].n}</b>`;
+
+function onRing(p,j){const x=pieces[p][j];return x>=0&&x<TL;}
+function occupant(abs,except){ // [q,j] eines fremden Steins auf Ringfeld abs
+  for(const q of active){if(q===except)continue;
+    for(let j=0;j<4;j++)if(onRing(q,j)&&absIdx(q,pieces[q][j])===abs)return [q,j];}
+  return null;
+}
+const safeBlocked=(p,abs)=>cellType[abs]==='safe'&&!!occupant(abs,p);
+function canLand(p,i,to){
+  const own=pieces[p],pos=own[i];
+  if(to<0||to>TL+LN-1)return false;
+  if(own.some((q,j)=>j!==i&&(q===to||(q>=TL&&q>pos&&q<to))))return false;
+  if(to<TL&&safeBlocked(p,absIdx(p,to)))return false;
+  return true;
+}
+function legalMoves(p,roll){
+  const own=pieces[p],moves=[];let baseDone=false;
+  own.forEach((pos,i)=>{
+    if(pos===-1){
+      if(roll!==6||baseDone||own.includes(0))return;
+      baseDone=true;moves.push({i,to:0});return;
+    }
+    if(canLand(p,i,pos+roll))moves.push({i,to:pos+roll});
+  });
+  if(own.includes(-1)){
+    const onStart=own.indexOf(0);
+    if(onStart>=0){const m=moves.find(m=>m.i===onStart);if(m)return [m];}
+    else if(roll===6){const out=moves.filter(m=>own[m.i]===-1);if(out.length)return out;}
+  }
+  return moves;
+}
+const wins=p=>pieces[p].every(q=>q>=TL);
+function lanePacked(p){return pieces[p].filter(q=>q>=TL).sort((a,b)=>b-a).every((q,k)=>q===TL+LN-1-k);}
+const isWaiting=p=>!pieces[p].some(q=>q>=0&&q<TL)&&lanePacked(p);
+
+function layoutCells(){
+  cellType=Array(TL).fill('normal');portals=[];
+  for(let k=0;k<6;k++)cellType[k*R]='start';
+  if(!useSpecials)return;
+  const cand=[];
+  for(let k=0;k<6;k++)for(const off of [1,3,5])cand.push(k*R+off);
+  const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+  const types=['boost','boost','boost','ice','ice','ice','safe','safe','safe','swap','swap','event','event','event','portal','portal','lag','lag'];
+  for(let tries=0;tries<80;tries++){
+    shuffle(cand);shuffle(types);
+    const pi=types.map((t,i)=>t==='portal'?cand[i]:-1).filter(x=>x>=0);
+    const d=Math.abs(pi[0]-pi[1]);
+    if(Math.min(d,TL-d)>=14)break;
+  }
+  types.forEach((t,i)=>{cellType[cand[i]]=t;if(t==='portal')portals.push(cand[i]);});
+}
+
+// ====================== Three.js: Szene ======================
+let renderer,scene,camera,controls,composer,bloom,stage=$('stage');
+const tweens=[];
+let boardG=null,pieceMeshes={},baseSpots={},baseGlow={},startBeams={},rain,tower;
+
+function initThree(){
+  try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}
+  catch(e){$('nogl').hidden=false;$('setup').hidden=true;return false;}
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.setClearColor(0x05060b);
+  stage.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x05060b,.012);
+  camera=new THREE.PerspectiveCamera(55,1,.1,300);
+  camera.position.set(0,34,24);
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=.08;
+  controls.minDistance=10;controls.maxDistance=90;controls.maxPolarAngle=1.38;controls.target.set(0,0,0);
+  controls.enablePan=false;
+  scene.add(new THREE.AmbientLight(0x3a4a70,.5));
+  const dl=new THREE.DirectionalLight(0xaaccff,.35);dl.position.set(8,20,6);scene.add(dl);
+  buildEnvironment();
+  try{
+    composer=new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene,camera));
+    bloom=new THREE.UnrealBloomPass(new THREE.Vector2(512,512),.5,.45,.55);
+    composer.addPass(bloom);
+  }catch(e){composer=null;}
+  addEventListener('resize',resize);resize();
+  setupPicking();
+  requestAnimationFrame(tick);
+  return true;
+}
+function resize(){
+  const w=innerWidth,h=innerHeight;
+  renderer.setSize(w,h,false);
+  if(composer)composer.setSize(w,h);
+  camera.aspect=w/h;camera.updateProjectionMatrix();
+}
+// Kamera so weit zurück, dass die ganze Karte samt Basen auch im Hochformat sichtbar bleibt
+function camScale(){return Math.max(1,.85/camera.aspect);}
+
+function buildEnvironment(){
+  // Boden mit Raster
+  const grid=new THREE.GridHelper(320,160,0x00f0ff,0x0b3f4a);
+  grid.position.y=-.55;grid.material.transparent=true;grid.material.opacity=.4;scene.add(grid);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(320,320),new THREE.MeshBasicMaterial({color:0x04050a}));
+  floor.rotation.x=-Math.PI/2;floor.position.y=-.6;scene.add(floor);
+  // Stadt
+  const city=new THREE.Group();
+  const bm=new THREE.MeshStandardMaterial({color:0x0a0e1c,roughness:.8,metalness:.3,emissive:0x03050c});
+  const cols=[0x00f0ff,0xff2fa8,0xfcee09,0x9a6bff];
+  for(let n=0;n<150;n++){
+    const a=Math.random()*Math.PI*2,d=27+Math.random()*45;
+    const w=1.6+Math.random()*3.2,dp=1.6+Math.random()*3.2,h=3+Math.pow(Math.random(),2)*26;
+    const geo=new THREE.BoxGeometry(w,h,dp);
+    const m=new THREE.Mesh(geo,bm);
+    m.position.set(Math.cos(a)*d,h/2-.6,Math.sin(a)*d);
+    const col=cols[n%4];
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.6}));
+    e.position.copy(m.position);
+    city.add(m,e);
+    if(n%2===0){ // Leuchtstreifen
+      const s=new THREE.Mesh(new THREE.BoxGeometry(.12,h*(.3+Math.random()*.5),.12),new THREE.MeshBasicMaterial({color:cols[(n+1)%4]}));
+      s.position.set(m.position.x+w/2+.05,m.position.y,m.position.z+dp/2+.05);
+      city.add(s);
+    }
+  }
+  scene.add(city);
+  // Regen
+  const N=900,pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const a=Math.random()*Math.PI*2,d=Math.random()*42;pos[i*3]=Math.cos(a)*d;pos[i*3+1]=Math.random()*26;pos[i*3+2]=Math.sin(a)*d;}
+  const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  rain=new THREE.Points(rg,new THREE.PointsMaterial({color:0x7fd8ff,size:.09,transparent:true,opacity:.55,depthWrite:false}));
+  scene.add(rain);
+  // Zentraler Server-Turm
+  tower=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(.55,.8,7,6,1,true),
+    new THREE.MeshBasicMaterial({color:0x00f0ff,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  core.position.y=3.5;tower.add(core);
+  const inner=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,7.6,8),new THREE.MeshBasicMaterial({color:0xe8ffff}));
+  inner.position.y=3.8;tower.add(inner);
+  for(let i=0;i<4;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.1+i*.28,.05,8,48),new THREE.MeshBasicMaterial({color:i%2?0xff2fa8:0x00f0ff}));
+    ring.rotation.x=Math.PI/2;ring.position.y=1.2+i*1.5;ring.userData.s=(i%2?1:-1)*(.6+i*.2);tower.add(ring);
+  }
+  const pl=new THREE.PointLight(0x00f0ff,1.6,22);pl.position.y=4;tower.add(pl);
+  scene.add(tower);
+}
+
+// ====================== Spielfeld bauen ======================
+const geoCache={};
+function hexGeo(h,r=SIZE*.93){const k=h+'_'+r;return geoCache[k]||(geoCache[k]=new THREE.CylinderGeometry(r,r,h,6));}
+function addTile(parent,w,h,color,emissive,eI,edgeColor,edgeOp=.9){
+  const g=hexGeo(h);
+  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity:eI,roughness:.45,metalness:.5}));
+  m.position.set(w.x,h/2,w.z);parent.add(m);
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:edgeColor,transparent:true,opacity:edgeOp}));
+  e.position.copy(m.position);parent.add(e);
+  return m;
+}
+const glyphCache={};
+function glyphMesh(text,color,size=1.2){
+  const key=text+color;
+  let tex=glyphCache[key];
+  if(!tex){
+    const c=document.createElement('canvas');c.width=c.height=128;
+    const x=c.getContext('2d');
+    x.font='900 74px "Rajdhani","Segoe UI",system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';
+    x.shadowColor=hexCss(color);x.shadowBlur=14;x.fillStyle=hexCss(color);
+    x.fillText(text,64,70);x.fillText(text,64,70);
+    tex=glyphCache[key]=new THREE.CanvasTexture(c);
+  }
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+  m.rotation.x=-Math.PI/2;return m;
+}
+function buildBoard(){
+  if(boardG){scene.remove(boardG);}
+  boardG=new THREE.Group();scene.add(boardG);
+  baseSpots={};baseGlow={};startBeams={};
+  const laneSet=new Map();
+  for(let k=0;k<6;k++)for(let j=0;j<LN;j++)laneSet.set(laneCell(k,j).join(','),k);
+  const ringSet=new Set(RING.map(c=>c.join(',')));
+  // Innenfläche
+  for(let q=-R;q<=R;q++)for(let r=-R;r<=R;r++){
+    const d=Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r));
+    if(d>R-1||ringSet.has(q+','+r))continue;
+    const key=q+','+r,w=hex2w([q,r]);
+    const lk=laneSet.get(key);
+    if(lk!==undefined){
+      const owner=active.find(p=>corner[p]===lk);
+      if(owner!==undefined){
+        const c=PLAYERS[owner].c;
+        addTile(boardG,w,H_LANE,0x10131c,c,.3,c,1);
+        const gm=glyphMesh('▸',c,.9);gm.position.set(w.x,H_LANE+.02,w.z);boardG.add(gm);
+        continue;
+      }
+    }
+    addTile(boardG,w,.14,0x0a0e18,0x041a24,.8,d<=1?0x00f0ff:0x0e4a58,d<=1?1:.55);
+  }
+  // Ring
+  RING.forEach((cell,i)=>{
+    const w=hex2w(cell),t=cellType[i];
+    if(t==='start'){
+      const k=i/R,owner=active.find(p=>corner[p]===k);
+      if(owner!==undefined){
+        const c=PLAYERS[owner].c;
+        addTile(boardG,w,H_RING,c,c,.5,0xffffff,1);
+        const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.55,5,12,1,true),
+          new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+        beam.position.set(w.x,H_RING+2.5,w.z);boardG.add(beam);startBeams[owner]=beam;
+      }else addTile(boardG,w,H_RING,0x151a28,0x07101c,.8,0x2a4a5a,.8);
+    }else if(t==='normal'){
+      addTile(boardG,w,H_RING,0x141a2a,0x0a2a3c,.5,0x00b4d8,.8);
+    }else{
+      const ty=TYPES[t];
+      addTile(boardG,w,H_RING,0x10141f,ty.c,.28,ty.c,1);
+      const gm=glyphMesh(ty.g,ty.c,1.5);gm.position.set(w.x,H_RING+.02,w.z);boardG.add(gm);
+    }
+  });
+  // Basen
+  active.forEach(p=>{
+    const c=PLAYERS[p].c,cw=hex2w(RING[corner[p]*R]);
+    const o=new THREE.Vector3(cw.x,0,cw.z).normalize(),pv=new THREE.Vector3(-o.z,0,o.x);
+    const ctr=cw.clone().addScaledVector(o,3.5);
+    const plat=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.5,.3,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:c,emissiveIntensity:.25,roughness:.5,metalness:.6}));
+    plat.position.set(ctr.x,.15,ctr.z);boardG.add(plat);baseGlow[p]=plat;
+    const edge=new THREE.LineSegments(new THREE.EdgesGeometry(plat.geometry),new THREE.LineBasicMaterial({color:c}));
+    edge.position.copy(plat.position);boardG.add(edge);
+    // Steg zum Startfeld
+    const bridge=new THREE.Mesh(new THREE.BoxGeometry(.5,.12,1.9),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.75}));
+    const bp=cw.clone().addScaledVector(o,1.55);bridge.position.set(bp.x,.2,bp.z);bridge.rotation.y=Math.atan2(o.x,o.z);boardG.add(bridge);
+    baseSpots[p]=[[-.8,-.8],[.8,-.8],[-.8,.8],[.8,.8]].map(([a,b])=>ctr.clone().addScaledVector(o,a).addScaledVector(pv,b).setY(.3));
+  });
+  // Figuren
+  for(const k in pieceMeshes)scene.remove(pieceMeshes[k].g);
+  pieceMeshes={};
+  active.forEach(p=>{for(let i=0;i<4;i++){const pm=makePiece(p,i);pieceMeshes[p+'-'+i]=pm;scene.add(pm.g);}});
+  placeAll();
+}
+function makePiece(p,i){
+  const col=PLAYERS[p].c,g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.2,.34,.62,6),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.95,roughness:.3,metalness:.6}));
+  body.position.y=.31;g.add(body);
+  const head=new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshBasicMaterial({color:0xffffff}));
+  head.position.y=.88;g.add(head);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.52,40),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
+  ring.rotation.x=-Math.PI/2;ring.position.y=.03;g.add(ring);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.06,.34,3.2,12,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  beam.position.y=1.6;g.add(beam);
+  const hit=new THREE.Mesh(new THREE.CylinderGeometry(.75,.75,1.7,8),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
+  hit.position.y=.85;hit.userData={p,i};g.add(hit);
+  return {g,body,head,ring,beam,hit,p,i,can:false,mine:false};
+}
+function worldOf(p,i){
+  const pos=pieces[p][i];
+  if(pos<0)return baseSpots[p][i].clone();
+  if(pos<TL)return hex2w(RING[absIdx(p,pos)],H_RING);
+  return hex2w(laneCell(corner[p],pos-TL),H_LANE);
+}
+function placePiece(p,i){const pm=pieceMeshes[p+'-'+i];if(pm){pm.g.position.copy(worldOf(p,i));pm.g.scale.set(1,1,1);}}
+function placeAll(){active.forEach(p=>{for(let i=0;i<4;i++)placePiece(p,i);});}
+
+// ====================== Tweens / Render-Loop ======================
+function tween(dur,fn,t=token){
+  return new Promise(res=>tweens.push({t0:performance.now(),dur:dur/SPEED,fn,res,t}));
+}
+const ease=k=>k*k*(3-2*k);
+function hop(g,to,dur=260,h=.9){
+  const from=g.position.clone();
+  return tween(dur,k=>{
+    const e=ease(k);g.position.lerpVectors(from,to,e);g.position.y+=Math.sin(k*Math.PI)*h;
+  }).then(()=>g.position.copy(to));
+}
+function runTweens(now){
+  for(let i=tweens.length-1;i>=0;i--){
+    const tw=tweens[i],k=Math.min(1,(now-tw.t0)/tw.dur);
+    if(tw.t!==token){tweens.splice(i,1);continue;}
+    tw.fn(k);
+    if(k>=1){tweens.splice(i,1);tw.res();}
+  }
+}
+// Pausiert der Browser requestAnimationFrame (Tab im Hintergrund), laufen die Animationen trotzdem weiter.
+setInterval(()=>runTweens(performance.now()),50);
+let lastT=performance.now();
+function tick(now){
+  requestAnimationFrame(tick);
+  const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
+  runTweens(now);
+  const t=now/1000;
+  if(tower){tower.children.forEach(c=>{if(c.userData.s)c.rotation.z+=c.userData.s*dt;});}
+  if(rain){
+    const a=rain.geometry.attributes.position;
+    for(let i=0;i<a.count;i++){let y=a.getY(i)-dt*9;if(y<-.5)y=26;a.setY(i,y);}
+    a.needsUpdate=true;
+  }
+  for(const k in pieceMeshes){
+    const pm=pieceMeshes[k];
+    pm.head.rotation.y+=dt*2;
+    const pulse=.5+.5*Math.sin(t*6+pm.i);
+    pm.ring.material.opacity=pm.can?.6+.4*pulse:(pm.mine?.35:0);
+    pm.beam.material.opacity=pm.can?.2+.25*pulse:0;
+    pm.body.material.emissiveIntensity=pm.can?1.1+.6*pulse:(pm.mine?.95:.55);
+  }
+  active.forEach(p=>{
+    const on=p===cur,pl=.5+.5*Math.sin(t*4);
+    if(baseGlow[p])baseGlow[p].material.emissiveIntensity=on?.5+.6*pl:.12;
+    if(startBeams[p])startBeams[p].material.opacity=on?.22+.3*pl:.07;
+  });
+  controls.update();
+  if(composer&&glow)composer.render();else renderer.render(scene,camera);
+}
+
+// ====================== Kamera ======================
+function focusCorner(p){
+  if(!follow||p===undefined||p<0)return;
+  const cw=hex2w(RING[corner[p]*R]);
+  const a=Math.atan2(cw.x,cw.z);
+  const off=camera.position.clone().sub(controls.target);
+  const r=Math.hypot(off.x,off.z),y=off.y;
+  const a0=Math.atan2(off.x,off.z);
+  let da=a-a0;da=Math.atan2(Math.sin(da),Math.cos(da));
+  tween(1100,k=>{
+    const aa=a0+da*ease(k);
+    camera.position.set(controls.target.x+Math.sin(aa)*r,controls.target.y+y,controls.target.z+Math.cos(aa)*r);
+  });
+}
+$('camIso').onclick=()=>{camTo(0,34,24);};
+$('camTop').onclick=()=>{camTo(0,48,.01);};
+function camTo(x,y,z){
+  const to=new THREE.Vector3(x,y,z).multiplyScalar(camScale()),from=camera.position.clone(),tg=controls.target.clone();
+  tween(800,k=>{camera.position.lerpVectors(from,to,ease(k));controls.target.lerpVectors(tg,new THREE.Vector3(),ease(k));});
+}
+$('followBtn').onclick=()=>{follow=!follow;$('followBtn').textContent='Kamera folgt: '+(follow?'an':'aus');if(follow)focusCorner(cur);};
+$('glowBtn').onclick=()=>{glow=!glow;$('glowBtn').textContent='Glow: '+(glow?'an':'aus');};
+
+// ====================== Eingabe (Figuren anklicken) ======================
+function setupPicking(){
+  const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
+  let down=null;
+  renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,t:performance.now()};});
+  renderer.domElement.addEventListener('pointerup',e=>{
+    if(!down||!pick)return;
+    const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y),dt=performance.now()-down.t;down=null;
+    if(moved>8||dt>600)return;
+    const r=renderer.domElement.getBoundingClientRect();
+    mouse.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+    ray.setFromCamera(mouse,camera);
+    const hits=pick.moves.map(m=>pieceMeshes[pick.p+'-'+m.i].hit);
+    const hit=ray.intersectObjects(hits,false)[0];
+    if(!hit)return;
+    const m=pick.moves.find(m=>m.i===hit.object.userData.i);
+    if(m)choose(m);
+  });
+}
+function choose(m){if(!pick)return;const r=pick.res;pick=null;markMovable(null);r(m);}
+function markMovable(p,moves){
+  for(const k in pieceMeshes)pieceMeshes[k].can=false;
+  if(p==null)return;
+  moves.forEach(m=>{pieceMeshes[p+'-'+m.i].can=true;});
+}
+// ====================== HUD ======================
+function setDie(v){
+  const pat={0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
+  $('die').innerHTML=Array.from({length:9},(_,k)=>`<i class="${pat.includes(k)?'on':''}"></i>`).join('');
+}
+function say(t,keep=true){
+  $('msg').innerHTML=t;
+  if(keep){logLines.push(t);if(logLines.length>40)logLines.shift();
+    $('log').innerHTML=logLines.slice(-8).reverse().map(l=>`<div>${l}</div>`).join('');}
+}
+function showTurn(p){
+  const b=$('banner');
+  b.innerHTML=`${PLAYERS[p].n} ist dran<small>${isHuman(p)?'Du bist an der Reihe':'Computer'}</small>`;
+  b.style.setProperty('--pc',hexCss(PLAYERS[p].c));
+  b.classList.remove('bump');void b.offsetWidth;b.classList.add('bump');
+  for(const k in pieceMeshes)pieceMeshes[k].mine=pieceMeshes[k].p===p;
+  showScores();
+  focusCorner(p);
+}
+function showScores(){
+  $('plist').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${PLAYERS[p].n}${isHuman(p)?'':' (PC)'}${skip[p]?' · Lag':''}</span><span class="meta">${pieces[p].filter(q=>q>=TL).length}/4 im Ziel</span></div>`).join('');
+}
+function buildLegend(){
+  $('legend').hidden=!useSpecials;
+  $('legendBody').innerHTML=Object.keys(TYPES).map(k=>{const t=TYPES[k];
+    return `<div class="it"><span class="g" style="background:${hexCss(t.c)}">${t.g}</span><span><b style="color:var(--text)">${t.t}</b><br>${t.d}</span></div>`;}).join('');
+}
+
+// ====================== Ablauf ======================
+async function doRoll(p,label){
+  const btn=$('rollBtn');
+  if(isHuman(p)){
+    btn.disabled=false;btn.textContent=label||'Würfeln';
+    say(`${nm(p)}: Klicke auf <b>Würfeln</b>.`,false);
+    await new Promise(res=>{rollWait=res;});
+    rollWait=null;btn.disabled=true;
+  }else{
+    say(`${nm(p)} würfelt …`,false);
+    await sleep(600);
+  }
+  const t=token,die=$('die');die.classList.add('roll');
+  for(let k=0;k<7;k++){setDie(1+Math.floor(Math.random()*6));await sleep(70,t);}
+  die.classList.remove('roll');
+  const v=1+Math.floor(Math.random()*6);setDie(v);lastRoll=v;return v;
+}
+function pickMove(p,moves){
+  return new Promise(async res=>{
+    const t=token;markMovable(p,moves);
+    say(`${nm(p)}: eine <b>${lastRoll}</b>. Tippe auf eine leuchtende Figur.`,false);
+    pick={p,moves,res};
+    if(moves.length===1){
+      try{await sleep(650,t);}catch(e){return;}
+      if(pick&&pick.res===res)choose(moves[0]);
+    }
+  });
+}
+function aiPick(p,roll,moves){
+  const danger=abs=>{
+    if(cellType[abs]==='safe')return false;
+    return active.some(q=>q!==p&&pieces[q].some((x,j)=>onRing(q,j)&&((abs-absIdx(q,x)+TL)%TL)>=1&&((abs-absIdx(q,x)+TL)%TL)<=6));
+  };
+  const scored=moves.map(m=>{
+    const pos=pieces[p][m.i],np=m.to;let s=Math.random();
+    if(np<TL){
+      const abs=absIdx(p,np);
+      if(occupant(abs,p))s+=100;
+      if(danger(abs))s-=25;
+      const t=cellType[abs];
+      s+={boost:26,ice:-26,safe:10,swap:14,event:4,lag:-22,portal:6}[t]||0;
+    }
+    if(pos>=0&&pos<TL&&danger(absIdx(p,pos)))s+=20;
+    if(pos===-1)s+=50;
+    if(np>=TL&&pos<TL)s+=60;
+    s+=np*.3;
+    return {m,s};
+  }).sort((a,b)=>b.s-a.s);
+  return scored[0].m;
+}
+
+async function walkTo(p,i,target){
+  const pm=pieceMeshes[p+'-'+i];
+  let pos=pieces[p][i];
+  while(pos!==target){
+    pos+=target>pos?1:-1;
+    pieces[p][i]=pos;
+    await hop(pm.g,worldOf(p,i),pos===0&&target>=0?280:200,.7);
+  }
+}
+async function captureAt(p,abs){
+  const hit=occupant(abs,p);
+  if(!hit)return;
+  const [q,j]=hit;
+  say(`${nm(p)} wirft eine Figur von ${nm(q)} raus!`);
+  pieces[q][j]=-1;
+  await hop(pieceMeshes[q+'-'+j].g,worldOf(q,j),520,3);
+}
+async function applyMove(p,m){
+  const pm=pieceMeshes[p+'-'+m.i];
+  if(pieces[p][m.i]===-1){
+    pieces[p][m.i]=0;await hop(pm.g,worldOf(p,m.i),420,1.8);
+  }else await walkTo(p,m.i,m.to);
+  const pos=pieces[p][m.i];
+  if(pos<TL)await captureAt(p,absIdx(p,pos));
+  await sleep(150);
+  if(pos<TL&&useSpecials)await resolveCell(p,m.i);
+  showScores();
+}
+
+async function resolveCell(p,i){
+  const pos=pieces[p][i],abs=absIdx(p,pos),t=cellType[abs];
+  const pm=pieceMeshes[p+'-'+i];
+  if(t==='boost'||t==='ice'){
+    const d=t==='boost'?3:-3,to=Math.max(0,pos+d);
+    say(t==='boost'?`${nm(p)}: <b>Overclock!</b> 3 Felder vor.`:`${nm(p)}: <b>ICE-Falle!</b> 3 Felder zurück.`);
+    await sleep(500);
+    await shiftTo(p,i,to);
+  }else if(t==='portal'){
+    const other=portals.find(x=>x!==abs);
+    const np=(other-startIdx[p]+TL)%TL;
+    say(`${nm(p)}: <b>Datenlink!</b> Die Figur springt zum Gegenstück.`);
+    await sleep(500);
+    if(!canLand(p,i,np)||pieces[p].some((q,j)=>j!==i&&q===np)){say('Das Gegenstück ist blockiert.');return;}
+    await tween(300,k=>{pm.g.scale.setScalar(1-k*.95);});
+    pieces[p][i]=np;pm.g.position.copy(worldOf(p,i));
+    await tween(300,k=>{pm.g.scale.setScalar(.05+k*.95);});
+    await captureAt(p,other);
+  }else if(t==='swap'){
+    let best=null;
+    for(const q of active){if(q===p)continue;
+      for(let j=0;j<4;j++){
+        if(!onRing(q,j))continue;
+        const a=absIdx(q,pieces[q][j]);
+        if(cellType[a]==='safe')continue;
+        if(!best||pieces[q][j]>pieces[best[0]][best[1]])best=[q,j];
+      }}
+    if(!best){say(`${nm(p)}: <b>Tausch</b>, aber kein Ziel auf der Karte.`);return;}
+    const [q,j]=best,qa=absIdx(q,pieces[q][j]),pa=abs;
+    say(`${nm(p)}: <b>Tausch!</b> Platz mit ${nm(q)} getauscht.`);
+    await sleep(400);
+    const g1=pm.g,g2=pieceMeshes[q+'-'+j].g;
+    pieces[p][i]=(qa-startIdx[p]+TL)%TL;
+    pieces[q][j]=(pa-startIdx[q]+TL)%TL;
+    await Promise.all([hop(g1,worldOf(p,i),700,2.4),hop(g2,worldOf(q,j),700,2.4)]);
+  }else if(t==='safe'){
+    say(`${nm(p)}: <b>Sicherer Knoten.</b> Hier kann dich niemand schlagen.`);
+    await sleep(350);
+  }else if(t==='lag'){
+    skip[p]=1;
+    say(`${nm(p)}: <b>Lag!</b> Die nächste Runde setzt aus.`);
+    await sleep(700);
+  }else if(t==='event'){
+    await eventChallenge(p,i);
+  }
+}
+async function shiftTo(p,i,to){
+  const pm=pieceMeshes[p+'-'+i],pos=pieces[p][i];
+  if(to===pos)return;
+  if(!canLand(p,i,to)){say('Das Zielfeld ist blockiert.');return;}
+  await walkTo(p,i,to);
+  if(to<TL)await captureAt(p,absIdx(p,to));
+}
+async function eventChallenge(p,i){
+  const target=1+Math.floor(Math.random()*6);
+  $('eventNum').textContent=target;
+  $('eventTxt').textContent=`${PLAYERS[p].n}: würfle die ${target}`;
+  $('eventCard').hidden=false;
+  say(`${nm(p)}: <b>Hack-Terminal!</b> Würfle eine <b>${target}</b>: Treffer +6, sonst −2.`);
+  const roll=await doRoll(p,`Hacken (${target})`);
+  await sleep(500);
+  $('eventCard').hidden=true;
+  const pos=pieces[p][i];
+  if(roll===target){
+    say(`${nm(p)}: <b>Zugriff erfolgreich!</b> 6 Felder vor.`);
+    let to=pos+6;
+    while(to>pos&&!canLand(p,i,to))to--;
+    await shiftTo(p,i,to);
+  }else{
+    say(`${nm(p)}: eine ${roll}. <b>Zugriff verweigert</b>, 2 Felder zurück.`);
+    await sleep(400);
+    await shiftTo(p,i,Math.max(0,pos-2));
+  }
+}
+
+async function playTurn(p){
+  if(skip[p]>0){
+    skip[p]--;showScores();
+    say(`${nm(p)} steckt im <b>Lag</b> und setzt aus.`);
+    await sleep(1400);return false;
+  }
+  let tries=isWaiting(p)?3:1;
+  for(;;){
+    const roll=await doRoll(p);
+    const moves=legalMoves(p,roll);
+    if(moves.length){
+      const mv=isHuman(p)?await pickMove(p,moves):(await sleep(500),aiPick(p,roll,moves));
+      await applyMove(p,mv);
+      if(wins(p))return true;
+      if(roll===6){tries=isWaiting(p)?3:1;say(`${nm(p)}: Eine 6! Nochmal würfeln.`);await sleep(700);continue;}
+      return false;
+    }
+    say(`${nm(p)}: ${roll}, kein Zug möglich.`);
+    await sleep(900);
+    if(--tries<=0)return false;
+  }
+}
+async function gameLoop(){
+  try{
+    let i=0;
+    for(;;){
+      cur=active[i%active.length];
+      showTurn(cur);
+      if(await playTurn(cur)){
+        $('winTitle').innerHTML=`${chip(cur)}${PLAYERS[cur].n} gewinnt! 🎉`;
+        $('winBox').hidden=false;return;
+      }
+      i++;
+    }
+  }catch(e){if(e!==CANCEL)throw e;}
+}
+
+// ====================== Start / Setup ======================
+function buildSetup(){
+  const def=['human','cpu','cpu','off','off','off'];
+  $('slots').innerHTML=PLAYERS.map((c,p)=>`
+    <div class="row"><label><span class="chip" style="background:${hexCss(c.c)}"></span>${c.n}</label>
+    <select id="slot${p}"><option value="human">Mensch</option><option value="cpu">Computer</option><option value="off">Aus</option></select></div>`).join('');
+  def.forEach((d,p)=>$('slot'+p).value=d);
+}
+function startGame(){
+  cfg=PLAYERS.map((_,p)=>$('slot'+p).value);
+  active=PLAYERS.map((_,p)=>p).filter(p=>cfg[p]!=='off');
+  if(active.length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
+  $('setupErr').textContent='';
+  useSpecials=$('specials').value==='1';
+  token++;pick=null;rollWait=null;cur=-1;logLines=[];tweens.length=0;
+  const cs=CORNER_SETS[active.length];
+  corner=[];startIdx=[];skip=[];pieces=[];
+  active.forEach((p,k)=>{corner[p]=cs[k];startIdx[p]=cs[k]*R;skip[p]=0;pieces[p]=[-1,-1,-1,-1];});
+  layoutCells();buildBoard();buildLegend();
+  camera.position.set(0,34,24).multiplyScalar(camScale());controls.target.set(0,0,0);
+  $('setup').hidden=true;$('winBox').hidden=true;$('hud').hidden=false;$('eventCard').hidden=true;
+  $('log').innerHTML='';$('rollBtn').disabled=true;setDie(0);showScores();
+  gameLoop();
+}
+function backToSetup(){
+  token++;pick=null;rollWait=null;
+  $('hud').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;
+}
+$('start').onclick=startGame;
+$('againBtn').onclick=backToSetup;
+$('winBtn').onclick=backToSetup;
+$('rollBtn').onclick=()=>{if(rollWait)rollWait();};
+$('die').onclick=()=>{if(rollWait)rollWait();};
+buildSetup();setDie(0);
+if(!window.THREE||!initThree()){$('setup').hidden=true;$('nogl').hidden=false;}
+</script>
+</body>
+</html>
