@@ -1,0 +1,119 @@
+/* DEUKRO Cyber: nur aktiv mit html[data-style="cyber"] (siehe theme.js) */
+html[data-style="cyber"]{
+  --bg:#05060b;--card:#10131c;--card-hover:#161a26;--text:#e8f9ff;--muted:#7a8a96;
+  --accent:#fcee09;--accent2:#00f0ff;--border:#3a3d18;
+  --red:#ff2a55;--yel:#fcee09;--green:#2dffb3;
+  --ui:Rajdhani,"Segoe UI",sans-serif;--mono:"Share Tech Mono",ui-monospace,monospace;--disp:Orbitron,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+/* Scanlines und Vignette, auch auf den älteren Spielen */
+html[data-style="cyber"] body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:400;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
+             radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5));
+}
+html[data-style="cyber"] #styleSwitch button{
+  font-family:var(--ui);text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-size:11px;
+  background:#0b0e16;color:var(--text);border:1px solid #3a3d18;border-radius:0;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+}
+html[data-style="cyber"] #styleSwitch button:hover{color:var(--accent);border-color:var(--accent)}
+
+/* ---- ab hier nur die neuen Seiten (nicht die älteren Spiele) ---- */
+html[data-style="cyber"]:not([data-legacy]) body{
+  font-family:var(--mono);font-size:14px;letter-spacing:.02em;color:var(--text);
+  background:radial-gradient(700px 420px at 0% 0%,rgba(0,240,255,.10),transparent 60%),
+             radial-gradient(700px 420px at 100% 100%,rgba(255,42,85,.09),transparent 60%),#05060b;
+}
+html[data-style="cyber"]:not([data-legacy]) h1{
+  font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:.08em;
+  background:none;-webkit-text-fill-color:currentColor;color:var(--text);
+  text-shadow:2px 0 #ff2a55,-2px 0 #00f0ff;
+}
+html[data-style="cyber"]:not([data-legacy]) h2,
+html[data-style="cyber"]:not([data-legacy]) .turn,
+html[data-style="cyber"]:not([data-legacy]) .btn,
+html[data-style="cyber"]:not([data-legacy]) .back,
+html[data-style="cyber"]:not([data-legacy]) .play,
+html[data-style="cyber"]:not([data-legacy]) .row label{
+  font-family:var(--ui);text-transform:uppercase;letter-spacing:.12em;font-weight:800;
+}
+html[data-style="cyber"]:not([data-legacy]) .panel h2::before,
+html[data-style="cyber"]:not([data-legacy]) .game h2::before{content:"// ";color:var(--accent)}
+
+/* Karten: Ecken abgeschnitten, 4px Kante links */
+html[data-style="cyber"]:not([data-legacy]) .panel,
+html[data-style="cyber"]:not([data-legacy]) .game{
+  border-radius:0;border:1px solid #2a2d12;border-left:4px solid var(--accent);background:#10131c;box-shadow:none;
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,12px 100%,0 calc(100% - 12px));
+}
+html[data-style="cyber"]:not([data-legacy]) .game:hover,
+html[data-style="cyber"]:not([data-legacy]) .game:focus-visible{
+  transform:translateX(2px);background:#161a26;border-color:#2a2d12;border-left-color:var(--accent2);box-shadow:none;
+}
+html[data-style="cyber"]:not([data-legacy]) .game .play{color:var(--accent2)}
+html[data-style="cyber"]:not([data-legacy]) .game .icon{
+  border-radius:0;background:var(--accent);color:#000;font-size:0;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+}
+html[data-style="cyber"]:not([data-legacy]) .game .icon::before{content:"//";font:900 1.3rem var(--disp)}
+html[data-style="cyber"]:not([data-legacy]) header p,
+html[data-style="cyber"]:not([data-legacy]) footer{color:var(--muted)}
+
+/* Buttons */
+html[data-style="cyber"]:not([data-legacy]) .btn{
+  border-radius:0;background:var(--accent);color:#000;font-size:13px;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+  transition:filter .15s,transform .1s;
+}
+html[data-style="cyber"]:not([data-legacy]) .btn:hover:not(:disabled){transform:none;box-shadow:none;filter:drop-shadow(0 0 8px rgba(252,238,9,.6)) brightness(1.1)}
+html[data-style="cyber"]:not([data-legacy]) .btn:active:not(:disabled){transform:scale(.97)}
+html[data-style="cyber"]:not([data-legacy]) .btn.alt{background:#0b0e16;color:var(--text);border:1px solid #3a3d18}
+html[data-style="cyber"]:not([data-legacy]) .btn.alt:hover:not(:disabled){color:var(--accent)}
+html[data-style="cyber"]:not([data-legacy]) .back{
+  border-radius:0;background:#0b0e16;color:var(--accent2);border:1px solid #3a3d18;font-size:12px;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+}
+html[data-style="cyber"]:not([data-legacy]) select{
+  border-radius:0;background:#0b0e16;border:1px solid #3a3d18;font-family:var(--mono);color:var(--text);
+}
+html[data-style="cyber"]:not([data-legacy]) :focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+html[data-style="cyber"]:not([data-legacy]) .overlay{background:rgba(5,6,11,.8)}
+html[data-style="cyber"]:not([data-legacy]) .overlay .box{
+  border-radius:0;background:#10131c;border:1px solid var(--accent);
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,12px 100%,0 calc(100% - 12px));
+}
+html[data-style="cyber"]:not([data-legacy]) .overlay h2{color:var(--accent)}
+html[data-style="cyber"]:not([data-legacy]) .chip{border-radius:0;border-color:rgba(255,255,255,.6)}
+
+/* Spielbretter */
+html[data-style="cyber"] #board{border-radius:0}
+html[data-style="cyber"] svg#board{background:#0b0d14;border:1px solid #00f0ff;box-shadow:0 0 14px rgba(0,240,255,.35)}
+html[data-style="cyber"] div#board{background:#10131c;border:2px solid #00f0ff;box-shadow:0 0 14px rgba(0,240,255,.35)}
+html[data-style="cyber"] .slot{background:#05060b;box-shadow:inset 0 0 0 1px rgba(0,240,255,.25)}
+html[data-style="cyber"] .die{border-radius:0;box-shadow:0 0 14px rgba(252,238,9,.45)}
+html[data-style="cyber"] #svg{background:#0b0d14;border:1px solid #00f0ff;border-radius:0;box-shadow:0 0 14px rgba(0,240,255,.35)}
+html[data-style="cyber"] .line{stroke:#00f0ff;stroke-width:3}
+html[data-style="cyber"] .spot{fill:#00f0ff}
+html[data-style="cyber"] .dest{fill:rgba(252,238,9,.5)}
+html[data-style="cyber"] .sel{stroke:#fcee09}
+html[data-style="cyber"] .stone{stroke:#00f0ff}
+html[data-style="cyber"] .boards .grid{background:#00f0ff;border-radius:0;box-shadow:0 0 14px rgba(0,240,255,.3)}
+html[data-style="cyber"] .c{background:#0b0d14;border-radius:0}
+html[data-style="cyber"] .enemy .c.free:hover{background:#1a2a36}
+html[data-style="cyber"] .c.ship{background:#5b7b99}
+html[data-style="cyber"] .c.hit{background:#ff2a55}
+html[data-style="cyber"] .c.sunk{background:#7a1230}
+html[data-style="cyber"] .c.last{outline-color:#fcee09}
+html[data-style="cyber"] .fleet span{border-radius:0}
+
+/* Titel flackert alle 7 Sekunden */
+@keyframes dk-flicker{0%,93%,100%{opacity:1}94%{opacity:.4}95%{opacity:1}96%{opacity:.6}97%{opacity:1}}
+html[data-style="cyber"]:not([data-legacy]) h1{animation:dk-flicker 7s infinite}
+
+/* Weniger Effekte und reduzierte Bewegung */
+html[data-fx="off"] *,html[data-fx="off"] *::before,html[data-fx="off"] *::after{animation:none!important;transition:none!important}
+html[data-fx="off"][data-style="cyber"] body::after{display:none}
+@media (prefers-reduced-motion:reduce){
+  html[data-style="cyber"] *,html[data-style="cyber"] *::before,html[data-style="cyber"] *::after{animation:none!important;transition:none!important}
+}
