@@ -408,6 +408,15 @@
             selectedForMove: null // For tap-to-select mode
         };
 
+        // 3D-Tisch (eigene Datei, wird erst beim ersten Öffnen geladen)
+        function openTable3D() {
+            if (window.R3D) { R3D.open(); return; }
+            const s = document.createElement('script');
+            s.src = 'table3d.js';
+            s.onload = () => R3D.open();
+            document.head.appendChild(s);
+        }
+
         function setTouchMode(enabled) {
             state.touchMode = enabled;
             localStorage.setItem('rummikub-touch-mode', enabled);
@@ -3938,6 +3947,7 @@
                             <div style="display:flex;gap:0.3rem;align-items:center;">
                                 ${state.gameMode && state.gameMode.startsWith('online') && state.gameId ? `<span class="info-badge" style="cursor:pointer;font-family:monospace;" onclick="copyCode()" title="Spielcode kopieren">🔑 ${esc(state.gameId.replace('RK', ''))}</span>` : ''}
                                 <span class="info-badge">Pool: ${state.pool.length}</span>
+                                <button class="settings-btn" onclick="openTable3D()" title="3D-Ansicht" style="font-size:0.75rem;font-weight:800;">3D</button>
                                 <button class="settings-btn" onclick="toggleSettings()">⚙️</button>
                             </div>
                         </div>
