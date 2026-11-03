@@ -38,3 +38,12 @@ select{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(
 .overlay .box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 32px;text-align:center;max-width:380px}
 .overlay h2{margin:0 0 8px;font-size:1.6rem}
 .overlay p{margin:0 0 18px;color:var(--muted)}
+
+/* Würfel (siehe dice.js) */
+.die{--die:84px;width:var(--die);height:var(--die);margin:0 auto;border-radius:16px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;position:relative;overflow:hidden;flex:none}
+.die .dp{display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);width:100%;height:100%;padding:13%;gap:2px}
+.die .dp i{border-radius:50%;margin:8%}
+.die .dp i.on{background:#10131c}
+.die .dn,.die .dh,.die .db{display:none}
+.die.roll{animation:shake .3s infinite}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}

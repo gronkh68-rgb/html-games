@@ -6,6 +6,7 @@
 <title>Netrunner ärgere dich nicht</title>
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
+<script src="../dice.js"></script>
 <style>
 html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
 #stage{position:fixed;inset:0;touch-action:none}
@@ -26,12 +27,7 @@ html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
 #plist div.act{color:var(--text);font-weight:700}
 #plist .meta{white-space:nowrap}
 .diebox{display:flex;align-items:center;gap:14px}
-.die{width:64px;height:64px;flex:none;border-radius:12px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);
-  display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:8px;gap:1px;cursor:pointer}
-.die i{border-radius:50%;margin:2px}
-.die i.on{background:#10131c}
-.die.roll{animation:shake .3s infinite}
-@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+.die{--die:72px}
 #msg{font-size:.95rem;min-height:2.6em}
 #log{font-size:.78rem;color:var(--muted);margin-top:6px;max-height:120px;overflow:auto;line-height:1.35}
 #log div{padding:1px 0;border-top:1px solid rgba(255,255,255,.06)}
@@ -79,7 +75,7 @@ html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
     <div class="panel">
       <div class="diebox">
         <div class="die" id="die" title="Würfeln"></div>
-        <button class="btn" id="rollBtn" disabled>Würfeln</button>
+        <button class="btn" id="rollBtn" disabled>Hack starten</button>
       </div>
     </div>
     <div class="panel"><div id="msg"></div><div id="log"></div></div>
@@ -124,7 +120,7 @@ const $=id=>document.getElementById(id);
 const SPEED=+new URLSearchParams(location.search).get('speed')||1;
 
 // ====================== Konstanten / Geometrie ======================
-const R=7, TL=6*R, LN=4, SIZE=1;                       // Ring-Radius, Ringlänge, Zielfelder
+const R=10, TL=6*R, LN=4, SIZE=1, SEC=R;               // Ring-Radius, Ringlänge (60), Zielfelder, Feldzahl je Sektor
 const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
 const PLAYERS=[
   {n:'Gelb',c:0xfcee09},{n:'Cyan',c:0x00f0ff},{n:'Pink',c:0xff2fa8},
@@ -134,7 +130,7 @@ const CORNER_SETS={2:[0,3],3:[0,2,4],4:[0,1,3,4],5:[0,1,2,3,4],6:[0,1,2,3,4,5]};
 const TYPES={
   boost :{g:'+3',c:0x3dff8a,t:'Overclock',d:'3 Felder vor.'},
   ice   :{g:'−3',c:0xff3b5c,t:'ICE-Falle',d:'3 Felder zurück.'},
-  portal:{g:'◎', c:0xb57bff,t:'Datenlink',d:'Springt zum Gegenstück.'},
+  portal:{g:'◎', c:0xb57bff,t:'Datenlink',d:'Springt einen ganzen Sektor (10 Felder) vor. Zu nah am Ziel: wirkungslos.'},
   swap  :{g:'⇄', c:0x00e5ff,t:'Tausch',d:'Platz mit dem am weitesten vorn liegenden Gegner tauschen.'},
   safe  :{g:'◈', c:0xbde8ff,t:'Sicherer Knoten',d:'Hier wirst du nicht geschlagen. Ein besetzter Knoten ist für andere gesperrt.'},
   event :{g:'?', c:0xffa31a,t:'Hack-Terminal',d:'Würfle die gezeigte Zahl: Treffer +6 Felder, sonst −2.'},
@@ -147,7 +143,11 @@ const RING=ringCells();
 const axis=k=>DIRS[(4+k)%6];
 const laneCell=(k,j)=>{const a=axis(k),m=R-1-j;return [a[0]*m,a[1]*m];};
 const hex2w=([q,r],y=0)=>new THREE.Vector3(SIZE*Math.sqrt(3)*(q+r/2),y,SIZE*1.5*r);
-const H_RING=.3,H_LANE=.3;
+// Höhenprofil: jeder der 6 Sektoren ist ein gleich hoher Hügel (fair für alle), das Ziel liegt auf einer Hochebene
+const PROFILE=[0,.4,.9,1.5,2.0,2.0,1.5,.9,.4,.1];
+const RINGH=Array.from({length:TL},(_,i)=>.3+PROFILE[i%SEC]);
+const LANEH=[.4,.95,1.55,2.2];
+const interH=d=>d<=2?2.6:(d===3?1.7:(d===4?1.0:.14));
 
 // ====================== Spielzustand ======================
 let cfg=[],active=[],corner=[],startIdx=[],pieces=[],skip=[],cellType=[],portals=[];
@@ -193,21 +193,17 @@ const wins=p=>pieces[p].every(q=>q>=TL);
 function lanePacked(p){return pieces[p].filter(q=>q>=TL).sort((a,b)=>b-a).every((q,k)=>q===TL+LN-1-k);}
 const isWaiting=p=>!pieces[p].some(q=>q>=0&&q<TL)&&lanePacked(p);
 
+// Jeder Sektor bekommt dieselbe Feldfolge: Jeder Spieler läuft also genau dieselbe Strecke, nur um 60° gedreht.
+const TEMPLATES=[
+  ['normal','boost','normal','event','safe','portal','normal','swap','ice'],
+  ['normal','safe','boost','normal','event','ice','portal','normal','swap'],
+  ['normal','boost','lag','normal','safe','event','normal','ice','portal']];
 function layoutCells(){
   cellType=Array(TL).fill('normal');portals=[];
-  for(let k=0;k<6;k++)cellType[k*R]='start';
+  for(let k=0;k<6;k++)cellType[k*SEC]='start';
   if(!useSpecials)return;
-  const cand=[];
-  for(let k=0;k<6;k++)for(const off of [1,3,5])cand.push(k*R+off);
-  const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-  const types=['boost','boost','boost','ice','ice','ice','safe','safe','safe','swap','swap','event','event','event','portal','portal','lag','lag'];
-  for(let tries=0;tries<80;tries++){
-    shuffle(cand);shuffle(types);
-    const pi=types.map((t,i)=>t==='portal'?cand[i]:-1).filter(x=>x>=0);
-    const d=Math.abs(pi[0]-pi[1]);
-    if(Math.min(d,TL-d)>=14)break;
-  }
-  types.forEach((t,i)=>{cellType[cand[i]]=t;if(t==='portal')portals.push(cand[i]);});
+  const tpl=TEMPLATES[Math.floor(Math.random()*TEMPLATES.length)];
+  for(let k=0;k<6;k++)tpl.forEach((t,j)=>{cellType[k*SEC+1+j]=t;if(t==='portal')portals.push(k*SEC+1+j);});
 }
 
 // ====================== Three.js: Szene ======================
@@ -222,12 +218,12 @@ function initThree(){
   renderer.setClearColor(0x05060b);
   stage.appendChild(renderer.domElement);
   scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x05060b,.0045);
-  camera=new THREE.PerspectiveCamera(55,1,.1,300);
-  camera.position.set(0,34,24);
+  scene.fog=new THREE.FogExp2(0x05060b,.003);
+  camera=new THREE.PerspectiveCamera(55,1,.1,700);
+  camera.position.set(0,50,35);
   controls=new THREE.OrbitControls(camera,renderer.domElement);
   controls.enableDamping=true;controls.dampingFactor=.08;
-  controls.minDistance=10;controls.maxDistance=80;controls.maxPolarAngle=1.38;controls.target.set(0,0,0);
+  controls.minDistance=10;controls.maxDistance=125;controls.maxPolarAngle=1.38;controls.target.set(0,0,0);
   controls.enablePan=false;
   scene.add(new THREE.AmbientLight(0x3a4a70,.5));
   const dl=new THREE.DirectionalLight(0xaaccff,.35);dl.position.set(8,20,6);scene.add(dl);
@@ -254,17 +250,17 @@ function camScale(){return Math.max(1,.85/camera.aspect);}
 
 function buildEnvironment(){
   // Boden mit Raster
-  const grid=new THREE.GridHelper(320,160,0x00f0ff,0x0b3f4a);
+  const grid=new THREE.GridHelper(520,260,0x00f0ff,0x0b3f4a);
   grid.position.y=-.55;grid.material.transparent=true;grid.material.opacity=.4;scene.add(grid);
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(320,320),new THREE.MeshBasicMaterial({color:0x04050a}));
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(520,520),new THREE.MeshBasicMaterial({color:0x04050a}));
   floor.rotation.x=-Math.PI/2;floor.position.y=-.6;scene.add(floor);
   // Stadt
   const city=new THREE.Group();
   const bm=new THREE.MeshStandardMaterial({color:0x0a0e1c,roughness:.8,metalness:.3,emissive:0x03050c});
   const cols=[0x00f0ff,0xff2fa8,0xfcee09,0x9a6bff];
-  for(let n=0;n<170;n++){
-    const a=Math.random()*Math.PI*2,d=88+Math.random()*50; // weiter weg, als die Kamera je kommt (max. 80)
-    const w=3+Math.random()*6,dp=3+Math.random()*6,h=14+Math.pow(Math.random(),2)*80;
+  for(let n=0;n<190;n++){
+    const a=Math.random()*Math.PI*2,d=140+Math.random()*60; // weiter weg, als die Kamera je kommt (max. 125)
+    const w=4+Math.random()*9,dp=4+Math.random()*9,h=24+Math.pow(Math.random(),2)*110;
     const geo=new THREE.BoxGeometry(w,h,dp);
     const m=new THREE.Mesh(geo,bm);
     m.position.set(Math.cos(a)*d,h/2-.6,Math.sin(a)*d);
@@ -281,7 +277,7 @@ function buildEnvironment(){
   scene.add(city);
   // Regen
   const N=900,pos=new Float32Array(N*3);
-  for(let i=0;i<N;i++){const a=Math.random()*Math.PI*2,d=Math.random()*42;pos[i*3]=Math.cos(a)*d;pos[i*3+1]=Math.random()*26;pos[i*3+2]=Math.sin(a)*d;}
+  for(let i=0;i<N;i++){const a=Math.random()*Math.PI*2,d=Math.random()*62;pos[i*3]=Math.cos(a)*d;pos[i*3+1]=Math.random()*26;pos[i*3+2]=Math.sin(a)*d;}
   const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(pos,3));
   rain=new THREE.Points(rg,new THREE.PointsMaterial({color:0x7fd8ff,size:.09,transparent:true,opacity:.55,depthWrite:false}));
   scene.add(rain);
@@ -297,16 +293,16 @@ function buildEnvironment(){
     ring.rotation.x=Math.PI/2;ring.position.y=1.2+i*1.5;ring.userData.s=(i%2?1:-1)*(.6+i*.2);tower.add(ring);
   }
   const pl=new THREE.PointLight(0x00f0ff,1.6,22);pl.position.y=4;tower.add(pl);
-  scene.add(tower);
+  tower.position.y=2.6;tower.scale.setScalar(1.5);scene.add(tower);
 }
 
 // ====================== Spielfeld bauen ======================
 const geoCache={};
 function hexGeo(h,r=SIZE*.93){const k=h+'_'+r;return geoCache[k]||(geoCache[k]=new THREE.CylinderGeometry(r,r,h,6));}
-function addTile(parent,w,h,color,emissive,eI,edgeColor,edgeOp=.9){
-  const g=hexGeo(h);
+function addTile(parent,w,top,color,emissive,eI,edgeColor,edgeOp=.9){
+  const h=top+.4,g=hexGeo(h); // Säule von unten (-0.4) bis zur Oberkante: Hügel wirken wie Hochstraßen
   const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity:eI,roughness:.45,metalness:.5}));
-  m.position.set(w.x,h/2,w.z);parent.add(m);
+  m.position.set(w.x,top-h/2,w.z);parent.add(m);
   const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:edgeColor,transparent:true,opacity:edgeOp}));
   e.position.copy(m.position);parent.add(e);
   return m;
@@ -331,7 +327,7 @@ function buildBoard(){
   boardG=new THREE.Group();scene.add(boardG);
   baseSpots={};baseGlow={};startBeams={};
   const laneSet=new Map();
-  for(let k=0;k<6;k++)for(let j=0;j<LN;j++)laneSet.set(laneCell(k,j).join(','),k);
+  for(let k=0;k<6;k++)for(let j=0;j<LN;j++)laneSet.set(laneCell(k,j).join(','),[k,j]);
   const ringSet=new Set(RING.map(c=>c.join(',')));
   // Innenfläche
   for(let q=-R;q<=R;q++)for(let r=-R;r<=R;r++){
@@ -340,35 +336,53 @@ function buildBoard(){
     const key=q+','+r,w=hex2w([q,r]);
     const lk=laneSet.get(key);
     if(lk!==undefined){
-      const owner=active.find(p=>corner[p]===lk);
+      const owner=active.find(p=>corner[p]===lk[0]);
       if(owner!==undefined){
-        const c=PLAYERS[owner].c;
-        addTile(boardG,w,H_LANE,0x10131c,c,.3,c,1);
-        const gm=glyphMesh('▸',c,.9);gm.position.set(w.x,H_LANE+.02,w.z);boardG.add(gm);
+        const c=PLAYERS[owner].c,top=LANEH[lk[1]];
+        addTile(boardG,w,top,0x10131c,c,.3,c,1);
+        const gm=glyphMesh('▸',c,.9);gm.position.set(w.x,top+.02,w.z);boardG.add(gm);
         continue;
       }
     }
-    addTile(boardG,w,.14,0x0a0e18,0x041a24,.8,d<=1?0x00f0ff:0x0e4a58,d<=1?1:.55);
+    addTile(boardG,w,interH(d),0x0a0e18,d<=2?0x063040:0x041a24,.8,d<=2?0x00f0ff:(d<=4?0x14788a:0x0e4a58),d<=2?1:.55);
   }
   // Ring
   RING.forEach((cell,i)=>{
-    const w=hex2w(cell),t=cellType[i];
+    const w=hex2w(cell),t=cellType[i],H=RINGH[i];
     if(t==='start'){
-      const k=i/R,owner=active.find(p=>corner[p]===k);
+      const k=i/SEC,owner=active.find(p=>corner[p]===k);
       if(owner!==undefined){
         const c=PLAYERS[owner].c;
-        addTile(boardG,w,H_RING,c,c,.5,0xffffff,1);
+        addTile(boardG,w,H,c,c,.5,0xffffff,1);
         const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.55,5,12,1,true),
           new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
-        beam.position.set(w.x,H_RING+2.5,w.z);boardG.add(beam);startBeams[owner]=beam;
-      }else addTile(boardG,w,H_RING,0x151a28,0x07101c,.8,0x2a4a5a,.8);
+        beam.position.set(w.x,H+2.5,w.z);boardG.add(beam);startBeams[owner]=beam;
+      }else addTile(boardG,w,H,0x151a28,0x07101c,.8,0x2a4a5a,.8);
     }else if(t==='normal'){
-      addTile(boardG,w,H_RING,0x141a2a,0x0a2a3c,.5,0x00b4d8,.8);
+      addTile(boardG,w,H,0x141a2a,0x0a2a3c,.5,0x00b4d8,.8);
     }else{
       const ty=TYPES[t];
-      addTile(boardG,w,H_RING,0x10141f,ty.c,.28,ty.c,1);
-      const gm=glyphMesh(ty.g,ty.c,1.5);gm.position.set(w.x,H_RING+.02,w.z);boardG.add(gm);
+      addTile(boardG,w,H,0x10141f,ty.c,.28,ty.c,1);
+      const gm=glyphMesh(ty.g,ty.c,1.5);gm.position.set(w.x,H+.02,w.z);boardG.add(gm);
     }
+  });
+  // Pylone auf den Hügelkuppen (je Sektor gleich) und Datenlink-Bögen
+  for(let k=0;k<6;k++){
+    const i=k*SEC+5,w=hex2w(RING[i]),o=new THREE.Vector3(w.x,0,w.z).normalize();
+    const pw=w.clone().addScaledVector(o,2.1);
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(.14,.2,9,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:0x00f0ff,emissiveIntensity:.5,metalness:.6,roughness:.4}));
+    col.position.set(pw.x,4.2,pw.z);boardG.add(col);
+    for(let r=0;r<3;r++){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(.45,.04,6,24),new THREE.MeshBasicMaterial({color:r%2?0xff2fa8:0x00f0ff}));
+      ring.rotation.x=Math.PI/2;ring.position.set(pw.x,2.5+r*2.2,pw.z);boardG.add(ring);
+    }
+  }
+  portals.forEach(i=>{
+    const j=(i+SEC)%TL,a=hex2w(RING[i],RINGH[i]+.6),b=hex2w(RING[j],RINGH[j]+.6);
+    const mid=a.clone().add(b).multiplyScalar(.5);mid.y+=a.distanceTo(b)*.45;
+    const curve=new THREE.QuadraticBezierCurve3(a,mid,b);
+    const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,40,.045,6,false),new THREE.MeshBasicMaterial({color:0xb57bff,transparent:true,opacity:.75,blending:THREE.AdditiveBlending,depthWrite:false}));
+    boardG.add(tube);
   });
   // Basen
   active.forEach(p=>{
@@ -407,8 +421,8 @@ function makePiece(p,i){
 function worldOf(p,i){
   const pos=pieces[p][i];
   if(pos<0)return baseSpots[p][i].clone();
-  if(pos<TL)return hex2w(RING[absIdx(p,pos)],H_RING);
-  return hex2w(laneCell(corner[p],pos-TL),H_LANE);
+  if(pos<TL){const a=absIdx(p,pos);return hex2w(RING[a],RINGH[a]);}
+  return hex2w(laneCell(corner[p],pos-TL),LANEH[pos-TL]);
 }
 function placePiece(p,i){const pm=pieceMeshes[p+'-'+i];if(pm){pm.g.position.copy(worldOf(p,i));pm.g.scale.set(1,1,1);}}
 function placeAll(){active.forEach(p=>{for(let i=0;i<4;i++)placePiece(p,i);});}
@@ -477,8 +491,8 @@ function focusCorner(p){
     camera.position.set(controls.target.x+Math.sin(aa)*r,controls.target.y+y,controls.target.z+Math.cos(aa)*r);
   });
 }
-$('camIso').onclick=()=>{camTo(0,34,24);};
-$('camTop').onclick=()=>{camTo(0,48,.01);};
+$('camIso').onclick=()=>{camTo(0,50,35);};
+$('camTop').onclick=()=>{camTo(0,72,.01);};
 function camTo(x,y,z){
   const to=new THREE.Vector3(x,y,z).multiplyScalar(camScale()),from=camera.position.clone(),tg=controls.target.clone();
   tween(800,k=>{camera.position.lerpVectors(from,to,ease(k));controls.target.lerpVectors(tg,new THREE.Vector3(),ease(k));});
@@ -512,10 +526,6 @@ function markMovable(p,moves){
   moves.forEach(m=>{pieceMeshes[p+'-'+m.i].can=true;});
 }
 // ====================== HUD ======================
-function setDie(v){
-  const pat={0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
-  $('die').innerHTML=Array.from({length:9},(_,k)=>`<i class="${pat.includes(k)?'on':''}"></i>`).join('');
-}
 function say(t,keep=true){
   $('msg').innerHTML=t;
   if(keep){logLines.push(t);if(logLines.length>40)logLines.shift();
@@ -543,18 +553,17 @@ function buildLegend(){
 async function doRoll(p,label){
   const btn=$('rollBtn');
   if(isHuman(p)){
-    btn.disabled=false;btn.textContent=label||'Würfeln';
-    say(`${nm(p)}: Klicke auf <b>Würfeln</b>.`,false);
+    btn.disabled=false;btn.textContent=label||rollLabel();
+    say(`${nm(p)}: Klicke auf <b>${label||rollLabel()}</b>.`,false);
     await new Promise(res=>{rollWait=res;});
     rollWait=null;btn.disabled=true;
   }else{
     say(`${nm(p)} würfelt …`,false);
     await sleep(600);
   }
-  const t=token,die=$('die');die.classList.add('roll');
-  for(let k=0;k<7;k++){setDie(1+Math.floor(Math.random()*6));await sleep(70,t);}
-  die.classList.remove('roll');
-  const v=1+Math.floor(Math.random()*6);setDie(v);lastRoll=v;return v;
+  const t=token;
+  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(60,t);}
+  const v=1+Math.floor(Math.random()*6);dieDone(v);lastRoll=v;return v;
 }
 function pickMove(p,moves){
   return new Promise(async res=>{
@@ -628,15 +637,14 @@ async function resolveCell(p,i){
     await sleep(500);
     await shiftTo(p,i,to);
   }else if(t==='portal'){
-    const other=portals.find(x=>x!==abs);
-    const np=(other-startIdx[p]+TL)%TL;
-    say(`${nm(p)}: <b>Datenlink!</b> Die Figur springt zum Gegenstück.`);
+    const np=pos+SEC;
+    say(`${nm(p)}: <b>Datenlink!</b> Ein Sektor weiter.`);
     await sleep(500);
-    if(!canLand(p,i,np)||pieces[p].some((q,j)=>j!==i&&q===np)){say('Das Gegenstück ist blockiert.');return;}
+    if(np>TL-1||!canLand(p,i,np)){say('Der Datenlink ist überlastet. Nichts passiert.');return;}
     await tween(300,k=>{pm.g.scale.setScalar(1-k*.95);});
     pieces[p][i]=np;pm.g.position.copy(worldOf(p,i));
     await tween(300,k=>{pm.g.scale.setScalar(.05+k*.95);});
-    await captureAt(p,other);
+    await captureAt(p,absIdx(p,np));
   }else if(t==='swap'){
     let best=null;
     for(const q of active){if(q===p)continue;
@@ -750,7 +758,7 @@ function startGame(){
   corner=[];startIdx=[];skip=[];pieces=[];
   active.forEach((p,k)=>{corner[p]=cs[k];startIdx[p]=cs[k]*R;skip[p]=0;pieces[p]=[-1,-1,-1,-1];});
   layoutCells();buildBoard();buildLegend();
-  camera.position.set(0,34,24).multiplyScalar(camScale());controls.target.set(0,0,0);
+  camera.position.set(0,50,35).multiplyScalar(camScale());controls.target.set(0,0,0);
   $('setup').hidden=true;$('winBox').hidden=true;$('hud').hidden=false;$('eventCard').hidden=true;
   $('log').innerHTML='';$('rollBtn').disabled=true;setDie(0);showScores();
   gameLoop();

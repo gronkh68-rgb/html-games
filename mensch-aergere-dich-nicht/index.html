@@ -6,6 +6,7 @@
 <title>Mensch ärgere dich nicht</title>
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
+<script src="../dice.js"></script>
 <style>
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
 @media (max-width:760px){.layout{grid-template-columns:1fr}}
@@ -16,14 +17,6 @@
 .piece.can circle.main{animation:pulse .7s infinite alternate;transform-box:fill-box;transform-origin:center}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.22)}}
 .side{display:flex;flex-direction:column;gap:12px}
-.die{
-  width:84px;height:84px;margin:0 auto;border-radius:16px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);
-  display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:11px;gap:2px;cursor:pointer;
-}
-.die i{border-radius:50%;background:transparent;margin:3px}
-.die i.on{background:#1b1e33}
-.die.roll{animation:shake .3s infinite}
-@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
 .turn{font-weight:800;font-size:1.4rem;text-align:center;padding:14px 8px;margin:-6px -6px 10px;background:var(--pc,#888);color:#000;letter-spacing:.08em;text-transform:uppercase}
 .turn.bump{animation:bump .55s}
 @keyframes bump{0%{transform:scale(1.1);filter:brightness(1.7)}100%{transform:none;filter:none}}
@@ -223,10 +216,6 @@ function placePiece(p,i,front){
   if(front)g.parentNode.appendChild(g);
 }
 function placeAll(){active.forEach(p=>{for(let i=0;i<4;i++)placePiece(p,i)});}
-function setDie(v){
-  const pat={0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
-  $('die').innerHTML=Array.from({length:9},(_,k)=>`<i class="${pat.includes(k)?'on':''}"></i>`).join('');
-}
 function setMsg(t){$('msg').innerHTML=t;}
 function chip(p){return `<span class="chip" style="background:${COLORS[p].c}"></span>`;}
 function showTurn(p){
@@ -256,7 +245,8 @@ async function doRoll(p){
   const btn=$('rollBtn');
   if(isHuman(p)){
     btn.disabled=false;
-    setMsg('Klicke auf <b>Würfeln</b>.');
+    $('rollBtn').textContent=rollLabel();
+    setMsg(`Klicke auf <b>${rollLabel()}</b>.`);
     await new Promise(res=>{rollWait=res;});
     rollWait=null;btn.disabled=true;
   }else{
@@ -264,11 +254,9 @@ async function doRoll(p){
     await sleep(650);
   }
   const t=token;
-  const die=$('die');die.classList.add('roll');
-  for(let k=0;k<7;k++){setDie(1+Math.floor(Math.random()*6));await sleep(70,t);}
-  die.classList.remove('roll');
+  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(60,t);}
   const v=1+Math.floor(Math.random()*6);
-  setDie(v);lastRoll=v;
+  dieDone(v);lastRoll=v;
   return v;
 }
 function pickMove(p,moves){
