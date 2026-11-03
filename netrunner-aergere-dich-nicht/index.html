@@ -120,7 +120,7 @@ const $=id=>document.getElementById(id);
 const SPEED=+new URLSearchParams(location.search).get('speed')||1;
 
 // ====================== Konstanten / Geometrie ======================
-const R=10, TL=6*R, LN=4, SIZE=1, SEC=R;               // Ring-Radius, Ringlänge (60), Zielfelder, Feldzahl je Sektor
+const R=10, SEC=12, TL=6*SEC, LN=4, SIZE=1;            // Eck-Radius (Raster), Felder je Sektor, Ringlänge (72), Zielfelder
 const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
 const PLAYERS=[
   {n:'Gelb',c:0xfcee09},{n:'Cyan',c:0x00f0ff},{n:'Pink',c:0xff2fa8},
@@ -130,27 +130,26 @@ const CORNER_SETS={2:[0,3],3:[0,2,4],4:[0,1,3,4],5:[0,1,2,3,4],6:[0,1,2,3,4,5]};
 const TYPES={
   boost :{g:'+3',c:0x3dff8a,t:'Overclock',d:'3 Felder vor.'},
   ice   :{g:'−3',c:0xff3b5c,t:'ICE-Falle',d:'3 Felder zurück.'},
-  portal:{g:'◎', c:0xb57bff,t:'Datenlink',d:'Springt einen ganzen Sektor (10 Felder) vor. Zu nah am Ziel: wirkungslos.'},
+  portal:{g:'A»',c:0xb57bff,t:'Datenlink: Eingang',d:'Springt zum Ausgang mit gleichem Buchstaben und gleicher Farbe (»A). Nur in diese Richtung, immer vorwärts. Zu nah am Ziel: wirkungslos.'},
+  exit  :{g:'»A',c:0xb57bff,t:'Datenlink: Ausgang',d:'Hier kommt der Datenlink heraus. Ansonsten ein normales Feld.'},
   swap  :{g:'⇄', c:0x00e5ff,t:'Tausch',d:'Platz mit dem am weitesten vorn liegenden Gegner tauschen.'},
   safe  :{g:'◈', c:0xbde8ff,t:'Sicherer Knoten',d:'Hier wirst du nicht geschlagen. Ein besetzter Knoten ist für andere gesperrt.'},
   event :{g:'?', c:0xffa31a,t:'Hack-Terminal',d:'Würfle die gezeigte Zahl: Treffer +6 Felder, sonst −2.'},
   lag   :{g:'II',c:0xff4fd8,t:'Lag',d:'Du setzt die nächste Runde aus.'}
 };
-const ringCells=()=>{const res=[];let h=[-R*1,R*1];
-  for(let i=0;i<6;i++)for(let j=0;j<R;j++){res.push(h);h=[h[0]+DIRS[i][0],h[1]+DIRS[i][1]];}
-  return res;};
-const RING=ringCells();
+let RINGW=[],shapeName='';
+const ringPos=(i,y=0)=>new THREE.Vector3(RINGW[i].x,y,RINGW[i].z);
 const axis=k=>DIRS[(4+k)%6];
 const laneCell=(k,j)=>{const a=axis(k),m=R-1-j;return [a[0]*m,a[1]*m];};
 const hex2w=([q,r],y=0)=>new THREE.Vector3(SIZE*Math.sqrt(3)*(q+r/2),y,SIZE*1.5*r);
 // Höhenprofil: jeder der 6 Sektoren ist ein gleich hoher Hügel (fair für alle), das Ziel liegt auf einer Hochebene
-const PROFILE=[0,.4,.9,1.5,2.0,2.0,1.5,.9,.4,.1];
+const PROFILE=Array.from({length:SEC},(_,i)=>2.0*Math.pow(Math.sin(Math.PI*i/SEC),.8));
 const RINGH=Array.from({length:TL},(_,i)=>.3+PROFILE[i%SEC]);
 const LANEH=[.4,.95,1.55,2.2];
 const interH=d=>d<=2?2.6:(d===3?1.7:(d===4?1.0:.14));
 
 // ====================== Spielzustand ======================
-let cfg=[],active=[],corner=[],startIdx=[],pieces=[],skip=[],cellType=[],portals=[];
+let cfg=[],active=[],corner=[],startIdx=[],pieces=[],skip=[],cellType=[],portalPairs=[],portalFx=[];
 let cur=-1,token=0,pick=null,rollWait=null,lastRoll=0,follow=true,glow=true,useSpecials=true,logLines=[];
 const CANCEL={};
 const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms/SPEED));
@@ -193,17 +192,63 @@ const wins=p=>pieces[p].every(q=>q>=TL);
 function lanePacked(p){return pieces[p].filter(q=>q>=TL).sort((a,b)=>b-a).every((q,k)=>q===TL+LN-1-k);}
 const isWaiting=p=>!pieces[p].some(q=>q>=0&&q<TL)&&lanePacked(p);
 
-// Jeder Sektor bekommt dieselbe Feldfolge: Jeder Spieler läuft also genau dieselbe Strecke, nur um 60° gedreht.
+// Jeder Sektor bekommt dieselbe Form und dieselbe Feldfolge: Jeder Spieler läuft also genau dieselbe Strecke, nur um 60° gedreht.
+const tri=x=>(2/Math.PI)*Math.asin(Math.sin(x));
+const SHAPES=[
+  {name:'Welle',f:t=>5.0*Math.sin(2*Math.PI*t)},
+  {name:'Zickzack',f:t=>4.6*tri(4*Math.PI*t)},
+  {name:'Bucht',f:t=>-6.0*Math.sin(Math.PI*t)},
+  {name:'Schlangenlinie',f:t=>4.2*Math.sin(3*Math.PI*t)}];
+function makeRing(){
+  const c0=hex2w([-R,R]),c1=hex2w([0,R]);
+  const a0=Math.atan2(c0.z,c0.x),rho0=Math.hypot(c0.x,c0.z);
+  let da=Math.atan2(c1.z,c1.x)-a0;da=Math.atan2(Math.sin(da),Math.cos(da));
+  const shape=SHAPES[Math.floor(Math.random()*SHAPES.length)];
+  const lanes=[];for(let k=0;k<6;k++)for(let j=0;j<LN;j++)lanes.push(hex2w(laneCell(k,j)));
+  const build=scale=>{
+    // dichte Kurve von Ecke 0 zu Ecke 1, nahe den Ecken gedämpft (dort stehen die Basen)
+    const N=600,pts=[];
+    for(let n=0;n<=N;n++){
+      const t=n/N,amp=scale*shape.f(t)*Math.pow(Math.sin(Math.PI*t),.6),ang=a0+da*t,rho=rho0+amp;
+      pts.push({x:rho*Math.cos(ang),z:rho*Math.sin(ang)});
+    }
+    const cum=[0];for(let n=1;n<=N;n++)cum.push(cum[n-1]+Math.hypot(pts[n].x-pts[n-1].x,pts[n].z-pts[n-1].z));
+    const base=[];let n=0;
+    for(let i=0;i<SEC;i++){const target=cum[N]*i/SEC;while(cum[n+1]<target)n++;
+      const f=(target-cum[n])/(cum[n+1]-cum[n]);base.push({x:pts[n].x+(pts[n+1].x-pts[n].x)*f,z:pts[n].z+(pts[n+1].z-pts[n].z)*f});}
+    const ring=[];
+    for(let k=0;k<6;k++){const ca=Math.cos(da*k),sa=Math.sin(da*k);
+      base.forEach(b=>ring.push({x:b.x*ca-b.z*sa,z:b.x*sa+b.z*ca}));}
+    return ring;
+  };
+  const ok=ring=>{
+    const d=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+    const n=ring.length;
+    for(let i=0;i<n;i++){
+      for(let j=i+2;j<n;j++){if(i===0&&j===n-1)continue;if(d(ring[i],ring[j])<1.7)return false;}
+      for(const l of lanes)if(d(ring[i],l)<1.7)return false;
+    }
+    return true;
+  };
+  let ring=build(1);
+  for(let sc=1;sc>0.25&&!ok(ring);sc-=.08)ring=build(sc);
+  RINGW=ring;shapeName=shape.name;
+}
+// Datenlinks haben getrennte Ein- und Ausgänge (gleiche Farbe und gleicher Buchstabe), damit nichts verwirrt.
+const PAIR_COLORS=[0xb57bff,0xff7bd5,0x7bffd0,0xffd27b,0x7bb8ff,0xc7ff7b];
 const TEMPLATES=[
-  ['normal','boost','normal','event','safe','portal','normal','swap','ice'],
-  ['normal','safe','boost','normal','event','ice','portal','normal','swap'],
-  ['normal','boost','lag','normal','safe','event','normal','ice','portal']];
+  ['normal','boost','portal','event','safe','swap','normal','exit','ice','normal','normal'],
+  ['normal','safe','portal','boost','event','ice','swap','normal','exit','normal','normal'],
+  ['normal','boost','lag','portal','safe','event','normal','exit','ice','normal','normal']];
 function layoutCells(){
-  cellType=Array(TL).fill('normal');portals=[];
+  cellType=Array(TL).fill('normal');portalPairs=[];
+  makeRing();
   for(let k=0;k<6;k++)cellType[k*SEC]='start';
   if(!useSpecials)return;
   const tpl=TEMPLATES[Math.floor(Math.random()*TEMPLATES.length)];
-  for(let k=0;k<6;k++)tpl.forEach((t,j)=>{cellType[k*SEC+1+j]=t;if(t==='portal')portals.push(k*SEC+1+j);});
+  for(let k=0;k<6;k++)tpl.forEach((t,j)=>{cellType[k*SEC+1+j]=t;});
+  const eo=tpl.indexOf('portal')+1,xo=tpl.indexOf('exit')+1;
+  for(let k=0;k<6;k++)portalPairs.push({entry:k*SEC+eo,exit:((k+1)%6)*SEC+xo,jump:SEC+xo-eo,letter:'ABCDEF'[k],color:PAIR_COLORS[k]});
 }
 
 // ====================== Three.js: Szene ======================
@@ -322,17 +367,19 @@ function glyphMesh(text,color,size=1.2){
   const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
   m.rotation.x=-Math.PI/2;return m;
 }
+const nearest=(list,w)=>{let m=1e9;for(const v of list){const d=Math.hypot(v.x-w.x,v.z-w.z);if(d<m)m=d;}return m;};
 function buildBoard(){
   if(boardG){scene.remove(boardG);}
   boardG=new THREE.Group();scene.add(boardG);
-  baseSpots={};baseGlow={};startBeams={};
+  baseSpots={};baseGlow={};startBeams={};portalFx=[];
   const laneSet=new Map();
   for(let k=0;k<6;k++)for(let j=0;j<LN;j++)laneSet.set(laneCell(k,j).join(','),[k,j]);
-  const ringSet=new Set(RING.map(c=>c.join(',')));
-  // Innenfläche
-  for(let q=-R;q<=R;q++)for(let r=-R;r<=R;r++){
+  const ringPts=RINGW.map((_,i)=>ringPos(i));
+  const baseCtr=active.map(p=>{const cw=ringPos(corner[p]*SEC),o=cw.clone().setY(0).normalize();return cw.clone().addScaledVector(o,3.5);});
+  // Innenfläche (Sechseck-Raster) mit Terrassen; unter der Strecke und den Basen bleibt Platz
+  for(let q=-R-2;q<=R+2;q++)for(let r=-R-2;r<=R+2;r++){
     const d=Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r));
-    if(d>R-1||ringSet.has(q+','+r))continue;
+    if(d>R+2)continue;
     const key=q+','+r,w=hex2w([q,r]);
     const lk=laneSet.get(key);
     if(lk!==undefined){
@@ -344,11 +391,13 @@ function buildBoard(){
         continue;
       }
     }
+    if(nearest(ringPts,w)<1.5)continue;
+    if(baseCtr.some(c=>Math.hypot(c.x-w.x,c.z-w.z)<2.8))continue;
     addTile(boardG,w,interH(d),0x0a0e18,d<=2?0x063040:0x041a24,.8,d<=2?0x00f0ff:(d<=4?0x14788a:0x0e4a58),d<=2?1:.55);
   }
-  // Ring
-  RING.forEach((cell,i)=>{
-    const w=hex2w(cell),t=cellType[i],H=RINGH[i];
+  // Strecke
+  RINGW.forEach((_,i)=>{
+    const w=ringPos(i),t=cellType[i],H=RINGH[i];
     if(t==='start'){
       const k=i/SEC,owner=active.find(p=>corner[p]===k);
       if(owner!==undefined){
@@ -360,16 +409,24 @@ function buildBoard(){
       }else addTile(boardG,w,H,0x151a28,0x07101c,.8,0x2a4a5a,.8);
     }else if(t==='normal'){
       addTile(boardG,w,H,0x141a2a,0x0a2a3c,.5,0x00b4d8,.8);
+    }else if(t==='portal'||t==='exit'){
+      const pr=portalPairs.find(q=>q.entry===i||q.exit===i),entry=pr.entry===i;
+      addTile(boardG,w,H,0x10141f,pr.color,entry?.5:.2,pr.color,1);
+      const gm=glyphMesh(entry?pr.letter+'»':'»'+pr.letter,pr.color,1.6);gm.position.set(w.x,H+.02,w.z);boardG.add(gm);
     }else{
       const ty=TYPES[t];
       addTile(boardG,w,H,0x10141f,ty.c,.28,ty.c,1);
       const gm=glyphMesh(ty.g,ty.c,1.5);gm.position.set(w.x,H+.02,w.z);boardG.add(gm);
     }
   });
-  // Pylone auf den Hügelkuppen (je Sektor gleich) und Datenlink-Bögen
+  // leuchtende Straße entlang der Felder
+  const road=new THREE.CatmullRomCurve3(ringPts.map((v,i)=>new THREE.Vector3(v.x,RINGH[i]+.03,v.z)),true);
+  boardG.add(new THREE.Mesh(new THREE.TubeGeometry(road,TL*8,.07,6,true),
+    new THREE.MeshBasicMaterial({color:0x00b4d8,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false})));
+  // Pylone auf den Hügelkuppen (je Sektor gleich)
   for(let k=0;k<6;k++){
-    const i=k*SEC+5,w=hex2w(RING[i]),o=new THREE.Vector3(w.x,0,w.z).normalize();
-    const pw=w.clone().addScaledVector(o,2.1);
+    const i=k*SEC+Math.floor(SEC/2),w=ringPos(i),o=w.clone().setY(0).normalize();
+    const pw=w.clone().addScaledVector(o,2.3);
     const col=new THREE.Mesh(new THREE.CylinderGeometry(.14,.2,9,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:0x00f0ff,emissiveIntensity:.5,metalness:.6,roughness:.4}));
     col.position.set(pw.x,4.2,pw.z);boardG.add(col);
     for(let r=0;r<3;r++){
@@ -377,23 +434,25 @@ function buildBoard(){
       ring.rotation.x=Math.PI/2;ring.position.set(pw.x,2.5+r*2.2,pw.z);boardG.add(ring);
     }
   }
-  portals.forEach(i=>{
-    const j=(i+SEC)%TL,a=hex2w(RING[i],RINGH[i]+.6),b=hex2w(RING[j],RINGH[j]+.6);
-    const mid=a.clone().add(b).multiplyScalar(.5);mid.y+=a.distanceTo(b)*.45;
+  // Datenlinks: farbiger Bogen vom Eingang zum Ausgang, Lichtpunkt zeigt die Richtung
+  portalPairs.forEach(pr=>{
+    const a=ringPos(pr.entry,RINGH[pr.entry]+.6),b=ringPos(pr.exit,RINGH[pr.exit]+.6);
+    const mid=a.clone().add(b).multiplyScalar(.5);mid.y+=a.distanceTo(b)*.5;
     const curve=new THREE.QuadraticBezierCurve3(a,mid,b);
-    const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,40,.045,6,false),new THREE.MeshBasicMaterial({color:0xb57bff,transparent:true,opacity:.75,blending:THREE.AdditiveBlending,depthWrite:false}));
-    boardG.add(tube);
+    boardG.add(new THREE.Mesh(new THREE.TubeGeometry(curve,40,.05,6,false),
+      new THREE.MeshBasicMaterial({color:pr.color,transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false})));
+    const pulse=new THREE.Mesh(new THREE.SphereGeometry(.24,10,10),new THREE.MeshBasicMaterial({color:0xffffff}));
+    boardG.add(pulse);portalFx.push({pulse,curve,off:Math.random()});
   });
   // Basen
   active.forEach(p=>{
-    const c=PLAYERS[p].c,cw=hex2w(RING[corner[p]*R]);
+    const c=PLAYERS[p].c,cw=ringPos(corner[p]*SEC);
     const o=new THREE.Vector3(cw.x,0,cw.z).normalize(),pv=new THREE.Vector3(-o.z,0,o.x);
     const ctr=cw.clone().addScaledVector(o,3.5);
     const plat=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.5,.3,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:c,emissiveIntensity:.25,roughness:.5,metalness:.6}));
     plat.position.set(ctr.x,.15,ctr.z);boardG.add(plat);baseGlow[p]=plat;
     const edge=new THREE.LineSegments(new THREE.EdgesGeometry(plat.geometry),new THREE.LineBasicMaterial({color:c}));
     edge.position.copy(plat.position);boardG.add(edge);
-    // Steg zum Startfeld
     const bridge=new THREE.Mesh(new THREE.BoxGeometry(.5,.12,1.9),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.75}));
     const bp=cw.clone().addScaledVector(o,1.55);bridge.position.set(bp.x,.2,bp.z);bridge.rotation.y=Math.atan2(o.x,o.z);boardG.add(bridge);
     baseSpots[p]=[[-.8,-.8],[.8,-.8],[-.8,.8],[.8,.8]].map(([a,b])=>ctr.clone().addScaledVector(o,a).addScaledVector(pv,b).setY(.3));
@@ -421,7 +480,7 @@ function makePiece(p,i){
 function worldOf(p,i){
   const pos=pieces[p][i];
   if(pos<0)return baseSpots[p][i].clone();
-  if(pos<TL){const a=absIdx(p,pos);return hex2w(RING[a],RINGH[a]);}
+  if(pos<TL){const a=absIdx(p,pos);return ringPos(a,RINGH[a]);}
   return hex2w(laneCell(corner[p],pos-TL),LANEH[pos-TL]);
 }
 function placePiece(p,i){const pm=pieceMeshes[p+'-'+i];if(pm){pm.g.position.copy(worldOf(p,i));pm.g.scale.set(1,1,1);}}
@@ -455,6 +514,7 @@ function tick(now){
   runTweens(now);
   const t=now/1000;
   if(tower){tower.children.forEach(c=>{if(c.userData.s)c.rotation.z+=c.userData.s*dt;});}
+  portalFx.forEach(f=>f.curve.getPoint((t*.3+f.off)%1,f.pulse.position));
   if(rain){
     const a=rain.geometry.attributes.position;
     for(let i=0;i<a.count;i++){let y=a.getY(i)-dt*9;if(y<-.5)y=26;a.setY(i,y);}
@@ -480,7 +540,7 @@ function tick(now){
 // ====================== Kamera ======================
 function focusCorner(p){
   if(!follow||p===undefined||p<0)return;
-  const cw=hex2w(RING[corner[p]*R]);
+  const cw=ringPos(corner[p]*SEC);
   const a=Math.atan2(cw.x,cw.z);
   const off=camera.position.clone().sub(controls.target);
   const r=Math.hypot(off.x,off.z),y=off.y;
@@ -637,8 +697,8 @@ async function resolveCell(p,i){
     await sleep(500);
     await shiftTo(p,i,to);
   }else if(t==='portal'){
-    const np=pos+SEC;
-    say(`${nm(p)}: <b>Datenlink!</b> Ein Sektor weiter.`);
+    const pr=portalPairs.find(q=>q.entry===abs),np=pos+pr.jump;
+    say(`${nm(p)}: <b>Datenlink ${pr.letter}!</b> Weiter zum Ausgang »${pr.letter}.`);
     await sleep(500);
     if(np>TL-1||!canLand(p,i,np)){say('Der Datenlink ist überlastet. Nichts passiert.');return;}
     await tween(300,k=>{pm.g.scale.setScalar(1-k*.95);});
@@ -756,11 +816,12 @@ function startGame(){
   token++;pick=null;rollWait=null;cur=-1;logLines=[];tweens.length=0;
   const cs=CORNER_SETS[active.length];
   corner=[];startIdx=[];skip=[];pieces=[];
-  active.forEach((p,k)=>{corner[p]=cs[k];startIdx[p]=cs[k]*R;skip[p]=0;pieces[p]=[-1,-1,-1,-1];});
+  active.forEach((p,k)=>{corner[p]=cs[k];startIdx[p]=cs[k]*SEC;skip[p]=0;pieces[p]=[-1,-1,-1,-1];});
   layoutCells();buildBoard();buildLegend();
   camera.position.set(0,50,35).multiplyScalar(camScale());controls.target.set(0,0,0);
   $('setup').hidden=true;$('winBox').hidden=true;$('hud').hidden=false;$('eventCard').hidden=true;
   $('log').innerHTML='';$('rollBtn').disabled=true;setDie(0);showScores();
+  say(`Kartenform: <b>${shapeName}</b>. Alle Sektoren sind gleich, jeder läuft dieselbe Strecke.`);
   gameLoop();
 }
 function backToSetup(){
