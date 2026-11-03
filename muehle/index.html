@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mühle</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+.wrap{max-width:640px}
+#svg{width:100%;max-width:600px;display:block;margin:0 auto;background:#c89a5a;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.4);touch-action:manipulation}
+.line{stroke:#5b3a14;stroke-width:4;fill:none;stroke-linecap:round}
+.spot{fill:#5b3a14}
+.hit{fill:transparent;cursor:pointer}
+.stone{stroke:#222;stroke-width:2;pointer-events:none;transition:opacity .2s}
+.s1{fill:#f4f1ea}
+.s2{fill:#2b2b33}
+.sel{stroke:#27d3c3;stroke-width:5}
+.dest{fill:rgba(39,211,195,.55);pointer-events:none}
+.rem{stroke:#ef4444;stroke-width:5;animation:blink .5s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:.55}}
+.hand{display:flex;justify-content:center;gap:28px;margin:8px 0;color:var(--muted)}
+.hand b{color:var(--text)}
+.stonechip{display:inline-block;width:1em;height:1em;border-radius:50%;vertical-align:-.15em;margin-right:.3em;border:2px solid #222}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Mühle</h1></div>
+
+  <div class="panel">
+    <div class="row">
+      <label>Modus</label>
+      <select id="mode"><option value="cpu">Gegen Computer</option><option value="two">2 Spieler</option></select>
+      <select id="level"><option value="1">Leicht</option><option value="3" selected>Mittel</option><option value="4">Schwer</option></select>
+      <button class="btn" id="new">Neues Spiel</button>
+    </div>
+    <div class="status" id="msg" style="text-align:center"></div>
+    <div class="hand" id="hand"></div>
+  </div>
+
+  <svg id="svg" viewBox="0 0 600 600"></svg>
+</div>
+<div class="overlay" id="winBox" hidden>
+  <div class="box"><h2 id="winTitle"></h2><p id="winSub"></p><button class="btn" id="winBtn">Neues Spiel</button></div>
+</div>
+
+<script>
+const NS='http://www.w3.org/2000/svg',$=id=>document.getElementById(id);
+// Punkte: Ring 0..7 außen, 8..15 Mitte, 16..23 innen
+const G=[[0,0],[3,0],[6,0],[6,3],[6,6],[3,6],[0,6],[0,3],
+         [1,1],[3,1],[5,1],[5,3],[5,5],[3,5],[1,5],[1,3],
+         [2,2],[3,2],[4,2],[4,3],[4,4],[3,4],[2,4],[2,3]];
+const px=([c,r])=>[c*90+30,r*90+30];
+const ADJ=Array.from({length:24},()=>[]);
+for(let ring=0;ring<3;ring++)for(let k=0;k<8;k++){
+  const a=ring*8+k,b=ring*8+(k+1)%8;
+  ADJ[a].push(b);ADJ[b].push(a);
+}
+for(const k of [1,3,5,7]){
+  ADJ[k].push(k+8);ADJ[k+8].push(k,k+16);ADJ[k+16].push(k+8);
+}
+const MILLS=[];
+for(let ring=0;ring<3;ring++)for(let s=0;s<4;s++){
+  const o=ring*8;MILLS.push([o+s*2,o+s*2+1,o+(s*2+2)%8]);
+}
+for(const k of [1,3,5,7])MILLS.push([k,k+8,k+16]);
+const MILLS_AT=Array.from({length:24},(_,i)=>MILLS.filter(m=>m.includes(i)));
+
+let note='',st,mode,sel=null,removing=false,busy=false,over=false,token=0,pendingMove=null;
+const nm=p=>mode==='cpu'?(p===1?'Du':'Computer'):(p===1?'Weiß':'Schwarz');
+const chip=p=>`<span class="stonechip" style="background:${p===1?'#f4f1ea':'#2b2b33'}"></span>`;
+
+function newState(){return {b:Array(24).fill(0),hand:[0,9,9],turn:1};}
+const count=(s,p)=>s.b.filter(x=>x===p).length;
+const inMill=(b,i)=>MILLS_AT[i].some(m=>m.every(j=>b[j]===b[i]));
+function phase(s,p){
+  if(s.hand[p]>0)return 'place';
+  return count(s,p)===3?'fly':'move';
+}
+function baseMoves(s,p){
+  const out=[],ph=phase(s,p);
+  if(ph==='place'){for(let i=0;i<24;i++)if(!s.b[i])out.push({from:-1,to:i});}
+  else for(let i=0;i<24;i++)if(s.b[i]===p){
+    if(ph==='fly'){for(let j=0;j<24;j++)if(!s.b[j])out.push({from:i,to:j});}
+    else for(const j of ADJ[i])if(!s.b[j])out.push({from:i,to:j});
+  }
+  return out;
+}
+function removable(s,p,b=s.b){
+  const o=3-p,all=[],free=[];
+  for(let i=0;i<24;i++)if(b[i]===o){all.push(i);if(!inMill(b,i))free.push(i);}
+  return free.length?free:all;
+}
+function apply(s,p,m,rem){
+  const n={b:s.b.slice(),hand:s.hand.slice(),turn:3-p};
+  if(m.from<0)n.hand[p]--;else n.b[m.from]=0;
+  n.b[m.to]=p;
+  if(rem!==undefined&&rem>=0)n.b[rem]=0;
+  return n;
+}
+const makesMill=(s,p,m)=>{const t=apply(s,p,m);return MILLS_AT[m.to].some(ml=>ml.every(j=>t.b[j]===p));};
+function loser(s,p){ // hat p verloren?
+  const total=count(s,p)+s.hand[p];
+  if(total<3)return true;
+  if(s.hand[p]===0&&baseMoves(s,p).length===0)return true;
+  return false;
+}
+
+// ---------- Darstellung ----------
+function el(tag,a,parent){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);parent&&parent.appendChild(e);return e;}
+function draw(){
+  const svg=$('svg');svg.innerHTML='';
+  const L=(a,b)=>{const [x1,y1]=px(G[a]),[x2,y2]=px(G[b]);el('line',{class:'line',x1,y1,x2,y2},svg);};
+  for(let ring=0;ring<3;ring++)for(let k=0;k<8;k++)L(ring*8+k,ring*8+(k+1)%8);
+  for(const k of [1,3,5,7]){L(k,k+8);L(k+8,k+16);}
+  const dests=new Set();
+  if(!over&&!removing&&!busy&&canHuman()){
+    const ph=phase(st,st.turn);
+    if(ph==='place')st.b.forEach((v,i)=>{if(!v)dests.add(i);});
+    else if(sel!==null)baseMoves(st,st.turn).filter(m=>m.from===sel).forEach(m=>dests.add(m.to));
+  }
+  const rem=removing?new Set(removable(st,st.turn)):new Set();
+  for(let i=0;i<24;i++){
+    const [x,y]=px(G[i]);
+    el('circle',{class:'spot',cx:x,cy:y,r:7},svg);
+    if(dests.has(i))el('circle',{class:'dest',cx:x,cy:y,r:16},svg);
+    if(st.b[i]){
+      const c=el('circle',{class:`stone s${st.b[i]}${sel===i?' sel':''}${rem.has(i)?' rem':''}`,cx:x,cy:y,r:23},svg);
+      if(st.b[i]===1)el('circle',{cx:x,cy:y,r:14,fill:'none',stroke:'rgba(0,0,0,.12)','stroke-width':2,'pointer-events':'none'},svg);
+    }
+    const h=el('circle',{class:'hit',cx:x,cy:y,r:30},svg);
+    h.addEventListener('click',()=>onPoint(i));
+  }
+  $('hand').innerHTML=[1,2].map(p=>`<span>${chip(p)}${nm(p)}: <b>${st.hand[p]}</b> zu setzen, <b>${count(st,p)}</b> auf dem Brett</span>`).join('');
+}
+function say(t){$('msg').innerHTML=(removing||(mode==='cpu'&&st.turn===2)?'':note)+t;}
+function prompt_(){
+  const p=st.turn,ph=phase(st,p);
+  const who=`${chip(p)}<b>${nm(p)}</b>`;
+  if(removing){say(`${who}: Mühle! Entferne einen gegnerischen Stein.`);return;}
+  if(mode==='cpu'&&p===2){say(`${who} denkt nach …`);return;}
+  const verb=mode==='cpu'?'bist':'ist';
+  if(ph==='place')say(`${who} ${verb} dran: Stein setzen.`);
+  else if(ph==='fly')say(`${who} ${verb} dran: Du darfst springen! Stein wählen.`);
+  else say(`${who} ${verb} dran: Stein verschieben.`);
+}
+const canHuman=()=>!(mode==='cpu'&&st.turn===2);
+
+// ---------- Eingabe ----------
+function onPoint(i){
+  if(over||busy||!canHuman())return;
+  note='';
+  const p=st.turn,ph=phase(st,p);
+  if(removing){
+    if(removable(st,p).includes(i))finishMove(pendingMove,i);
+    return;
+  }
+  if(ph==='place'){
+    if(st.b[i])return;
+    doMove({from:-1,to:i});return;
+  }
+  if(st.b[i]===p){sel=sel===i?null:i;draw();return;}
+  if(sel!==null&&!st.b[i]){
+    const m=baseMoves(st,p).find(m=>m.from===sel&&m.to===i);
+    if(m)doMove(m);
+  }
+}
+function doMove(m){
+  const p=st.turn;
+  if(makesMill(st,p,m)){
+    st=apply(st,p,m);st.turn=p;sel=null;
+    removing=true;pendingMove=m;prompt_();draw();
+    return;
+  }
+  st=apply(st,p,m);sel=null;
+  afterMove();
+}
+function finishMove(m,rem){
+  const p=st.turn;
+  st.b[rem]=0;st.turn=3-p;
+  removing=false;pendingMove=null;sel=null;
+  afterMove();
+}
+function afterMove(){
+  const p=st.turn;
+  if(loser(st,p)){
+    over=true;draw();
+    const w=3-p;
+    $('winTitle').innerHTML=`${chip(w)}${nm(w)} ${mode==='cpu'&&w===1?'hast':'hat'} gewonnen! 🎉`;
+    $('winSub').textContent=count(st,p)+st.hand[p]<3?'Der Gegner hat nur noch zwei Steine.':'Der Gegner kann sich nicht mehr bewegen.';
+    $('winBox').hidden=false;return;
+  }
+  draw();prompt_();
+  if(mode==='cpu'&&p===2)cpuTurn();
+}
+
+// ---------- KI ----------
+function genFull(s,p){
+  const out=[];
+  for(const m of baseMoves(s,p)){
+    if(makesMill(s,p,m)){
+      const t=apply(s,p,m);
+      for(const r of removable(t,p,t.b))out.push({m,rem:r});
+    }else out.push({m,rem:-1});
+  }
+  return out;
+}
+function evalS(s,p){
+  const o=3-p;
+  let v=(count(s,p)+s.hand[p]-count(s,o)-s.hand[o])*12;
+  let m1=0,m2=0,two1=0,two2=0;
+  for(const ml of MILLS){
+    const a=ml.filter(j=>s.b[j]===p).length,b=ml.filter(j=>s.b[j]===o).length;
+    if(a===3)m1++;if(b===3)m2++;
+    if(a===2&&b===0)two1++;if(b===2&&a===0)two2++;
+  }
+  v+=(m1-m2)*5+(two1-two2)*4;
+  if(s.hand[p]===0&&s.hand[o]===0){v+=(baseMoves(s,p).length-baseMoves(s,o).length)*1.2;}
+  return v;
+}
+function search(s,depth,alpha,beta,p,root){
+  // p ist am Zug; Rückgabe aus Sicht von p
+  if(loser(s,p))return -10000-depth;
+  if(depth===0)return evalS(s,p);
+  const moves=genFull(s,p);
+  if(!moves.length)return -10000-depth;
+  moves.sort(()=>Math.random()-.5);
+  let best=-Infinity,bestM=null;
+  for(const mv of moves){
+    const n=apply(s,p,mv.m,mv.rem);
+    const v=-search(n,depth-1,-beta,-alpha,3-p);
+    if(v>best){best=v;bestM=mv;}
+    if(best>alpha)alpha=best;
+    if(alpha>=beta)break;
+  }
+  return root?bestM:best;
+}
+function cpuTurn(){
+  busy=true;const t=token;
+  setTimeout(()=>{
+    if(t!==token)return;
+    const level=+$('level').value;
+    let depth=level;
+    if(depth>=4&&st.hand[2]+st.hand[1]>10)depth=3; // Setzphase nicht zu tief
+    const mv=depth===1&&Math.random()<.3?pickRandom():search(st,depth,-Infinity,Infinity,2,true);
+    busy=false;
+    st=apply(st,2,mv.m,mv.rem);
+    note=mv.rem>=0?`${chip(2)}<b>Computer</b> hat eine Mühle gebildet und einen Stein entfernt.<br>`:'';
+    afterMove();
+  },600);
+}
+function pickRandom(){const all=genFull(st,2);return all[Math.floor(Math.random()*all.length)];}
+function start(){
+  token++;mode=$('mode').value;$('level').hidden=mode!=='cpu';
+  note='';st=newState();sel=null;removing=false;busy=false;over=false;pendingMove=null;
+  $('winBox').hidden=true;draw();prompt_();
+}
+$('new').onclick=start;$('mode').onchange=start;$('winBtn').onclick=start;
+start();
+</script>
+</body>
+</html>

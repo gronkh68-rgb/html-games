@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mensch ärgere dich nicht</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
+@media (max-width:760px){.layout{grid-template-columns:1fr}}
+#board{width:100%;max-width:640px;height:auto;background:var(--card);border:1px solid var(--border);border-radius:18px;touch-action:manipulation}
+.piece{transition:transform .14s ease}
+.piece circle.main{stroke:#fff;stroke-width:3}
+.piece.can{cursor:pointer}
+.piece.can circle.main{animation:pulse .7s infinite alternate;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.22)}}
+.side{display:flex;flex-direction:column;gap:12px}
+.die{
+  width:84px;height:84px;margin:0 auto;border-radius:16px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);
+  display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:11px;gap:2px;cursor:pointer;
+}
+.die i{border-radius:50%;background:transparent;margin:3px}
+.die i.on{background:#1b1e33}
+.die.roll{animation:shake .3s infinite}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+.turn{font-weight:700;font-size:1.1rem}
+.scores div{display:flex;justify-content:space-between;padding:3px 0;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Mensch ärgere dich nicht</h1></div>
+
+  <div id="setup" class="panel">
+    <h2>Spieler wählen</h2>
+    <div id="slots"></div>
+    <div class="row"><button class="btn" id="start">Spiel starten</button></div>
+    <p id="setupErr" style="color:#ff7b7b;margin:6px 0 0"></p>
+  </div>
+
+  <div id="game" hidden>
+    <div class="layout">
+      <svg id="board" viewBox="0 0 550 550"></svg>
+      <div class="side">
+        <div class="panel">
+          <div class="turn" id="turn"></div>
+          <div class="status" id="msg"></div>
+        </div>
+        <div class="panel">
+          <div class="die" id="die"></div>
+          <div class="row" style="justify-content:center;margin-top:14px">
+            <button class="btn" id="rollBtn" disabled>Würfeln</button>
+          </div>
+        </div>
+        <div class="panel scores" id="scores"></div>
+        <button class="btn alt" id="again">Neues Spiel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="winBox" hidden>
+  <div class="box"><h2 id="winTitle"></h2><p>Glückwunsch!</p><button class="btn" id="winBtn">Neues Spiel</button></div>
+</div>
+
+<script>
+const COLORS=[{n:'Rot',c:'#e5484d'},{n:'Blau',c:'#3b82f6'},{n:'Grün',c:'#2fb457'},{n:'Gelb',c:'#f2c230'}];
+const CELL=50, NS='http://www.w3.org/2000/svg';
+const $=id=>document.getElementById(id);
+
+// ---------- Brett-Geometrie (11x11) ----------
+const TRACK=(()=>{const t=[],p=(c,r)=>t.push([c,r]);
+  for(let c=0;c<=4;c++)p(c,4);
+  for(let r=3;r>=0;r--)p(4,r);
+  p(5,0);p(6,0);
+  for(let r=1;r<=4;r++)p(6,r);
+  for(let c=7;c<=10;c++)p(c,4);
+  p(10,5);p(10,6);
+  for(let c=9;c>=6;c--)p(c,6);
+  for(let r=7;r<=10;r++)p(6,r);
+  p(5,10);p(4,10);
+  for(let r=9;r>=6;r--)p(4,r);
+  for(let c=3;c>=0;c--)p(c,6);
+  p(0,5);return t;})();
+const rot=(cells,n)=>{let r=cells;for(let k=0;k<n;k++)r=r.map(([c,rw])=>[10-rw,c]);return r;};
+const LANE=[0,1,2,3].map(p=>rot([[1,5],[2,5],[3,5],[4,5]],p));
+const BASE=[0,1,2,3].map(p=>rot([[0,0],[1,0],[0,1],[1,1]],p));
+const cx=c=>c*CELL+CELL/2;
+
+// ---------- Zustand ----------
+let cfg=[], active=[], pieces=[], cur=0, token=0, pick=null, rollWait=null, rolling=false, lastRoll=0;
+const CANCEL={};
+
+const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms));
+const isHuman=p=>cfg[p]==='human';
+const absIdx=(p,pos)=>(p*10+pos)%40;
+function cellOf(p,i){
+  const pos=pieces[p][i];
+  if(pos<0)return BASE[p][i];
+  if(pos<40)return TRACK[absIdx(p,pos)];
+  return LANE[p][pos-40];
+}
+function lanePacked(p){
+  const l=pieces[p].filter(q=>q>=40).sort((a,b)=>b-a);
+  return l.every((q,k)=>q===43-k);
+}
+function isWaiting(p){
+  return !pieces[p].some(q=>q>=0&&q<40)&&lanePacked(p);
+}
+function legalMoves(p,roll){
+  const own=pieces[p],moves=[];
+  let baseDone=false;
+  own.forEach((pos,i)=>{
+    if(pos===-1){
+      if(roll!==6||baseDone||own.includes(0))return;
+      baseDone=true;moves.push({i,to:0});return;
+    }
+    const to=pos+roll;
+    if(to>43)return;
+    if(own.some(q=>q===to||(q>=40&&q>pos&&q<to)))return;
+    moves.push({i,to});
+  });
+  const clear=moves.find(m=>own[m.i]===0);
+  return clear?[clear]:moves;
+}
+function wins(p){return pieces[p].every(q=>q>=40);}
+
+// ---------- Zeichnen ----------
+function el(tag,attrs,parent){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs)e.setAttribute(k,attrs[k]);
+  if(parent)parent.appendChild(e);return e;
+}
+function drawBoard(){
+  const svg=$('board');svg.innerHTML='';
+  // Basen
+  [0,1,2,3].forEach(p=>{
+    const [x0,y0]=[[0,0],[9,0],[9,9],[0,9]][p];
+    el('rect',{x:x0*CELL+4,y:y0*CELL+4,width:2*CELL-8,height:2*CELL-8,rx:18,fill:COLORS[p].c,opacity:active.includes(p)?.28:.1},svg);
+  });
+  const track=new Set(TRACK.map(([c,r])=>c+','+r));
+  TRACK.forEach(([c,r],i)=>{
+    const start=i%10===0;
+    const owner=start?i/10:-1;
+    el('circle',{cx:cx(c),cy:cx(r),r:19,fill:start?COLORS[owner].c:'rgba(255,255,255,.14)',stroke:start?'#fff':'rgba(255,255,255,.35)','stroke-width':start?2.5:1.5,opacity:start&&!active.includes(owner)?.4:1},svg);
+  });
+  [0,1,2,3].forEach(p=>{
+    LANE[p].forEach(([c,r])=>el('circle',{cx:cx(c),cy:cx(r),r:17,fill:COLORS[p].c,opacity:.55,stroke:'#fff','stroke-width':1.5},svg));
+    BASE[p].forEach(([c,r])=>el('circle',{cx:cx(c),cy:cx(r),r:17,fill:'rgba(0,0,0,.25)',stroke:COLORS[p].c,'stroke-width':2},svg));
+  });
+  // Pfeile an den Startfeldern (kleine Punkte) - Mitte: Titel
+  const t=el('text',{x:275,y:285,'text-anchor':'middle','font-size':16,'font-weight':700,fill:'rgba(255,255,255,.35)'},svg);
+  t.textContent='MÄDN';
+  const layer=el('g',{id:'pieces'},svg);
+  active.forEach(p=>{
+    for(let i=0;i<4;i++){
+      const g=el('g',{class:'piece',id:`pc-${p}-${i}`},layer);
+      el('circle',{class:'main',r:17,fill:COLORS[p].c},g);
+      el('circle',{r:7,fill:'rgba(255,255,255,.35)',cx:-4,cy:-5},g);
+      g.addEventListener('click',()=>onPieceClick(p,i));
+    }
+  });
+  placeAll();
+}
+function placePiece(p,i,front){
+  const g=$(`pc-${p}-${i}`);if(!g)return;
+  const [c,r]=cellOf(p,i);
+  g.style.transform=`translate(${cx(c)}px,${cx(r)}px)`;
+  if(front)g.parentNode.appendChild(g);
+}
+function placeAll(){active.forEach(p=>{for(let i=0;i<4;i++)placePiece(p,i)});}
+function setDie(v){
+  const pat={0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
+  $('die').innerHTML=Array.from({length:9},(_,k)=>`<i class="${pat.includes(k)?'on':''}"></i>`).join('');
+}
+function setMsg(t){$('msg').innerHTML=t;}
+function chip(p){return `<span class="chip" style="background:${COLORS[p].c}"></span>`;}
+function showTurn(p){
+  $('turn').innerHTML=`${chip(p)}${COLORS[p].n} ist dran`;
+}
+function showScores(){
+  $('scores').innerHTML=active.map(p=>`<div><span>${chip(p)}${COLORS[p].n}${isHuman(p)?'':' (PC)'}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
+}
+function markMovable(p,moves){
+  document.querySelectorAll('.piece.can').forEach(g=>g.classList.remove('can'));
+  if(p===null)return;
+  moves.forEach(m=>$(`pc-${p}-${m.i}`).classList.add('can'));
+}
+
+// ---------- Ablauf ----------
+async function doRoll(p){
+  const btn=$('rollBtn');
+  if(isHuman(p)){
+    btn.disabled=false;
+    setMsg('Klicke auf <b>Würfeln</b>.');
+    await new Promise(res=>{rollWait=res;});
+    rollWait=null;btn.disabled=true;
+  }else{
+    setMsg('Der Computer würfelt …');
+    await sleep(650);
+  }
+  const t=token;
+  const die=$('die');die.classList.add('roll');
+  for(let k=0;k<7;k++){setDie(1+Math.floor(Math.random()*6));await sleep(70,t);}
+  die.classList.remove('roll');
+  const v=1+Math.floor(Math.random()*6);
+  setDie(v);lastRoll=v;
+  return v;
+}
+function pickMove(p,moves){
+  return new Promise(async res=>{
+    const t=token;
+    markMovable(p,moves);
+    setMsg(`${chip(p)}Du hast eine <b>${lastRoll}</b>. Wähle eine Figur.`);
+    pick={p,moves,res};
+    if(moves.length===1){
+      try{await sleep(600,t);}catch(e){return;}
+      if(pick&&pick.res===res){pick=null;markMovable(null);res(moves[0]);}
+    }
+  });
+}
+function onPieceClick(p,i){
+  if(!pick||pick.p!==p)return;
+  const m=pick.moves.find(m=>m.i===i);
+  if(!m)return;
+  const r=pick.res;pick=null;markMovable(null);r(m);
+}
+function aiPick(p,roll,moves){
+  const myAbs=pos=>absIdx(p,pos);
+  const danger=(abs)=>{
+    for(const q of active){
+      if(q===p)continue;
+      for(const pos of pieces[q]){
+        if(pos<0||pos>=40)continue;
+        const a=absIdx(q,pos),d=(abs-a+40)%40;
+        if(d>=1&&d<=6)return true;
+      }
+    }
+    return false;
+  };
+  const scored=moves.map(m=>{
+    const pos=pieces[p][m.i],np=m.to;let s=Math.random();
+    if(np<40){
+      const abs=myAbs(np);
+      for(const q of active){
+        if(q===p)continue;
+        if(pieces[q].some(x=>x>=0&&x<40&&absIdx(q,x)===abs))s+=100;
+      }
+      if(danger(abs))s-=25;
+    }
+    if(pos>=0&&pos<40&&danger(myAbs(pos)))s+=20;
+    if(pos===-1)s+=50;
+    if(np>=40&&pos<40)s+=60;
+    if(np>=40)s+=np-40;
+    s+=np*.3;
+    return {m,s};
+  }).sort((a,b)=>b.s-a.s);
+  return scored[0].m;
+}
+async function applyMove(p,m){
+  const t=token;
+  const from=pieces[p][m.i];
+  if(from===-1){pieces[p][m.i]=0;placePiece(p,m.i,true);await sleep(260,t);}
+  else{
+    for(let pos=from+1;pos<=m.to;pos++){
+      pieces[p][m.i]=pos;placePiece(p,m.i,true);await sleep(150,t);
+    }
+  }
+  if(m.to<40){
+    const abs=absIdx(p,m.to);
+    for(const q of active){
+      if(q===p)continue;
+      pieces[q].forEach((pos,j)=>{
+        if(pos>=0&&pos<40&&absIdx(q,pos)===abs){
+          pieces[q][j]=-1;placePiece(q,j);
+          setMsg(`${chip(p)}<b>${COLORS[p].n}</b> wirft eine Figur von ${chip(q)}<b>${COLORS[q].n}</b> raus!`);
+        }
+      });
+    }
+    await sleep(300,t);
+  }
+  showScores();
+}
+async function playTurn(p){
+  let tries=isWaiting(p)?3:1;
+  for(;;){
+    const roll=await doRoll(p);
+    const moves=legalMoves(p,roll);
+    if(moves.length){
+      const mv=isHuman(p)?await pickMove(p,moves):(await sleep(450),aiPick(p,roll,moves));
+      await applyMove(p,mv);
+      if(wins(p))return true;
+      if(roll===6){tries=isWaiting(p)?3:1;setMsg(`${chip(p)}Eine 6! <b>${COLORS[p].n}</b> darf nochmal.`);await sleep(700);continue;}
+      return false;
+    }
+    setMsg(`${chip(p)}${roll}: kein Zug möglich.`);
+    await sleep(900);
+    if(--tries<=0)return false;
+  }
+}
+async function gameLoop(){
+  const t=token;
+  try{
+    let i=0;
+    for(;;){
+      cur=active[i%active.length];
+      showTurn(cur);
+      if(await playTurn(cur)){
+        $('winTitle').innerHTML=`${chip(cur)}${COLORS[cur].n} gewinnt! 🎉`;
+        $('winBox').hidden=false;return;
+      }
+      i++;
+    }
+  }catch(e){if(e!==CANCEL)throw e;}
+}
+
+// ---------- Start / Setup ----------
+function buildSetup(){
+  const def=['human','cpu','off','off'];
+  $('slots').innerHTML=COLORS.map((c,p)=>`
+    <div class="row"><label><span class="chip" style="background:${c.c}"></span>${c.n}</label>
+    <select id="slot${p}"><option value="human">Mensch</option><option value="cpu">Computer</option><option value="off">Aus</option></select></div>`).join('');
+  def.forEach((d,p)=>$('slot'+p).value=d);
+}
+function startGame(){
+  cfg=[0,1,2,3].map(p=>$('slot'+p).value);
+  active=[0,1,2,3].filter(p=>cfg[p]!=='off');
+  if(active.length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
+  $('setupErr').textContent='';
+  token++;pick=null;rollWait=null;
+  pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
+  $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
+  drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
+  gameLoop();
+}
+function backToSetup(){
+  token++;pick=null;rollWait=null;
+  $('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;
+}
+$('start').onclick=startGame;
+$('again').onclick=backToSetup;
+$('winBtn').onclick=backToSetup;
+$('rollBtn').onclick=()=>{if(rollWait)rollWait();};
+$('die').onclick=()=>{if(rollWait)rollWait();};
+buildSetup();setDie(0);
+</script>
+</body>
+</html>

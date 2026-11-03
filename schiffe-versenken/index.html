@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Schiffe versenken</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+.boards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:720px){.boards{grid-template-columns:1fr}}
+.boards h2{margin:0 0 8px;font-size:1rem;color:var(--muted);text-align:center}
+.grid{
+  --n:10;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;background:#0b3a6b;padding:2px;border-radius:10px;
+  aspect-ratio:1;max-width:420px;margin:0 auto;
+}
+.c{background:#2a79c4;border-radius:3px;position:relative;aspect-ratio:1;cursor:default}
+.enemy .c.free{cursor:crosshair}
+.enemy .c.free:hover{background:#4a95dd}
+.c.ship{background:#7b8794}
+.c.miss::after{content:"";position:absolute;inset:36%;border-radius:50%;background:rgba(255,255,255,.75)}
+.c.hit{background:#e5484d}
+.c.hit::after{content:"✕";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:800;font-size:clamp(.7rem,2.6vw,1.2rem)}
+.c.sunk{background:#7a1d22}
+.c.last{outline:3px solid #facc15;outline-offset:-3px}
+.fleet{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;font-size:.85rem;color:var(--muted)}
+.fleet span{padding:2px 8px;border:1px solid var(--border);border-radius:99px}
+.fleet span.dead{text-decoration:line-through;opacity:.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Schiffe versenken</h1></div>
+
+  <div class="panel">
+    <div class="status" id="msg" style="text-align:center"></div>
+    <div class="row" style="justify-content:center">
+      <button class="btn alt" id="shuffle">Flotte neu mischen</button>
+      <button class="btn" id="go">Los geht's</button>
+      <button class="btn alt" id="restart" hidden>Neues Spiel</button>
+    </div>
+  </div>
+
+  <div class="boards">
+    <div><h2>Deine Flotte</h2><div class="grid" id="mine"></div><div class="fleet" id="fleetMine"></div></div>
+    <div class="enemy"><h2>Gegner (hier schießen)</h2><div class="grid" id="theirs"></div><div class="fleet" id="fleetTheirs"></div></div>
+  </div>
+</div>
+<div class="overlay" id="winBox" hidden>
+  <div class="box"><h2 id="winTitle"></h2><p id="winSub"></p><button class="btn" id="winBtn">Neues Spiel</button></div>
+</div>
+
+<script>
+const N=10,SIZES=[5,4,3,3,2],NAMES=['Schlachtschiff','Kreuzer','Zerstörer','U-Boot','Patrouillenboot'];
+const $=id=>document.getElementById(id);
+let mine,theirs,phase,token=0,lastMine=-1,lastTheirs=-1;
+
+function emptyFleet(){return {ships:[],shots:Array(N*N).fill(0)};} // shots: 0 unbeschossen,1 Wasser,2 Treffer
+function randomFleet(){
+  const f=emptyFleet(),occ=new Set();
+  SIZES.forEach((len,k)=>{
+    for(;;){
+      const horiz=Math.random()<.5;
+      const r=Math.floor(Math.random()*(horiz?N:N-len+1));
+      const c=Math.floor(Math.random()*(horiz?N-len+1:N));
+      const cells=Array.from({length:len},(_,i)=>horiz?r*N+c+i:(r+i)*N+c);
+      const near=cells.some(x=>{
+        const xr=Math.floor(x/N),xc=x%N;
+        for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+          const rr=xr+dr,cc=xc+dc;
+          if(rr>=0&&rr<N&&cc>=0&&cc<N&&occ.has(rr*N+cc))return true;
+        }
+        return false;
+      });
+      if(near)continue;
+      cells.forEach(x=>occ.add(x));
+      f.ships.push({name:NAMES[k],cells});
+      break;
+    }
+  });
+  return f;
+}
+const shipAt=(f,i)=>f.ships.find(s=>s.cells.includes(i));
+const isSunk=(f,s)=>s.cells.every(i=>f.shots[i]===2);
+const allSunk=f=>f.ships.every(s=>isSunk(f,s));
+
+function build(id,onclick){
+  const g=$(id);g.innerHTML='';
+  for(let i=0;i<N*N;i++){
+    const d=document.createElement('div');d.className='c';d.id=id+i;
+    if(onclick)d.onclick=()=>onclick(i);
+    g.appendChild(d);
+  }
+}
+function paint(){
+  for(let i=0;i<N*N;i++){
+    const m=$('mine'+i),t=$('theirs'+i);
+    let cls='c';
+    const s=shipAt(mine,i);
+    if(s)cls+=' ship';
+    if(mine.shots[i]===1)cls+=' miss';
+    if(mine.shots[i]===2)cls+=' hit'+(isSunk(mine,s)?' sunk':'');
+    if(i===lastMine)cls+=' last';
+    m.className=cls;
+    cls='c';
+    const e=shipAt(theirs,i);
+    if(theirs.shots[i]===0&&phase==='play')cls+=' free';
+    if(theirs.shots[i]===1)cls+=' miss';
+    if(theirs.shots[i]===2)cls+=' hit'+(isSunk(theirs,e)?' sunk':'');
+    if(phase==='over'&&e&&theirs.shots[i]!==2)cls+=' ship';
+    if(i===lastTheirs)cls+=' last';
+    t.className=cls;
+  }
+  const fl=(f,id)=>$(id).innerHTML=f.ships.map(s=>`<span class="${isSunk(f,s)?'dead':''}">${s.name} (${s.cells.length})</span>`).join('');
+  fl(mine,'fleetMine');fl(theirs,'fleetTheirs');
+}
+function say(t){$('msg').innerHTML=t;}
+
+// ---------- Spielablauf ----------
+function setup(){
+  token++;phase='setup';lastMine=lastTheirs=-1;
+  mine=randomFleet();theirs=randomFleet();ai={hits:[],tried:new Set()};
+  build('mine');build('theirs',shoot);
+  $('go').hidden=false;$('shuffle').hidden=false;$('restart').hidden=true;$('winBox').hidden=true;
+  say('Das ist deine Flotte. Mische sie neu oder starte das Spiel.');
+  paint();
+}
+function startPlay(){
+  phase='play';$('go').hidden=true;$('shuffle').hidden=true;$('restart').hidden=false;
+  say('Du bist dran: Klicke auf ein Feld des Gegners.');paint();
+}
+function shoot(i){
+  if(phase!=='play'||theirs.shots[i])return;
+  lastTheirs=i;
+  const s=shipAt(theirs,i);
+  if(s){
+    theirs.shots[i]=2;
+    if(allSunk(theirs)){return end(true);}
+    say(isSunk(theirs,s)?`<b>${s.name} versenkt!</b> Du darfst nochmal.`:'Treffer! Du darfst nochmal.');
+    paint();
+  }else{
+    theirs.shots[i]=1;paint();
+    phase='ai';say('Wasser. Der Gegner schießt …');
+    const t=token;setTimeout(()=>{if(t===token)aiShot();},750);
+  }
+}
+
+// ---------- KI ----------
+let ai;
+function neighbors(i){
+  const r=Math.floor(i/N),c=i%N,o=[];
+  if(r>0)o.push(i-N);if(r<N-1)o.push(i+N);if(c>0)o.push(i-1);if(c<N-1)o.push(i+1);
+  return o;
+}
+function chooseShot(){
+  const open=i=>mine.shots[i]===0;
+  // offene Treffer = getroffene Felder von noch nicht versenkten Schiffen
+  const hits=[];
+  for(let i=0;i<N*N;i++)if(mine.shots[i]===2&&!isSunk(mine,shipAt(mine,i)))hits.push(i);
+  if(hits.length){
+    // Linie erkennen
+    const cand=[];
+    for(const h of hits){
+      for(const n of neighbors(h)){
+        if(!open(n))continue;
+        const dir=n-h;
+        const back=h-dir;
+        const aligned=hits.includes(back)&&neighbors(h).includes(back);
+        cand.push({n,w:aligned?5:1});
+      }
+    }
+    const pool=[];
+    cand.forEach(c=>{for(let k=0;k<c.w;k++)pool.push(c.n);});
+    if(pool.length)return pool[Math.floor(Math.random()*pool.length)];
+  }
+  // Suche mit Schachbrettmuster
+  const free=[];
+  for(let i=0;i<N*N;i++)if(open(i))free.push(i);
+  const par=free.filter(i=>((Math.floor(i/N)+i%N)%2)===0);
+  const pool=par.length?par:free;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function aiShot(){
+  if(phase!=='ai')return;
+  const i=chooseShot();lastMine=i;
+  const s=shipAt(mine,i);
+  if(s){
+    mine.shots[i]=2;
+    if(allSunk(mine)){paint();return end(false);}
+    say(isSunk(mine,s)?`Der Gegner hat dein <b>${s.name}</b> versenkt und schießt nochmal …`:'Der Gegner hat getroffen und schießt nochmal …');
+    paint();
+    const t=token;setTimeout(()=>{if(t===token)aiShot();},800);
+  }else{
+    mine.shots[i]=1;phase='play';paint();
+    say('Der Gegner hat verfehlt. Du bist dran.');
+  }
+}
+function end(win){
+  phase='over';paint();
+  $('winTitle').textContent=win?'Gewonnen! 🎉':'Verloren 😢';
+  $('winSub').textContent=win?'Du hast alle gegnerischen Schiffe versenkt.':'Der Gegner hat deine Flotte versenkt.';
+  $('winBox').hidden=false;
+  say(win?'Alle Schiffe versenkt!':'Deine Flotte wurde versenkt.');
+}
+
+$('shuffle').onclick=()=>{mine=randomFleet();paint();};
+$('go').onclick=startPlay;
+$('restart').onclick=setup;$('winBtn').onclick=setup;
+setup();
+</script>
+</body>
+</html>
