@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Netrunner ärgere dich nicht</title>
 <link rel="stylesheet" href="../common.css">
+<script>window.RAIN_OPTION=1;</script>
 <script src="../theme.js"></script>
+<script src="../room3d.js"></script>
 <script src="../dice.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
@@ -124,6 +126,21 @@ html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
 <script>
 const $=id=>document.getElementById(id);
 const SPEED=+new URLSearchParams(location.search).get('speed')||1;
+// Cyber = Neon-Stadt mit Regen, Standard = gemütliches Wohnzimmer mit klassischem Spielbrett
+const CY=()=>document.documentElement.getAttribute('data-style')==='cyber';
+const BL=()=>CY()?THREE.AdditiveBlending:THREE.NormalBlending;
+const CLASSIC={0xfcee09:0xe6b800,0x00f0ff:0x1aa6b7,0xff2fa8:0xd6336c,0x2dff7a:0x2e9e4f,0x9a6bff:0x7e57c2,0xff8a1f:0xef7d1a};
+const cl=c=>CLASSIC[c]!==undefined?CLASSIC[c]:c;
+const mixW=(h,t)=>{const r=(h>>16)&255,g=(h>>8)&255,b=h&255,f=v=>Math.round(v+(255-v)*t);return (f(r)<<16)|(f(g)<<8)|f(b);};
+const darker=(h,f)=>{const r=(h>>16)&255,g=(h>>8)&255,b=h&255,d=v=>Math.round(v*f);return (d(r)<<16)|(d(g)<<8)|d(b);};
+function classicTile(color,emissive){   // Rolle des Feldes aus den Neon-Farben ableiten
+  if(color===0x141a2a)return 0xf0e6cb;                         // normales Feld: Elfenbein
+  if(color===0x151a28)return 0xd9cda8;                         // nicht benutzte Startecke
+  if(color===0x10131c)return mixW(cl(emissive),.4);            // Zielgasse
+  if(color===0x10141f)return mixW(cl(emissive),.55);           // Sonderfeld
+  if(color===0x0a0e18)return emissive===0x063040?0xd4a76a:0xb98a4e;   // Innenfläche aus Holz
+  return cl(color);                                            // Startfeld des Spielers
+}
 
 // ====================== Konstanten / Geometrie ======================
 const R=10, SEC=12, TL=6*SEC, LN=4, SIZE=1;            // Eck-Radius (Raster), Felder je Sektor, Ringlänge (72), Zielfelder
@@ -276,15 +293,12 @@ function initThree(){
   renderer.setClearColor(0x05060b);
   stage.appendChild(renderer.domElement);
   scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x05060b,.003);
   camera=new THREE.PerspectiveCamera(55,1,.1,700);
   camera.position.set(0,50,35);
   controls=new THREE.OrbitControls(camera,renderer.domElement);
   controls.enableDamping=true;controls.dampingFactor=.08;
   controls.minDistance=10;controls.maxDistance=125;controls.maxPolarAngle=1.38;controls.target.set(0,0,0);
   controls.enablePan=false;
-  scene.add(new THREE.AmbientLight(0x3a4a70,.5));
-  const dl=new THREE.DirectionalLight(0xaaccff,.35);dl.position.set(8,20,6);scene.add(dl);
   buildEnvironment();
   try{
     composer=new THREE.EffectComposer(renderer);
@@ -293,6 +307,7 @@ function initThree(){
     composer.addPass(bloom);
   }catch(e){composer=null;}
   addEventListener('resize',resize);resize();
+  new MutationObserver(()=>{buildEnvironment();if(boardG){buildBoard();for(const k in pieceMeshes)pieceMeshes[k].mine=pieceMeshes[k].p===cur;}}).observe(document.documentElement,{attributes:true,attributeFilter:['data-style']});
   setupPicking();
   requestAnimationFrame(tick);
   return true;
@@ -306,12 +321,31 @@ function resize(){
 // Kamera so weit zurück, dass die ganze Karte samt Basen auch im Hochformat sichtbar bleibt
 function camScale(){return Math.max(1,.85/camera.aspect);}
 
+let envObjs=[],room=null;
 function buildEnvironment(){
+  envObjs.forEach(o=>scene.remove(o));envObjs=[];rain=null;tower=null;room=null;
+  const addEnv=o=>{scene.add(o);envObjs.push(o);return o;};
+  if(!CY()){
+    // Standard: Wohnzimmer, das Brett steht auf einem runden Holztisch
+    scene.fog=new THREE.Fog(0x2a1a10,130,340);renderer.setClearColor(0x2a1a10);
+    controls.maxDistance=88;
+    room=Room3D.livingRoom(THREE,{half:110,tableTopY:-.45,table:{shape:'round',size:54}});addEnv(room.group);
+    const wood=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.5});
+    tower=new THREE.Group();
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(.9,1.4,1.6,24),wood);col.position.y=.8;tower.add(col);
+    const knob=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),new THREE.MeshStandardMaterial({color:0xd9b24a,roughness:.3,metalness:.4}));knob.position.y=2.4;tower.add(knob);
+    tower.position.y=2.6;tower.scale.setScalar(1.5);addEnv(tower);
+    return;
+  }
+  controls.maxDistance=125;
+  scene.fog=new THREE.FogExp2(0x05060b,.003);renderer.setClearColor(0x05060b);
+  addEnv(new THREE.AmbientLight(0x3a4a70,.5));
+  const dl=new THREE.DirectionalLight(0xaaccff,.35);dl.position.set(8,20,6);addEnv(dl);
   // Boden mit Raster
   const grid=new THREE.GridHelper(520,260,0x00f0ff,0x0b3f4a);
-  grid.position.y=-.55;grid.material.transparent=true;grid.material.opacity=.4;scene.add(grid);
+  grid.position.y=-.55;grid.material.transparent=true;grid.material.opacity=.4;addEnv(grid);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(520,520),new THREE.MeshBasicMaterial({color:0x04050a}));
-  floor.rotation.x=-Math.PI/2;floor.position.y=-.6;scene.add(floor);
+  floor.rotation.x=-Math.PI/2;floor.position.y=-.6;addEnv(floor);
   // Stadt
   const city=new THREE.Group();
   const bm=new THREE.MeshStandardMaterial({color:0x0a0e1c,roughness:.8,metalness:.3,emissive:0x03050c});
@@ -332,13 +366,9 @@ function buildEnvironment(){
       city.add(s);
     }
   }
-  scene.add(city);
-  // Regen
-  const N=900,pos=new Float32Array(N*3);
-  for(let i=0;i<N;i++){const a=Math.random()*Math.PI*2,d=Math.random()*62;pos[i*3]=Math.cos(a)*d;pos[i*3+1]=Math.random()*26;pos[i*3+2]=Math.sin(a)*d;}
-  const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  rain=new THREE.Points(rg,new THREE.PointsMaterial({color:0x7fd8ff,size:.09,transparent:true,opacity:.55,depthWrite:false}));
-  scene.add(rain);
+  addEnv(city);
+  // Regen (über den Schalter ausschaltbar)
+  rain=Room3D.rain(THREE,{count:900,radius:62,top:26,bottom:-.5,size:.09});addEnv(rain.obj);
   // Zentraler Server-Turm
   tower=new THREE.Group();
   const core=new THREE.Mesh(new THREE.CylinderGeometry(.55,.8,7,6,1,true),
@@ -351,7 +381,7 @@ function buildEnvironment(){
     ring.rotation.x=Math.PI/2;ring.position.y=1.2+i*1.5;ring.userData.s=(i%2?1:-1)*(.6+i*.2);tower.add(ring);
   }
   const pl=new THREE.PointLight(0x00f0ff,1.6,22);pl.position.y=4;tower.add(pl);
-  tower.position.y=2.6;tower.scale.setScalar(1.5);scene.add(tower);
+  tower.position.y=2.6;tower.scale.setScalar(1.5);addEnv(tower);
 }
 
 // ====================== Spielfeld bauen ======================
@@ -359,21 +389,24 @@ const geoCache={};
 function hexGeo(h,r=SIZE*.93){const k=h+'_'+r;return geoCache[k]||(geoCache[k]=new THREE.CylinderGeometry(r,r,h,6));}
 function addTile(parent,w,top,color,emissive,eI,edgeColor,edgeOp=.9){
   const h=top+.4,g=hexGeo(h); // Säule von unten (-0.4) bis zur Oberkante: Hügel wirken wie Hochstraßen
-  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity:eI,roughness:.45,metalness:.5}));
+  const mt=CY()?new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity:eI,roughness:.45,metalness:.5})
+    :new THREE.MeshStandardMaterial({color:classicTile(color,emissive),roughness:.6,metalness:0});
+  const m=new THREE.Mesh(g,mt);
   m.position.set(w.x,top-h/2,w.z);parent.add(m);
-  const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:edgeColor,transparent:true,opacity:edgeOp}));
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:CY()?edgeColor:0x7a5a32,transparent:true,opacity:CY()?edgeOp:.5}));
   e.position.copy(m.position);parent.add(e);
   return m;
 }
 const glyphCache={};
 function glyphMesh(text,color,size=1.2){
-  const key=text+color;
+  if(!CY())color=darker(cl(color),.7);
+  const key=text+color+(CY()?'c':'k');
   let tex=glyphCache[key];
   if(!tex){
     const c=document.createElement('canvas');c.width=c.height=128;
     const x=c.getContext('2d');
     x.font='900 74px "Rajdhani","Segoe UI",system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';
-    x.shadowColor=hexCss(color);x.shadowBlur=14;x.fillStyle=hexCss(color);
+    x.shadowColor=hexCss(color);x.shadowBlur=CY()?14:0;x.fillStyle=hexCss(color);
     x.fillText(text,64,70);x.fillText(text,64,70);
     tex=glyphCache[key]=new THREE.CanvasTexture(c);
   }
@@ -417,7 +450,7 @@ function buildBoard(){
         const c=PLAYERS[owner].c;
         addTile(boardG,w,H,c,c,.5,0xffffff,1);
         const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.55,5,12,1,true),
-          new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+          new THREE.MeshBasicMaterial({color:CY()?c:cl(c),transparent:true,opacity:CY()?.15:.08,blending:BL(),depthWrite:false,side:THREE.DoubleSide}));
         beam.position.set(w.x,H+2.5,w.z);boardG.add(beam);startBeams[owner]=beam;
       }else addTile(boardG,w,H,0x151a28,0x07101c,.8,0x2a4a5a,.8);
     }else if(t==='normal'){
@@ -435,12 +468,12 @@ function buildBoard(){
   // leuchtende Straße entlang der Felder
   const road=new THREE.CatmullRomCurve3(ringPts.map((v,i)=>new THREE.Vector3(v.x,RINGH[i]+.03,v.z)),true);
   boardG.add(new THREE.Mesh(new THREE.TubeGeometry(road,TL*8,.07,6,true),
-    new THREE.MeshBasicMaterial({color:0x00b4d8,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false})));
+    new THREE.MeshBasicMaterial({color:CY()?0x00b4d8:0xa77a42,transparent:true,opacity:CY()?.55:.8,blending:BL(),depthWrite:false})));
   // Pylone auf den Hügelkuppen (je Sektor gleich)
   for(let k=0;k<6;k++){
     const i=k*SEC+Math.floor(SEC/2),w=ringPos(i),o=w.clone().setY(0).normalize();
     const pw=w.clone().addScaledVector(o,2.3);
-    const col=new THREE.Mesh(new THREE.CylinderGeometry(.14,.2,9,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:0x00f0ff,emissiveIntensity:.5,metalness:.6,roughness:.4}));
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(.14,.2,9,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:CY()?0x00f0ff:0x3a2412,emissiveIntensity:CY()?.5:.4,metalness:CY()?.6:.1,roughness:.4}));
     col.position.set(pw.x,4.2,pw.z);boardG.add(col);
     for(let r=0;r<3;r++){
       const ring=new THREE.Mesh(new THREE.TorusGeometry(.45,.04,6,24),new THREE.MeshBasicMaterial({color:r%2?0xff2fa8:0x00f0ff}));
@@ -453,7 +486,7 @@ function buildBoard(){
     const mid=a.clone().add(b).multiplyScalar(.5);mid.y+=a.distanceTo(b)*.5;
     const curve=new THREE.QuadraticBezierCurve3(a,mid,b);
     boardG.add(new THREE.Mesh(new THREE.TubeGeometry(curve,40,.05,6,false),
-      new THREE.MeshBasicMaterial({color:pr.color,transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false})));
+      new THREE.MeshBasicMaterial({color:CY()?pr.color:darker(pr.color,.8),transparent:true,opacity:.7,blending:BL(),depthWrite:false})));
     const pulse=new THREE.Mesh(new THREE.SphereGeometry(.24,10,10),new THREE.MeshBasicMaterial({color:0xffffff}));
     boardG.add(pulse);portalFx.push({pulse,curve,off:Math.random()});
   });
@@ -462,11 +495,11 @@ function buildBoard(){
     const c=PLAYERS[p].c,cw=ringPos(corner[p]*SEC);
     const o=new THREE.Vector3(cw.x,0,cw.z).normalize(),pv=new THREE.Vector3(-o.z,0,o.x);
     const ctr=cw.clone().addScaledVector(o,3.5);
-    const plat=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.5,.3,6),new THREE.MeshStandardMaterial({color:0x0b0e18,emissive:c,emissiveIntensity:.25,roughness:.5,metalness:.6}));
+    const plat=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.5,.3,6),new THREE.MeshStandardMaterial(CY()?{color:0x0b0e18,emissive:c,emissiveIntensity:.25,roughness:.5,metalness:.6}:{color:darker(cl(c),.8),emissive:c,emissiveIntensity:0,roughness:.6}));
     plat.position.set(ctr.x,.15,ctr.z);boardG.add(plat);baseGlow[p]=plat;
-    const edge=new THREE.LineSegments(new THREE.EdgesGeometry(plat.geometry),new THREE.LineBasicMaterial({color:c}));
+    const edge=new THREE.LineSegments(new THREE.EdgesGeometry(plat.geometry),new THREE.LineBasicMaterial({color:CY()?c:cl(c)}));
     edge.position.copy(plat.position);boardG.add(edge);
-    const bridge=new THREE.Mesh(new THREE.BoxGeometry(.5,.12,1.9),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.75}));
+    const bridge=new THREE.Mesh(new THREE.BoxGeometry(.5,.12,1.9),new THREE.MeshBasicMaterial({color:CY()?c:cl(c),transparent:true,opacity:.75}));
     const bp=cw.clone().addScaledVector(o,1.55);bridge.position.set(bp.x,.2,bp.z);bridge.rotation.y=Math.atan2(o.x,o.z);boardG.add(bridge);
     baseSpots[p]=[[-.8,-.8],[.8,-.8],[-.8,.8],[.8,.8]].map(([a,b])=>ctr.clone().addScaledVector(o,a).addScaledVector(pv,b).setY(.3));
   });
@@ -477,14 +510,16 @@ function buildBoard(){
   placeAll();
 }
 function makePiece(p,i){
-  const col=PLAYERS[p].c,g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(.2,.34,.62,6),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.95,roughness:.3,metalness:.6}));
-  body.position.y=.31;g.add(body);
-  const head=new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshBasicMaterial({color:0xffffff}));
-  head.position.y=.88;g.add(head);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.52,40),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
+  const col=PLAYERS[p].c,pcol=CY()?col:cl(col),g=new THREE.Group();
+  const body=CY()?new THREE.Mesh(new THREE.CylinderGeometry(.2,.34,.62,6),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.95,roughness:.3,metalness:.6}))
+    :new THREE.Mesh(new THREE.CylinderGeometry(.12,.36,.7,24),new THREE.MeshStandardMaterial({color:pcol,emissive:pcol,emissiveIntensity:0,roughness:.4}));
+  body.position.y=CY()?.31:.35;g.add(body);
+  const head=CY()?new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshBasicMaterial({color:0xffffff}))
+    :new THREE.Mesh(new THREE.SphereGeometry(.26,20,16),new THREE.MeshStandardMaterial({color:pcol,roughness:.35}));
+  head.position.y=CY()?.88:.84;g.add(head);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.52,40),new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.y=.03;g.add(ring);
-  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.06,.34,3.2,12,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.06,.34,3.2,12,1,true),new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:0,blending:BL(),depthWrite:false,side:THREE.DoubleSide}));
   beam.position.y=1.6;g.add(beam);
   const hit=new THREE.Mesh(new THREE.CylinderGeometry(.75,.75,1.7,8),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));
   hit.position.y=.85;hit.userData={p,i};g.add(hit);
@@ -528,26 +563,23 @@ function tick(now){
   const t=now/1000;
   if(tower){tower.children.forEach(c=>{if(c.userData.s)c.rotation.z+=c.userData.s*dt;});}
   portalFx.forEach(f=>f.curve.getPoint((t*.3+f.off)%1,f.pulse.position));
-  if(rain){
-    const a=rain.geometry.attributes.position;
-    for(let i=0;i<a.count;i++){let y=a.getY(i)-dt*9;if(y<-.5)y=26;a.setY(i,y);}
-    a.needsUpdate=true;
-  }
+  if(rain)rain.update(dt);
+  if(room)room.update(t);
   for(const k in pieceMeshes){
     const pm=pieceMeshes[k];
     pm.head.rotation.y+=dt*2;
     const pulse=.5+.5*Math.sin(t*6+pm.i);
     pm.ring.material.opacity=pm.can?.6+.4*pulse:(pm.mine?.35:0);
     pm.beam.material.opacity=pm.can?.2+.25*pulse:0;
-    pm.body.material.emissiveIntensity=pm.can?1.1+.6*pulse:(pm.mine?.95:.55);
+    pm.body.material.emissiveIntensity=CY()?(pm.can?1.1+.6*pulse:(pm.mine?.95:.55)):(pm.can?.35+.3*pulse:(pm.mine?.1:0));
   }
   active.forEach(p=>{
     const on=p===cur,pl=.5+.5*Math.sin(t*4);
-    if(baseGlow[p])baseGlow[p].material.emissiveIntensity=on?.5+.6*pl:.12;
-    if(startBeams[p])startBeams[p].material.opacity=on?.22+.3*pl:.07;
+    if(baseGlow[p])baseGlow[p].material.emissiveIntensity=CY()?(on?.5+.6*pl:.12):(on?.12+.22*pl:0);
+    if(startBeams[p])startBeams[p].material.opacity=(on?.22+.3*pl:.07)*(CY()?1:.4);
   });
   controls.update();
-  if(composer&&glow)composer.render();else renderer.render(scene,camera);
+  if(composer&&glow&&CY())composer.render();else renderer.render(scene,camera);
 }
 
 // ====================== Kamera ======================
