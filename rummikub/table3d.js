@@ -8,8 +8,14 @@
     'three@0.128.0/examples/js/postprocessing/EffectComposer.js', 'three@0.128.0/examples/js/postprocessing/MaskPass.js',
     'three@0.128.0/examples/js/postprocessing/RenderPass.js', 'three@0.128.0/examples/js/postprocessing/ShaderPass.js',
     'three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js'];
+  function loadRoom() {
+    if (window.Room3D) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = '../room3d.js'; s.onload = res; s.onerror = function () { rej(new Error('room3d.js')); }; document.head.appendChild(s);
+    });
+  }
   function loadLibs() {
-    if (window.THREE && THREE.UnrealBloomPass) return Promise.resolve();
+    if (window.THREE && THREE.UnrealBloomPass) return loadRoom();
     return LIBS.reduce(function (pr, u) {
       return pr.then(function () {
         return new Promise(function (res, rej) {
@@ -17,7 +23,7 @@
           s.onerror = function () { rej(new Error(u)); }; document.head.appendChild(s);
         });
       });
-    }, Promise.resolve());
+    }, Promise.resolve()).then(loadRoom);
   }
 
   var TW = 1.1, TH = 1.45, TT = .42, P = 1.2;        // Steinbreite, -höhe, -dicke, Abstand von Stein zu Stein
@@ -144,10 +150,11 @@
     var scene = T.scene, G = new THREE.Group(); staticGroup = G; scene.add(G);
     for (var i = scene.children.length - 1; i >= 0; i--) { var o = scene.children[i]; if (o.userData && o.userData.env) scene.remove(o); }
     var bg = cyber() ? 0x05060b : 0x1d120a;
-    scene.fog = new THREE.FogExp2(bg, .008); T.r.setClearColor(bg);
-    var amb = new THREE.AmbientLight(cyber() ? 0x4a5a80 : 0xffeed2, cyber() ? .6 : .8); amb.userData.env = true; scene.add(amb);
+    scene.fog = cyber() ? new THREE.FogExp2(bg, .008) : new THREE.Fog(0x2a1a10, 90, 220); T.r.setClearColor(bg);
+    T.rain = null; T.room = null;
+    var amb = new THREE.AmbientLight(cyber() ? 0x4a5a80 : 0xffeed2, cyber() ? .6 : .1); amb.userData.env = true; scene.add(amb);
     var dl = new THREE.DirectionalLight(cyber() ? 0xaaccff : 0xfff1d6, cyber() ? .5 : .85); dl.position.set(8, 22, 12); dl.userData.env = true; scene.add(dl);
-    var lamp = new THREE.PointLight(cyber() ? 0x00f0ff : 0xffe0b0, cyber() ? 1.1 : .5, 80); lamp.position.set(0, 18, 2); lamp.userData.env = true; scene.add(lamp);
+    var lamp = new THREE.PointLight(cyber() ? 0x00f0ff : 0xffe0b0, cyber() ? 1.1 : 0, 80); lamp.position.set(0, 18, 2); lamp.userData.env = true; scene.add(lamp);
     var felt = new THREE.Mesh(new THREE.BoxGeometry(FELT, .5, FELT), new THREE.MeshStandardMaterial(cyber()
       ? { color: 0x080b12, roughness: .35, metalness: .6, emissive: 0x021017 } : { color: 0x0f7a42, roughness: .95 }));
     felt.position.y = -.25; G.add(felt);
@@ -160,15 +167,19 @@
           T.composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .45, .45, .6));
         }
       } catch (err) { T.composer = null; }
+      if (window.Room3D) { T.rain = Room3D.rain(THREE, { count: 700, radius: 36, top: 26, bottom: -.5 }); scene.add(T.rain.obj); }
     } else {
       T.composer = null;
       var wood = new THREE.MeshStandardMaterial({ color: 0x6b3f1d, roughness: .6 });
       [[0, -FELT / 2 - .3, FELT + 1.2, .6], [0, FELT / 2 + .3, FELT + 1.2, .6], [-FELT / 2 - .3, 0, .6, FELT], [FELT / 2 + .3, 0, .6, FELT]].forEach(function (b) {
         var m = new THREE.Mesh(new THREE.BoxGeometry(b[2], .7, b[3]), wood); m.position.set(b[0], -.1, b[1]); G.add(m);
       });
+      if (window.Room3D) { T.room = Room3D.livingRoom(THREE, { half: 90, tableTopY: -.5, table: { shape: 'square', size: FELT } }); scene.add(T.room.group); }
     }
-    var floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: cyber() ? 0x04050a : 0x241509 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = -1.2; G.add(floor);
+    if (cyber() || !window.Room3D) {
+      var floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: cyber() ? 0x04050a : 0x241509 }));
+      floor.rotation.x = -Math.PI / 2; floor.position.y = -1.2; G.add(floor);
+    }
     resize();
   }
 
@@ -461,8 +472,10 @@
   function tick(now) {
     requestAnimationFrame(tick);
     if (!R3D.on || !T) return;
-    var t = now / 1000;
+    var t = now / 1000, dt = Math.min(.05, (now - (tick.last || now)) / 1000); tick.last = now;
     runTweens(now);
+    if (T.rain) T.rain.update(dt);
+    if (T.room) T.room.update(t);
     for (var id in meshes) {
       var e = meshes[id];
       if (e.outline.visible) { var s = 1.08 + .03 * Math.sin(t * 6); e.outline.scale.set(1.1 + .03 * Math.sin(t * 6), s, 1.25); }
