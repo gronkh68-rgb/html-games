@@ -6,6 +6,11 @@
 <title>Schiffe versenken</title>
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
 <style>
 .boards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media (max-width:720px){.boards{grid-template-columns:1fr}}
@@ -38,6 +43,8 @@
       <button class="btn alt" id="shuffle">Flotte neu mischen</button>
       <button class="btn" id="go">Los geht's</button>
       <button class="btn alt" id="restart" hidden>Neues Spiel</button>
+      <button class="btn alt" id="onlineBtn">Online</button>
+      <button class="btn alt" id="onlineEnd" hidden>Online beenden</button>
     </div>
   </div>
 
@@ -106,7 +113,7 @@ function paint(){
     const e=shipAt(theirs,i);
     if(theirs.shots[i]===0&&phase==='play')cls+=' free';
     if(theirs.shots[i]===1)cls+=' miss';
-    if(theirs.shots[i]===2)cls+=' hit'+(isSunk(theirs,e)?' sunk':'');
+    if(theirs.shots[i]===2)cls+=' hit'+(e&&isSunk(theirs,e)?' sunk':'');
     if(phase==='over'&&e&&theirs.shots[i]!==2)cls+=' ship';
     if(i===lastTheirs)cls+=' last';
     t.className=cls;
@@ -130,6 +137,7 @@ function startPlay(){
   say('Du bist dran: Klicke auf ein Feld des Gegners.');paint();
 }
 function shoot(i){
+  if(net.on){if(phase==='play'&&!theirs.shots[i])netShoot(i);return;}
   if(phase!=='play'||theirs.shots[i])return;
   lastTheirs=i;
   const s=shipAt(theirs,i);
@@ -203,9 +211,98 @@ function end(win){
   say(win?'Alle Schiffe versenkt!':'Deine Flotte wurde versenkt.');
 }
 
-$('shuffle').onclick=()=>{mine=randomFleet();paint();};
-$('go').onclick=startPlay;
-$('restart').onclick=setup;$('winBtn').onclick=setup;
+const net={on:false,role:'local',you:-1,names:['Flotte 1','Flotte 2'],fleets:null,ready:[false,false],started:false,turn:0,last:null,over:false,winner:-1};
+let L=null;
+
+// ---------- Online ----------
+// Der Host kennt beide Flotten und schickt jedem nur die eigene Flotte samt den Schüssen auf die gegnerische.
+function viewFor(seat){
+  const my=net.fleets[seat],en=net.fleets[1-seat],over=net.over;
+  return {you:seat,names:net.names,ready:net.ready,started:net.started,over,turn:net.turn,last:net.last,winner:net.winner,
+    mine:{ships:my.ships,shots:my.shots},
+    theirs:{shots:en.shots,ships:en.ships.map(sh=>{const open=isSunk(en,sh)||over;return {name:sh.name,len:sh.cells.length,cells:open?sh.cells:null};})}};
+}
+function viewText(v){
+  if(v.over)return v.winner===v.you?'Alle Schiffe versenkt!':'Deine Flotte wurde versenkt.';
+  if(!v.started)return v.ready[v.you]?'Bereit. Warte auf den Gegner …':'Das ist deine Flotte. Mische sie neu und drücke Bereit.';
+  const opp=v.names[1-v.you],l=v.last;let pre='';
+  if(l){
+    if(l.by===v.you)pre=l.hit?(l.sunk?`<b>${l.sunk} versenkt!</b> `:'Treffer! '):'Wasser. ';
+    else pre=l.hit?(l.sunk?`${opp} hat dein <b>${l.sunk}</b> versenkt. `:`${opp} hat getroffen. `):`${opp} hat verfehlt. `;
+  }
+  return pre+(v.turn===v.you?'Du bist dran: Klicke auf ein Feld des Gegners.':`${opp} ist dran …`);
+}
+function applyView(v){
+  mine={ships:v.mine.ships,shots:v.mine.shots};
+  theirs={shots:v.theirs.shots,ships:v.theirs.ships.map(sh=>({name:sh.name,cells:sh.cells||Array(sh.len).fill(-1)}))};
+  phase=v.over?'over':(!v.started?'setup':(v.turn===v.you?'play':'wait'));
+  if(v.last){if(v.last.by===v.you)lastTheirs=v.last.i;else lastMine=v.last.i;}
+  const setupPh=phase==='setup';
+  $('shuffle').hidden=!setupPh||v.ready[v.you];$('go').hidden=!setupPh||v.ready[v.you];$('go').textContent='Bereit';
+  $('restart').hidden=!(net.role==='host'&&phase==='over');$('restart').textContent='Neue Runde';
+  say(viewText(v));paint();
+  if(v.over){
+    $('winTitle').textContent=v.winner===v.you?'Gewonnen! 🎉':'Verloren 😢';
+    $('winSub').textContent=v.winner===v.you?'Du hast alle gegnerischen Schiffe versenkt.':'Der Gegner hat deine Flotte versenkt.';
+    $('winBtn').textContent=net.role==='host'?'Neue Runde':'Warten auf den Host';$('winBtn').disabled=net.role!=='host';
+    $('winBox').hidden=false;
+  }else $('winBox').hidden=true;
+}
+function bcastAll(){
+  if(net.role!=='host')return;
+  applyView(viewFor(net.you));
+  for(let seat=0;seat<2;seat++)if(seat!==net.you)L.sendTo(seat,{t:'view',v:viewFor(seat)});
+}
+function hostNewRound(){
+  net.fleets=[randomFleet(),randomFleet()];net.ready=[false,false];net.started=false;net.over=false;net.winner=-1;net.last=null;net.turn=0;
+  lastMine=lastTheirs=-1;bcastAll();
+}
+function hostAct(seat,m){
+  if(!m)return;
+  if(m.t==='shuffle'&&!net.started&&!net.ready[seat]){net.fleets[seat]=randomFleet();bcastAll();}
+  else if(m.t==='ready'&&!net.started&&!net.ready[seat]){net.ready[seat]=true;if(net.ready[0]&&net.ready[1]){net.started=true;net.turn=0;}bcastAll();}
+  else if(m.t==='shot'&&net.started&&!net.over&&net.turn===seat&&Number.isInteger(m.i)&&m.i>=0&&m.i<N*N){
+    const en=net.fleets[1-seat];if(en.shots[m.i])return;
+    const sh=shipAt(en,m.i);
+    if(sh){
+      en.shots[m.i]=2;const sunk=isSunk(en,sh)?sh.name:null;
+      net.last={by:seat,i:m.i,hit:true,sunk};
+      if(allSunk(en)){net.over=true;net.winner=seat;}
+    }else{en.shots[m.i]=1;net.last={by:seat,i:m.i,hit:false,sunk:null};net.turn=1-seat;}
+    bcastAll();
+  }else if(m.t==='again'&&net.over&&net.role==='host'&&seat===net.you)hostNewRound();
+}
+function netShoot(i){if(net.role==='host')hostAct(net.you,{t:'shot',i});else L.send({t:'shot',i});}
+function netShuffle(){if(net.role==='host')hostAct(net.you,{t:'shuffle'});else L.send({t:'shuffle'});}
+function netReady(){if(net.role==='host')hostAct(net.you,{t:'ready'});else L.send({t:'ready'});}
+function setOnlineUi(on){$('onlineBtn').hidden=on;$('onlineEnd').hidden=!on;}
+function leaveOnline(){if(L)L.leave();net.on=false;net.role='local';net.you=-1;setOnlineUi(false);$('winBtn').disabled=false;$('winBtn').textContent='Neues Spiel';setup();}
+L=MP.init({
+  prefix:'sv-v1-',title:'Schiffe versenken',
+  seats:[{name:'Flotte 1',color:'#2a79c4'},{name:'Flotte 2',color:'#ff9a1f'}],minPlayers:2,bots:false,
+  onStart(info){
+    token++;net.on=true;net.role=info.role;net.you=info.you;
+    net.names=[info.seats[0].name||'Flotte 1',info.seats[1].name||'Flotte 2'];
+    mine={ships:[],shots:Array(N*N).fill(0)};theirs={ships:[],shots:Array(N*N).fill(0)};lastMine=lastTheirs=-1;
+    build('mine');build('theirs',shoot);setOnlineUi(true);$('winBox').hidden=true;$('winBtn').disabled=false;
+    if(info.role==='host')hostNewRound();else{phase='wait';say('Warte auf den Host …');paint();}
+  },
+  onData(from,m){
+    if(!m)return;
+    if(net.role==='host')hostAct(from,m);
+    else if(m.t==='view')applyView(m.v);
+  },
+  onSeatDrop(i){net.over=true;$('winBox').hidden=true;L.backToLobby();},
+  onBackToLobby(){$('winBox').hidden=true;say('Warte in der Lobby …');},
+  onLeave(why){net.on=false;net.role='local';setOnlineUi(false);setup();}
+});
+$('onlineBtn').onclick=()=>L.open();
+$('onlineEnd').onclick=leaveOnline;
+
+$('shuffle').onclick=()=>{if(net.on){netShuffle();return;}mine=randomFleet();paint();};
+$('go').onclick=()=>{if(net.on){netReady();return;}startPlay();};
+$('restart').onclick=()=>{if(net.on){hostAct(net.you,{t:'again'});return;}setup();};
+$('winBtn').onclick=()=>{if(net.on){hostAct(net.you,{t:'again'});return;}setup();};
 setup();
 </script>
 </body>
