@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Blockheads</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+html,body{overscroll-behavior:none}
+body{user-select:none;-webkit-user-select:none}
+.wrap{max-width:1200px;padding:10px 12px 14px}
+#stage{position:relative;line-height:0;border:2px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.4);background:#000;overflow:hidden}
+#cv{display:block;width:100%;height:calc(100vh - 190px);min-height:340px;touch-action:none;cursor:crosshair}
+.hud{position:absolute;left:0;right:0;pointer-events:none;line-height:1.2}
+.hud.top{top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:8px 10px;gap:8px}
+.hud.bot{bottom:0;display:flex;justify-content:center;padding:8px}
+.pill{background:rgba(8,10,20,.72);border:1px solid var(--border);color:#fff;padding:5px 9px;font-size:.85rem;border-radius:var(--radius,8px)}
+#hearts{letter-spacing:2px;font-size:1.1rem;color:#ff4d6d}
+#hearts i{font-style:normal;color:#40202a}
+#hearts i.on{color:#ff4d6d}
+#hotbar{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:100%;pointer-events:auto}
+.slot{position:relative;width:44px;height:44px;background:rgba(8,10,20,.72);border:2px solid var(--border);cursor:pointer;padding:0;border-radius:6px}
+.slot.sel{border-color:var(--accent,#ffd86b);box-shadow:0 0 8px var(--accent,#ffd86b)}
+.slot canvas{width:100%;height:100%;image-rendering:pixelated;display:block}
+.slot b{position:absolute;right:2px;bottom:0;font-size:.72rem;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+.slot u{position:absolute;left:3px;top:0;font-size:.6rem;color:#aaa;text-decoration:none}
+.btns{display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end}
+.btns .btn{padding:5px 10px;font-size:.8rem}
+#craft{position:absolute;right:10px;top:52px;width:min(330px,calc(100% - 20px));max-height:calc(100% - 150px);overflow:auto;background:rgba(8,10,20,.92);border:2px solid var(--border);padding:10px;display:none;line-height:1.3;color:#fff;z-index:3}
+#craft h3{margin:0 0 8px;font-size:.9rem;text-transform:uppercase;letter-spacing:.1em}
+.rec{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.rec canvas{width:32px;height:32px;image-rendering:pixelated;flex:none}
+.rec .t{flex:1;font-size:.8rem}
+.rec .t small{display:block;color:#aab;font-size:.7rem}
+.rec .btn{padding:4px 9px;font-size:.78rem}
+.rec.no{opacity:.45}
+#toast{position:absolute;left:0;right:0;top:20%;text-align:center;color:#fff;font-weight:800;font-size:1.2rem;text-shadow:0 0 10px #000,0 0 4px #000;pointer-events:none;opacity:0;transition:opacity .4s;line-height:1.3;padding:0 12px}
+#toast.show{opacity:1}
+.touch{display:none;gap:8px;margin-top:10px;justify-content:center}
+.touch button{font-size:1.4rem;padding:14px 0;width:70px;touch-action:none}
+.keys{color:var(--muted);font-size:.8rem;line-height:1.6;margin:10px 0 0}
+.keys b{color:var(--text)}
+@media (pointer:coarse){.touch{display:flex}.keys{display:none}}
+@media (max-width:700px){.touch{display:flex}#cv{height:calc(100vh - 290px)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Blockheads</h1></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hud top">
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+        <div class="pill" id="hearts"></div>
+        <div class="pill" id="clock"></div>
+      </div>
+      <div class="btns">
+        <button class="btn alt" id="bCraft">Handwerk (E)</button>
+        <button class="btn alt" id="bZoom">Zoom</button>
+        <button class="btn alt" id="bNew">Neue Welt</button>
+      </div>
+    </div>
+    <div id="craft"><h3>Handwerk</h3><div id="recipes"></div></div>
+    <div id="toast"></div>
+    <div class="hud bot"><div id="hotbar"></div></div>
+  </div>
+  <div class="touch" id="touch">
+    <button class="btn alt" id="tL">◀</button>
+    <button class="btn alt" id="tR">▶</button>
+    <button class="btn" id="tJ">⤒</button>
+    <button class="btn alt" id="tM" style="width:auto;padding:14px 16px">⛏ Abbauen</button>
+  </div>
+  <p class="keys"><b>A/D</b> oder <b>←/→</b> laufen · <b>W/Leertaste</b> springen · <b>Linksklick</b> abbauen / kämpfen · <b>Rechtsklick</b> Block setzen · <b>1–9 / Mausrad</b> Block wählen · <b>E</b> Handwerk · <b>+/−</b> Zoom. Nachts kommen Nachtbären – bau dir ein Haus und stell Fackeln auf. Die Welt wird automatisch gespeichert.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var W = 320, H = 110, SEA = 44, REACH = 5.5, DAY = 300;
+  var AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WOOD = 5, LEAVES = 6, PLANKS = 7, COAL_ORE = 8, IRON_ORE = 9, GOLD_ORE = 10, WATER = 11, TORCH = 12, BEDROCK = 13, BRICK = 14, GLASS = 15, GOLDBLK = 16;
+  var COAL = 30, IRON = 31, GOLD = 32;
+  var NAMES = { 1: 'Gras', 2: 'Erde', 3: 'Stein', 4: 'Sand', 5: 'Holz', 6: 'Laub', 7: 'Bretter', 8: 'Kohleerz', 9: 'Eisenerz', 10: 'Golderz', 12: 'Fackel', 14: 'Ziegel', 15: 'Glas', 16: 'Goldblock', 20: 'Holz-Spitzhacke', 21: 'Stein-Spitzhacke', 22: 'Eisen-Spitzhacke', 23: 'Holzschwert', 24: 'Steinschwert', 25: 'Eisenschwert', 30: 'Kohle', 31: 'Eisen', 32: 'Gold' };
+  var SOLID = {}, OPAQUE = {}, PLACEABLE = {};
+  [1, 2, 3, 4, 5, 7, 8, 9, 10, 13, 14, 15, 16].forEach(function (i) { SOLID[i] = 1; });
+  [1, 2, 3, 4, 5, 7, 8, 9, 10, 13, 14, 16].forEach(function (i) { OPAQUE[i] = 1; });
+  [2, 3, 4, 5, 6, 7, 12, 14, 15, 16].forEach(function (i) { PLACEABLE[i] = 1; });
+  var HARD = { 1: .4, 2: .4, 3: 1.4, 4: .3, 5: .9, 6: .15, 7: .8, 8: 1.6, 9: 2.2, 10: 2.6, 12: .05, 14: 2, 15: .3, 16: 3 };
+  var NEED = { 3: 1, 8: 1, 9: 2, 10: 3, 14: 1, 16: 1 };
+  var DROP = { 1: 2, 6: 0, 8: COAL, 9: IRON, 10: GOLD };
+  var RECIPES = [
+    { out: PLANKS, n: 4, need: [[WOOD, 1]] },
+    { out: TORCH, n: 4, need: [[COAL, 1], [PLANKS, 1]] },
+    { out: 20, n: 1, need: [[PLANKS, 3]] },
+    { out: 21, n: 1, need: [[STONE, 3], [PLANKS, 2]] },
+    { out: 22, n: 1, need: [[IRON, 3], [PLANKS, 2]] },
+    { out: 23, n: 1, need: [[PLANKS, 2]] },
+    { out: 24, n: 1, need: [[STONE, 2], [PLANKS, 1]] },
+    { out: 25, n: 1, need: [[IRON, 2], [PLANKS, 1]] },
+    { out: BRICK, n: 4, need: [[STONE, 4]] },
+    { out: GLASS, n: 2, need: [[SAND, 2]] },
+    { out: GOLDBLK, n: 1, need: [[GOLD, 3]] }
+  ];
+  var TOOL_TIER = { 20: 1, 21: 2, 22: 3 }, SWORD = { 23: 2, 24: 3, 25: 5 };
+
+  // ---------- Zufall / Rauschen ----------
+  function mkRng(seed) { var s = seed >>> 0; return function () { s = (s + 0x6D2B79F5) >>> 0; var t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hash2(x, y, seed) { var h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+  function vnoise(x, y, seed) {
+    var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    var a = hash2(xi, yi, seed), b = hash2(xi + 1, yi, seed), c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+
+  // ---------- Welt ----------
+  var world, surf = new Int16Array(W), seed = 1, spawn = { x: W / 2, y: 20 };
+  function get(x, y) { if (x < 0 || x >= W) return BEDROCK; if (y < 0) return AIR; if (y >= H) return BEDROCK; return world[y * W + x]; }
+  function solid(x, y) { return !!SOLID[get(x, y)]; }
+  function calcSurf(x) { var y = 0; while (y < H && !OPAQUE[world[y * W + x]]) y++; surf[x] = y; }
+  function setBlock(x, y, id) { if (x < 0 || x >= W || y < 0 || y >= H) return; world[y * W + x] = id; calcSurf(x); dirty = true; }
+  function gen(sd) {
+    seed = sd; var w = new Uint8Array(W * H), rnd = mkRng(sd), hs = new Int16Array(W), x, y;
+    for (x = 0; x < W; x++) {
+      var h = Math.round(42 + (vnoise(x / 38, 0, sd) - .5) * 28 + (vnoise(x / 11, 5, sd) - .5) * 7);
+      hs[x] = Math.max(22, Math.min(70, h));
+    }
+    for (x = 0; x < W; x++) for (y = 0; y < H; y++) {
+      var id = AIR, h2 = hs[x];
+      if (y >= h2) {
+        var d = y - h2; id = d === 0 ? GRASS : (d <= 4 ? DIRT : STONE);
+        if (y >= H - 1) id = BEDROCK;
+        else if (y > h2 + 7 && y < H - 3) {
+          var n = vnoise(x / 9, y / 7, sd + 9) * .62 + vnoise(x / 4, y / 4, sd + 3) * .38;
+          if (n > .63) id = AIR;
+        }
+      }
+      w[y * W + x] = id;
+    }
+    // Erze (Adern)
+    for (x = 1; x < W - 1; x++) for (y = 1; y < H - 1; y++) {
+      if (w[y * W + x] !== STONE) continue;
+      var dd = y - hs[x], r = rnd(), ore = 0;
+      if (dd > 4 && r < .022) ore = COAL_ORE; else if (dd > 14 && r > .985) ore = IRON_ORE; else if (dd > 30 && r > .993) ore = GOLD_ORE;
+      if (ore) { w[y * W + x] = ore; if (rnd() < .6 && w[y * W + x + 1] === STONE) w[y * W + x + 1] = ore; if (rnd() < .6 && w[(y + 1) * W + x] === STONE) w[(y + 1) * W + x] = ore; }
+    }
+    // Wasser & Strand
+    for (x = 0; x < W; x++) {
+      var t = hs[x];
+      if (t > SEA) { for (y = SEA; y < t; y++) w[y * W + x] = WATER; for (y = t; y < t + 3; y++) if (w[y * W + x] !== AIR) w[y * W + x] = SAND; }
+      else if (t >= SEA - 1) { for (y = t; y < t + 3; y++) if (w[y * W + x] === GRASS || w[y * W + x] === DIRT) w[y * W + x] = SAND; }
+    }
+    // Bäume
+    var last = -9;
+    for (x = 4; x < W - 4; x++) {
+      if (x - last < 5 || rnd() > .14 || w[hs[x] * W + x] !== GRASS) continue;
+      last = x; var th = 4 + Math.floor(rnd() * 3), top = hs[x] - th;
+      for (y = hs[x] - 1; y >= top; y--) w[y * W + x] = WOOD;
+      for (var dx = -2; dx <= 2; dx++) for (var dy = -2; dy <= 1; dy++) {
+        if (Math.abs(dx) === 2 && Math.abs(dy) !== 0 && Math.abs(dy) !== 1) continue;
+        var lx = x + dx, ly = top + dy; if (lx < 0 || lx >= W || ly < 0) continue;
+        if (w[ly * W + lx] === AIR && !(dx === 0 && dy >= 0 && ly >= top)) w[ly * W + lx] = LEAVES;
+      }
+    }
+    world = w;
+    for (x = 0; x < W; x++) calcSurf(x);
+    var sx = W >> 1; for (var k = 0; k < 80; k++) { var cx = sx + (k % 2 ? k : -k) / 2 | 0; if (cx > 6 && cx < W - 6 && hs[cx] <= SEA - 2) { sx = cx; break; } }
+    spawn = { x: sx + .5, y: surf[sx] - 2 };
+  }
+
+  // ---------- Speichern ----------
+  var dirty = false, KEY = 'blockheads-save-v1';
+  function enc(w) { var out = [], i = 0; while (i < w.length) { var v = w[i], n = 1; while (i + n < w.length && w[i + n] === v && n < 255) n++; out.push(v, n); i += n; } var s = ''; for (var k = 0; k < out.length; k += 8192) s += String.fromCharCode.apply(null, out.slice(k, k + 8192)); return btoa(s); }
+  function dec(b) { var s = atob(b), w = new Uint8Array(W * H), i = 0; for (var k = 0; k < s.length; k += 2) { var v = s.charCodeAt(k), n = s.charCodeAt(k + 1); while (n-- > 0) w[i++] = v; } return w; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, seed: seed, world: enc(world), inv: inv, px: P.x, py: P.y, hp: P.hp, t: tod, sel: sel, sx: spawn.x, sy: spawn.y })); dirty = false; } catch (e) { } }
+  function load() {
+    try { var s = JSON.parse(localStorage.getItem(KEY)); if (!s || s.v !== 1) return false; world = dec(s.world); seed = s.seed; for (var x = 0; x < W; x++) calcSurf(x); inv = s.inv || []; P.x = s.px; P.y = s.py; P.hp = s.hp || 10; tod = s.t || .35; sel = s.sel || 0; spawn = { x: s.sx, y: s.sy }; return true; } catch (e) { return false; }
+  }
+
+  // ---------- Inventar ----------
+  var inv = [], sel = 0;
+  function count(id) { for (var i = 0; i < inv.length; i++) if (inv[i][0] === id) return inv[i][1]; return 0; }
+  function addItem(id, n) { if (!id) return; for (var i = 0; i < inv.length; i++) if (inv[i][0] === id) { inv[i][1] += n; invDirty = true; return; } inv.push([id, n]); invDirty = true; }
+  function takeItem(id, n) { for (var i = 0; i < inv.length; i++) if (inv[i][0] === id) { inv[i][1] -= n; if (inv[i][1] <= 0) { inv.splice(i, 1); if (sel >= inv.length) sel = Math.max(0, inv.length - 1); } invDirty = true; return; } }
+  var invDirty = true;
+  function tier() { var t = 0; for (var k in TOOL_TIER) if (count(+k) && TOOL_TIER[k] > t) t = TOOL_TIER[k]; return t; }
+  function dmg() { var d = 1; for (var k in SWORD) if (count(+k) && SWORD[k] > d) d = SWORD[k]; return d; }
+
+  // ---------- Grafik (Atlas) ----------
+  var atlas = document.createElement('canvas'); atlas.width = 16 * 40; atlas.height = 16;
+  (function () {
+    var g = atlas.getContext('2d');
+    function c(v) { return Math.max(0, Math.min(255, v | 0)); }
+    function sp(o, id, r, gg, b, amp, y0, y1) { for (var y = y0 || 0; y < (y1 || 16); y++) for (var x = 0; x < 16; x++) { var n = (hash2(x, y, id) - .5) * amp; g.fillStyle = 'rgb(' + c(r + n) + ',' + c(gg + n) + ',' + c(b + n) + ')'; g.fillRect(o + x, y, 1, 1); } }
+    function px(o, x, y, col, w, h) { g.fillStyle = col; g.fillRect(o + x, y, w || 1, h || 1); }
+    function dots(o, id, col) { for (var i = 0; i < 7; i++) { var x = (hash2(i, 1, id) * 13) | 0, y = (hash2(i, 2, id) * 13) | 0; px(o, x + 1, y + 1, col, 2, 2); } }
+    for (var id = 1; id <= 16; id++) {
+      var o = id * 16;
+      if (id === 1) { sp(o, id, 134, 96, 67, 28); for (var x = 0; x < 16; x++) { var dh = 4 + (hash2(x, 9, 1) > .6 ? 2 : 0); for (var gy = 0; gy < dh; gy++) { var gn = (hash2(x, gy, 91) - .5) * 36; g.fillStyle = 'rgb(' + c(84 + gn) + ',' + c(170 + gn) + ',' + c(60 + gn) + ')'; g.fillRect(o + x, gy, 1, 1); } } }
+      else if (id === 2) sp(o, id, 134, 96, 67, 30);
+      else if (id === 3) sp(o, id, 125, 125, 130, 34);
+      else if (id === 4) sp(o, id, 222, 205, 140, 22);
+      else if (id === 5) { sp(o, id, 112, 78, 45, 18); for (var x2 = 0; x2 < 16; x2 += 4) px(o, x2, 0, 'rgba(0,0,0,.25)', 1, 16); }
+      else if (id === 6) { sp(o, id, 50, 140, 50, 50); for (var yy = 0; yy < 16; yy++) for (var xx = 0; xx < 16; xx++) if (hash2(xx, yy, 66) > .84) g.clearRect(o + xx, yy, 1, 1); }
+      else if (id === 7) { sp(o, id, 190, 145, 85, 20); for (var y2 = 4; y2 < 16; y2 += 5) px(o, 0, y2, 'rgba(70,40,10,.55)', 16, 1); px(o, 5, 0, 'rgba(70,40,10,.4)', 1, 4); px(o, 11, 5, 'rgba(70,40,10,.4)', 1, 5); px(o, 4, 10, 'rgba(70,40,10,.4)', 1, 5); }
+      else if (id === 8) { sp(o, id, 125, 125, 130, 34); dots(o, id, '#15151a'); }
+      else if (id === 9) { sp(o, id, 125, 125, 130, 34); dots(o, id, '#e0b090'); }
+      else if (id === 10) { sp(o, id, 125, 125, 130, 34); dots(o, id, '#ffd93a'); }
+      else if (id === 11) { g.fillStyle = 'rgb(50,110,220)'; g.fillRect(o, 0, 16, 16); }
+      else if (id === 12) { px(o, 7, 6, '#7a4a20', 2, 10); px(o, 6, 2, '#ff8a1a', 4, 4); px(o, 7, 1, '#ffd34a', 2, 3); px(o, 7, 3, '#fff2a0', 2, 2); }
+      else if (id === 13) sp(o, id, 40, 40, 45, 30);
+      else if (id === 14) { sp(o, id, 170, 80, 70, 16); for (var yb = 3; yb < 16; yb += 4) px(o, 0, yb, '#8a8a8a', 16, 1); for (var rr = 0; rr < 4; rr++) px(o, (rr % 2 ? 4 : 10), rr * 4, '#8a8a8a', 1, 3); }
+      else if (id === 15) { g.fillStyle = 'rgba(200,240,255,.28)'; g.fillRect(o, 0, 16, 16); g.strokeStyle = 'rgba(230,250,255,.9)'; g.strokeRect(o + .5, .5, 15, 15); px(o, 3, 3, '#fff', 3, 1); px(o, 3, 4, '#fff', 1, 2); }
+      else if (id === 16) { sp(o, id, 240, 200, 50, 30); g.strokeStyle = 'rgba(120,80,0,.7)'; g.strokeRect(o + .5, .5, 15, 15); px(o, 3, 3, '#fff7b0', 4, 2); }
+    }
+    function pick(o, head) { for (var i = 0; i < 10; i++) px(o, 4 + i, 14 - i, '#7a4a20', 2, 2); for (var j = 0; j < 9; j++) { px(o, 4 + j, 2 + (j < 2 || j > 6 ? 2 : (j < 4 || j > 4 ? 1 : 0)), head, 2, 2); } }
+    function sword(o, head) { for (var i = 0; i < 8; i++) px(o, 6 + i, 8 - i, head, 2, 2); px(o, 3, 9, '#7a4a20', 6, 2); px(o, 3, 11, '#7a4a20', 2, 4); px(o, 2, 12, '#7a4a20', 2, 2); }
+    pick(20 * 16, '#c89a55'); pick(21 * 16, '#9a9aa0'); pick(22 * 16, '#e6ecf0');
+    sword(23 * 16, '#c89a55'); sword(24 * 16, '#9a9aa0'); sword(25 * 16, '#e6ecf0');
+    function blob(o, col, hi) { g.fillStyle = col; g.beginPath(); g.arc(o + 8, 8, 5, 0, 6.3); g.fill(); g.fillStyle = hi; g.fillRect(o + 6, 5, 2, 2); }
+    blob(30 * 16, '#222228', '#666'); blob(31 * 16, '#d0b8a8', '#fff'); blob(32 * 16, '#ffd93a', '#fff7b0');
+  })();
+  function icon(id, size) {
+    var c = document.createElement('canvas'); c.width = c.height = 16; var g = c.getContext('2d'); g.drawImage(atlas, id * 16, 0, 16, 16, 0, 0, 16, 16); return c;
+  }
+
+  // ---------- Spieler / Mobs ----------
+  var P = { x: 160, y: 20, w: .7, h: 1.8, vx: 0, vy: 0, on: false, inW: false, hp: 10, face: 1, walk: 0, hurtT: 0, regenT: 0 };
+  var mobs = [], tod = .35, msgT = 0, camX = 0, camY = 0, TSL = [24, 32, 40, 48], tsi = 1;
+  var keys = {}, mouse = { x: 0, y: 0, down: false, btn: 0, touch: false }, touchMode = 'mine';
+  function hit(x, y, w, h) {
+    var x0 = Math.floor(x - w / 2), x1 = Math.floor(x + w / 2 - 1e-6), y0 = Math.floor(y), y1 = Math.floor(y + h - 1e-6);
+    for (var tx = x0; tx <= x1; tx++) for (var ty = y0; ty <= y1; ty++) if (solid(tx, ty)) return true;
+    return false;
+  }
+  function stepEnt(e, dt, hop) {
+    e.inW = get(Math.floor(e.x), Math.floor(e.y + e.h * .5)) === WATER;
+    e.vy += (e.inW ? 8 : 34) * dt;
+    if (e.inW) { e.vy *= Math.pow(.04, dt); if (e.vy > 4) e.vy = 4; } else if (e.vy > 32) e.vy = 32;
+    var nx = e.x + e.vx * dt;
+    if (nx - e.w / 2 < 0) nx = e.w / 2; if (nx + e.w / 2 > W) nx = W - e.w / 2;
+    if (!hit(nx, e.y, e.w, e.h)) e.x = nx; else { if (hop && e.on && !hit(nx, e.y - 1.1, e.w, e.h)) e.vy = -9.6; e.vx = 0; }
+    var ny = e.y + e.vy * dt; e.land = 0; var was = e.on; e.on = false;
+    if (hit(e.x, ny, e.w, e.h)) {
+      if (e.vy > 0) { e.y = Math.floor(ny + e.h) - e.h - 1e-4; e.on = true; e.land = e.vy; } else e.y = Math.floor(ny) + 1 + 1e-4;
+      e.vy = 0;
+    } else e.y = ny;
+  }
+  function toast(t) { var el = document.getElementById('toast'); el.textContent = t; el.classList.add('show'); msgT = 2.2; }
+  function hurt(n, from) {
+    if (P.hurtT > 0) return; P.hp -= n; P.hurtT = .9; P.regenT = 0; P.vy = -6; P.vx = (P.x < from ? -1 : 1) * 6; heartsDirty = true;
+    if (P.hp <= 0) { P.hp = 10; P.x = spawn.x; P.y = spawn.y; P.vx = P.vy = 0; mobs.length = 0; toast('Du bist k.o. gegangen – zurück am Startpunkt.'); }
+  }
+  var heartsDirty = true;
+
+  // ---------- Eingabe ----------
+  addEventListener('keydown', function (e) {
+    var k = e.key.toLowerCase(); keys[k] = true;
+    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(k) >= 0) e.preventDefault();
+    if (k === 'e') toggleCraft();
+    if (k >= '1' && k <= '9') { var i = +k - 1; if (i < inv.length) { sel = i; invDirty = true; } }
+    if (k === '+' || k === '=') zoom(1); if (k === '-') zoom(-1);
+  });
+  addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  function mpos(e) { var r = cv.getBoundingClientRect(); mouse.x = (e.clientX - r.left) * cv.width / r.width; mouse.y = (e.clientY - r.top) * cv.height / r.height; }
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  cv.addEventListener('pointerdown', function (e) { mpos(e); mouse.down = true; mouse.btn = e.button; mouse.touch = e.pointerType === 'touch'; try { cv.setPointerCapture(e.pointerId); } catch (x) { } e.preventDefault(); });
+  cv.addEventListener('pointermove', function (e) { mpos(e); });
+  addEventListener('pointerup', function () { mouse.down = false; });
+  cv.addEventListener('wheel', function (e) { if (!inv.length) return; sel = (sel + (e.deltaY > 0 ? 1 : -1) + inv.length) % inv.length; invDirty = true; e.preventDefault(); }, { passive: false });
+  function hold(id, key) { var b = document.getElementById(id); function on(e) { keys[key] = true; e.preventDefault(); } function off() { keys[key] = false; } b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off); }
+  hold('tL', 'a'); hold('tR', 'd'); hold('tJ', 'w');
+  document.getElementById('tM').onclick = function () { touchMode = touchMode === 'mine' ? 'place' : 'mine'; this.textContent = touchMode === 'mine' ? '⛏ Abbauen' : '🧱 Setzen'; };
+  function zoom(d) { tsi = Math.max(0, Math.min(TSL.length - 1, tsi + d)); }
+  document.getElementById('bZoom').onclick = function () { tsi = (tsi + 1) % TSL.length; };
+  document.getElementById('bNew').onclick = function () { if (confirm('Neue Welt erstellen? Die gespeicherte Welt geht verloren.')) newGame(); };
+  document.getElementById('bCraft').onclick = toggleCraft;
+  function toggleCraft() { var el = document.getElementById('craft'); el.style.display = el.style.display === 'block' ? 'none' : 'block'; invDirty = true; }
+
+  // ---------- Aktionen ----------
+  var mine = { x: -1, y: -1, p: 0 }, placeCd = 0, atkCd = 0, noToolT = 0;
+  function worldMouse() { var ts = TSL[tsi]; return { x: camX - cv.width / ts / 2 + mouse.x / ts, y: camY - cv.height / ts / 2 + mouse.y / ts }; }
+  function act(dt) {
+    placeCd -= dt; atkCd -= dt; noToolT -= dt;
+    if (!mouse.down) { mine.p = 0; mine.x = -1; return; }
+    var m = worldMouse(), tx = Math.floor(m.x), ty = Math.floor(m.y), dx = m.x - P.x, dy = m.y - (P.y + .9);
+    if (dx * dx + dy * dy > REACH * REACH) { mine.p = 0; mine.x = -1; return; }
+    var placing = mouse.btn === 2 || (mouse.touch && touchMode === 'place');
+    if (placing) {
+      if (placeCd > 0) return; placeCd = .2;
+      var b = get(tx, ty), it = inv[sel]; if ((b !== AIR && b !== WATER) || !it || !PLACEABLE[it[0]]) return;
+      if (SOLID[it[0]]) { if (rectHit(P, tx, ty)) return; for (var i = 0; i < mobs.length; i++) if (rectHit(mobs[i], tx, ty)) return; }
+      setBlock(tx, ty, it[0]); takeItem(it[0], 1); return;
+    }
+    // Kämpfen
+    for (var i2 = 0; i2 < mobs.length; i2++) {
+      var mb = mobs[i2];
+      if (m.x > mb.x - mb.w / 2 - .3 && m.x < mb.x + mb.w / 2 + .3 && m.y > mb.y - .3 && m.y < mb.y + mb.h + .3) {
+        if (atkCd <= 0) { atkCd = .4; mb.hp -= dmg(); mb.vx = (mb.x > P.x ? 1 : -1) * 7; mb.vy = -5; mb.flash = .2; if (mb.hp <= 0) { if (Math.random() < .5) addItem(COAL, 1); mobs.splice(i2, 1); } }
+        return;
+      }
+    }
+    var b2 = get(tx, ty); if (b2 === AIR || b2 === WATER || b2 === BEDROCK) { mine.p = 0; mine.x = -1; return; }
+    if (mine.x !== tx || mine.y !== ty) { mine.x = tx; mine.y = ty; mine.p = 0; }
+    var need = NEED[b2] || 0, t = tier();
+    if (t < need) { if (noToolT <= 0) { toast(need === 1 ? 'Dafür brauchst du eine Spitzhacke (Bretter → Holz-Spitzhacke).' : 'Dafür brauchst du eine bessere Spitzhacke.'); noToolT = 2.5; } return; }
+    mine.p += dt * (1 + t * .9) / (HARD[b2] || 1);
+    if (mine.p >= 1) { var dr = DROP.hasOwnProperty(b2) ? DROP[b2] : b2; setBlock(tx, ty, AIR); addItem(dr, 1); mine.p = 0; if (get(tx, ty - 1) === TORCH) { setBlock(tx, ty - 1, AIR); addItem(TORCH, 1); } }
+  }
+  function rectHit(e, tx, ty) { return e.x + e.w / 2 > tx && e.x - e.w / 2 < tx + 1 && e.y + e.h > ty && e.y < ty + 1; }
+  function craft(i) {
+    var r = RECIPES[i]; for (var k = 0; k < r.need.length; k++) if (count(r.need[k][0]) < r.need[k][1]) return;
+    r.need.forEach(function (n) { takeItem(n[0], n[1]); }); addItem(r.out, r.n);
+  }
+
+  // ---------- Update ----------
+  var spawnT = 0;
+  function update(dt) {
+    tod = (tod + dt / DAY) % 1;
+    var dir = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
+    var sp = P.inW ? 3.4 : 5.6;
+    if (P.hurtT > 0) { P.hurtT -= dt; P.vx *= Math.pow(.02, dt); if (Math.abs(P.vx) < sp) P.vx = dir * sp; } else P.vx = dir * sp;
+    if (dir) { P.face = dir; P.walk += dt * 11; }
+    var jump = keys['w'] || keys['arrowup'] || keys[' '];
+    if (jump) { if (P.on) P.vy = -10.6; else if (P.inW) P.vy = -4.5; }
+    var wasVy = P.vy; stepEnt(P, dt, !!dir && !jump && false);
+    if (P.land > 19 && !P.inW) hurt(Math.floor((P.land - 19) / 4) + 1, P.x);
+    if (P.hurtT > 0 && P.hurtT < 0) P.hurtT = 0;
+    // Autohop an 1-Block-Stufen für Touch/Komfort
+    if (dir && P.on && hit(P.x + dir * .5, P.y + .5, .1, .9) && !hit(P.x + dir * .5, P.y - 1.1, P.w, P.h)) P.vy = -9.6;
+    P.regenT += dt; if (P.hp < 10 && P.regenT > 6) { P.hp++; P.regenT = 3; heartsDirty = true; }
+    if (P.y > H + 5) { P.x = spawn.x; P.y = spawn.y; P.vy = 0; }
+    // Nacht & Mobs
+    var day = daylight();
+    spawnT -= dt;
+    if (day < .3 && spawnT <= 0 && mobs.length < 6) {
+      spawnT = 3.5;
+      var sx = P.x + (Math.random() < .5 ? -1 : 1) * (14 + Math.random() * 12); sx = Math.max(2, Math.min(W - 3, sx));
+      var tx = Math.floor(sx), sy = surf[tx] - 2;
+      if (get(tx, surf[tx] - 1) === AIR && get(tx, sy) === AIR) mobs.push({ x: tx + .5, y: sy, w: .8, h: 1.2, vx: 0, vy: 0, on: false, hp: 3, atk: 0, flash: 0, dirT: 0, dir: 1 });
+    }
+    for (var i = mobs.length - 1; i >= 0; i--) {
+      var m = mobs[i]; m.atk -= dt; m.flash -= dt;
+      var dx = P.x - m.x, dist = Math.abs(dx) + Math.abs(P.y - m.y);
+      if (day > .55 && Math.random() < dt * .5 || dist > 70) { mobs.splice(i, 1); continue; }
+      if (m.flash > 0) { m.vx *= Math.pow(.05, dt); } else if (dist < 26) { m.vx = (dx > 0 ? 1 : -1) * 2.7; m.dir = dx > 0 ? 1 : -1; }
+      else { m.dirT -= dt; if (m.dirT < 0) { m.dirT = 1 + Math.random() * 2; m.dir = Math.random() < .5 ? -1 : 1; } m.vx = m.dir * 1.1; }
+      stepEnt(m, dt, true);
+      if (m.atk <= 0 && rectOverlap(m, P)) { m.atk = 1; hurt(2, m.x); }
+    }
+    act(dt);
+    if (msgT > 0) { msgT -= dt; if (msgT <= 0) document.getElementById('toast').classList.remove('show'); }
+    var ts = TSL[tsi], hw = cv.width / ts / 2, hh = cv.height / ts / 2;
+    var tcx = P.x, tcy = P.y + .9;
+    camX += (tcx - camX) * Math.min(1, dt * 8); camY += (tcy - camY) * Math.min(1, dt * 8);
+    camX = Math.max(hw, Math.min(W - hw, camX)); camY = Math.max(hh, Math.min(H - hh, camY)); if (W < hw * 2) camX = W / 2; if (H < hh * 2) camY = H / 2;
+  }
+  function rectOverlap(a, b) { return Math.abs(a.x - b.x) < (a.w + b.w) / 2 && a.y < b.y + b.h && a.y + a.h > b.y; }
+  function daylight() { var s = Math.sin(2 * Math.PI * (tod - .25)); return Math.max(0, Math.min(1, s * 1.6 + .5)); }
+
+  // ---------- Zeichnen ----------
+  var lc = document.createElement('canvas'), lg = lc.getContext('2d'), lb = null;
+  var stars = []; for (var si = 0; si < 70; si++) stars.push([Math.random(), Math.random() * .7, Math.random() * 1.5 + .5]);
+  function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+  function draw(time) {
+    var ts = TSL[tsi], cw = cv.width, ch = cv.height, day = daylight(), sky = mix([8, 10, 32], [124, 200, 255], day);
+    ctx.imageSmoothingEnabled = false;
+    // Himmel
+    var g1 = ctx.createLinearGradient(0, 0, 0, ch), top = mix([4, 6, 20], [70, 150, 235], day);
+    g1.addColorStop(0, 'rgb(' + top.map(Math.round) + ')'); g1.addColorStop(1, 'rgb(' + sky.map(Math.round) + ')'); ctx.fillStyle = g1; ctx.fillRect(0, 0, cw, ch);
+    if (day < .6) { ctx.fillStyle = '#fff'; for (var s = 0; s < stars.length; s++) { ctx.globalAlpha = (.6 - day) / .6 * .9; ctx.fillRect(stars[s][0] * cw, stars[s][1] * ch, stars[s][2], stars[s][2]); } ctx.globalAlpha = 1; }
+    var ang = 2 * Math.PI * (tod - .25), sxp = cw * (.5 - .46 * Math.cos(ang)), syp = ch * .6 - Math.sin(ang) * ch * .55;
+    ctx.fillStyle = '#ffe680'; ctx.beginPath(); ctx.arc(sxp, syp, 26, 0, 6.3); ctx.fill();
+    ctx.fillStyle = '#dfe6ff'; ctx.beginPath(); ctx.arc(cw - sxp, ch * 1.2 - syp, 18, 0, 6.3); ctx.fill();
+    // Kachelbereich
+    var left = camX - cw / ts / 2, topY = camY - ch / ts / 2;
+    var x0 = Math.floor(left), y0 = Math.floor(topY), x1 = Math.ceil(left + cw / ts), y1 = Math.ceil(topY + ch / ts);
+    var ox = Math.round((x0 - left) * ts), oy = Math.round((y0 - topY) * ts);
+    for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) {
+      var b = get(x, y), sx = ox + (x - x0) * ts, sy = oy + (y - y0) * ts;
+      if (b === AIR) { if (x >= 0 && x < W && y > surf[x] && y < H) { ctx.fillStyle = '#2b2321'; ctx.fillRect(sx, sy, ts + 1, ts + 1); } continue; }
+      if (b === WATER) ctx.globalAlpha = .62;
+      else if (b === GLASS) ctx.globalAlpha = 1;
+      if (b >= 1 && b <= 16 && !(b === AIR)) ctx.drawImage(atlas, b * 16, 0, 16, 16, sx, sy, ts + 1, ts + 1);
+      ctx.globalAlpha = 1;
+    }
+    // Abbau-Risse + Zeiger
+    var wm = worldMouse(), hx = Math.floor(wm.x), hy = Math.floor(wm.y), rx = wm.x - P.x, ry = wm.y - (P.y + .9), inR = rx * rx + ry * ry <= REACH * REACH;
+    ctx.lineWidth = 2; ctx.strokeStyle = inR ? 'rgba(255,255,255,.85)' : 'rgba(255,80,80,.55)';
+    ctx.strokeRect(ox + (hx - x0) * ts + 1, oy + (hy - y0) * ts + 1, ts - 2, ts - 2);
+    if (mine.p > 0 && mine.x >= 0) { ctx.fillStyle = 'rgba(0,0,0,' + (mine.p * .55) + ')'; ctx.fillRect(ox + (mine.x - x0) * ts, oy + (mine.y - y0) * ts, ts, ts); }
+    // Mobs
+    mobs.forEach(function (m) { drawBear(m, left, topY, ts); });
+    drawHead(P, left, topY, ts, time);
+    // Licht
+    var vw = x1 - x0 + 2, vh = y1 - y0 + 2; if (lc.width !== vw || lc.height !== vh) { lc.width = vw; lc.height = vh; lb = lg.createImageData(vw, vh); }
+    var L = new Float32Array(vw * vh), amb = .12 + .88 * day, xx, yy;
+    for (yy = 0; yy < vh; yy++) for (xx = 0; xx < vw; xx++) {
+      var wx = x0 + xx - 1, wy = y0 + yy - 1, d = wy - (wx >= 0 && wx < W ? surf[wx] : 0), l;
+      if (wx < 0 || wx >= W) l = amb; else l = d < 0 ? amb : Math.max(.04, amb * (1 - d / 5));
+      L[yy * vw + xx] = l;
+    }
+    function splat(cx, cy, r, s) { var a = Math.floor(cx - r), c2 = Math.ceil(cx + r), b2 = Math.floor(cy - r), d2 = Math.ceil(cy + r); for (var j = b2; j <= d2; j++) { if (j < 0 || j >= vh) continue; for (var i = a; i <= c2; i++) { if (i < 0 || i >= vw) continue; var q = 1 - Math.sqrt((i + .5 - cx) * (i + .5 - cx) + (j + .5 - cy) * (j + .5 - cy)) / r; if (q > 0) { q = q * q * s * 1.15; if (q > L[j * vw + i]) L[j * vw + i] = Math.min(1, q); } } } }
+    for (var ty = y0 - 9; ty <= y1 + 9; ty++) for (var tx = x0 - 9; tx <= x1 + 9; tx++) if (get(tx, ty) === TORCH) splat(tx - x0 + 1.5, ty - y0 + 1.5, 9, 1);
+    splat(P.x - x0 + 1, P.y + .9 - y0 + 1, 5, .75);
+    for (var k = 0; k < L.length; k++) { var o = k * 4; lb.data[o] = 4; lb.data[o + 1] = 6; lb.data[o + 2] = 22; lb.data[o + 3] = Math.round((1 - L[k]) * 235); }
+    lg.putImageData(lb, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(lc, 0, 0, vw, vh, ox - ts, oy - ts, vw * ts, vh * ts);
+    ctx.imageSmoothingEnabled = false;
+  }
+  function drawHead(e, left, topY, ts, time) {
+    var sx = (e.x - left) * ts, sy = (e.y - topY) * ts, u = ts / 10, f = e.face;
+    var legA = e.on && Math.abs(e.vx) > .1 ? Math.sin(e.walk) * u * 1.4 : 0, blink = e.hurtT > 0 && Math.floor(time / 80) % 2;
+    if (blink) ctx.globalAlpha = .45;
+    ctx.fillStyle = '#2d3f8f'; ctx.fillRect(sx - 2.2 * u + legA, sy + 13 * u, 1.9 * u, 5 * u); ctx.fillRect(sx + .3 * u - legA, sy + 13 * u, 1.9 * u, 5 * u);
+    ctx.fillStyle = '#e8483a'; ctx.fillRect(sx - 2.6 * u, sy + 7 * u, 5.2 * u, 6.2 * u);
+    ctx.fillStyle = '#f2c79b'; ctx.fillRect(sx - 3.5 * u, sy, 7 * u, 7 * u);
+    ctx.fillStyle = '#5a3a1e'; ctx.fillRect(sx - 3.7 * u, sy - .4 * u, 7.4 * u, 2.2 * u);
+    ctx.fillStyle = '#fff'; ctx.fillRect(sx + (f > 0 ? 0.4 : -2.8) * u, sy + 2.6 * u, 2.4 * u, 1.8 * u);
+    ctx.fillStyle = '#111'; ctx.fillRect(sx + (f > 0 ? 1.4 : -2.8) * u, sy + 2.8 * u, 1.2 * u, 1.4 * u);
+    ctx.globalAlpha = 1;
+  }
+  function drawBear(m, left, topY, ts) {
+    var sx = (m.x - left) * ts, sy = (m.y - topY) * ts, u = ts / 10, fl = m.flash > 0;
+    ctx.fillStyle = fl ? '#fff' : '#4a2f5e'; ctx.fillRect(sx - 4 * u, sy + 2 * u, 8 * u, 10 * u);
+    ctx.fillRect(sx - 4 * u, sy, 2 * u, 2.4 * u); ctx.fillRect(sx + 2 * u, sy, 2 * u, 2.4 * u);
+    ctx.fillStyle = fl ? '#fff' : '#2a1838'; ctx.fillRect(sx - 4 * u, sy + 10 * u, 2.6 * u, 2 * u); ctx.fillRect(sx + 1.4 * u, sy + 10 * u, 2.6 * u, 2 * u);
+    ctx.fillStyle = '#ff3b3b'; ctx.fillRect(sx - 2.6 * u, sy + 4 * u, 1.6 * u, 1.6 * u); ctx.fillRect(sx + 1 * u, sy + 4 * u, 1.6 * u, 1.6 * u);
+    ctx.fillStyle = '#e8d8f0'; ctx.fillRect(sx - 1.4 * u, sy + 7.5 * u, 2.8 * u, 1.2 * u);
+  }
+
+  // ---------- Oberfläche ----------
+  function renderHud() {
+    if (heartsDirty) { var h = ''; for (var i = 0; i < 10; i++) h += '<i class="' + (i < P.hp ? 'on' : '') + '">♥</i>'; document.getElementById('hearts').innerHTML = h; heartsDirty = false; }
+    var d = daylight(); document.getElementById('clock').textContent = (d > .5 ? '☀ Tag' : (d > .2 ? '🌅 Dämmerung' : '🌙 Nacht')) + ' · Spitzhacke Stufe ' + tier();
+    if (!invDirty) return; invDirty = false;
+    var hb = document.getElementById('hotbar'); hb.innerHTML = '';
+    inv.forEach(function (it, i) {
+      var b = document.createElement('button'); b.className = 'slot' + (i === sel ? ' sel' : ''); b.title = NAMES[it[0]] || ''; var c = icon(it[0]); b.appendChild(c);
+      if (i < 9) { var u = document.createElement('u'); u.textContent = i + 1; b.appendChild(u); }
+      if (it[1] > 1) { var n = document.createElement('b'); n.textContent = it[1]; b.appendChild(n); }
+      b.onclick = function () { sel = i; invDirty = true; }; hb.appendChild(b);
+    });
+    var rc = document.getElementById('craft');
+    if (rc.style.display === 'block') {
+      var el = document.getElementById('recipes'); el.innerHTML = '';
+      RECIPES.forEach(function (r, i) {
+        var ok = r.need.every(function (n) { return count(n[0]) >= n[1]; }), row = document.createElement('div'); row.className = 'rec' + (ok ? '' : ' no');
+        row.appendChild(icon(r.out));
+        var t = document.createElement('div'); t.className = 't'; t.innerHTML = (r.n > 1 ? r.n + '× ' : '') + NAMES[r.out] + '<small>' + r.need.map(function (n) { return n[1] + '× ' + NAMES[n[0]]; }).join(' + ') + '</small>'; row.appendChild(t);
+        var b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Bauen'; b.disabled = !ok; b.onclick = function () { craft(i); }; row.appendChild(b); el.appendChild(row);
+      });
+    }
+  }
+
+  // ---------- Start / Schleife ----------
+  function newGame() {
+    gen((Math.random() * 1e9) | 0); inv = []; sel = 0; P.x = spawn.x; P.y = spawn.y; P.vx = P.vy = 0; P.hp = 10; tod = .35; mobs.length = 0; camX = P.x; camY = P.y; invDirty = heartsDirty = true; save();
+    toast('Neue Welt! Hau mit Linksklick einen Baumstamm ab.');
+  }
+  function resize() { var r = cv.getBoundingClientRect(); cv.width = Math.max(300, Math.round(r.width)); cv.height = Math.max(240, Math.round(r.height)); }
+  addEventListener('resize', resize); resize();
+  if (!load()) { newGame(); } else { camX = P.x; camY = P.y; toast('Willkommen zurück!'); }
+  var last = performance.now(), hudT = 0, saveT = 0;
+  function frame() {
+    var now = performance.now(), dt = Math.min(.05, (now - last) / 1000); last = now; if (dt <= 0) return;
+    update(dt); draw(now); hudT -= dt; if (hudT <= 0) { hudT = .1; renderHud(); } if (P.hp !== P._hp) { P._hp = P.hp; heartsDirty = true; }
+    saveT += dt; if (saveT > 10) { saveT = 0; if (dirty || true) save(); }
+  }
+  function loop() { frame(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  setInterval(function () { if (performance.now() - last > 200) frame(); }, 100);
+  addEventListener('beforeunload', save);
+  window.BH = { P: P, mobs: mobs, inv: function () { return inv; }, addItem: addItem, craft: craft, setBlock: setBlock, get: get, count: count, newGame: newGame, tier: tier, setTod: function (t) { tod = t; }, frame: frame, mouse: mouse, worldMouse: worldMouse, sel: function (i) { sel = i; }, save: save, load: load, surf: surf };
+})();
+</script>
+</body>
+</html>
