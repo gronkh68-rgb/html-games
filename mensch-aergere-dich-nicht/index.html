@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
 <script src="../dice.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net.js"></script>
 <style>
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
 @media (max-width:760px){.layout{grid-template-columns:1fr}}
@@ -35,6 +38,14 @@
 #stage3d{width:100%;max-width:640px;aspect-ratio:1;border:2px solid var(--pc,var(--border));box-shadow:0 0 22px var(--pc,transparent);background:#05060b;touch-action:none}
 #stage3d canvas{display:block;width:100%;height:100%}
 .scores div.act{color:var(--text);font-weight:700}
+#setup input{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:160px}
+#modeTabs{gap:8px}
+.codebox{font:900 2.2rem ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:10px 6px 10px 16px;background:var(--bg);border:1px solid var(--border);margin:6px 0}
+.hint{color:var(--muted);font-size:.85rem;margin:6px 0}
+.mini{padding:3px 8px!important;font-size:.72rem!important;margin-left:6px}
+.slotrow{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.slotrow .nm{min-width:90px;color:var(--muted)}
+.slotrow .who{font-weight:700}
 .rules{font-size:.85rem;color:var(--muted);line-height:1.5}
 .rules summary{cursor:pointer;color:var(--text);font-weight:700}
 .rules ul{margin:8px 0 0;padding-left:18px}
@@ -46,9 +57,39 @@
   <div class="top"><a class="back" href="../">← Spiele</a><h1>Mensch ärgere dich nicht</h1></div>
 
   <div id="setup" class="panel">
-    <h2>Spieler wählen</h2>
-    <div id="slots"></div>
-    <div class="row"><button class="btn" id="start">Spiel starten</button></div>
+    <div class="row"><label>Dein Name</label><input id="myName" maxlength="14" placeholder="Name"></div>
+    <div class="row" id="modeTabs">
+      <button class="btn" data-m="local">Lokal</button>
+      <button class="btn alt" data-m="host">Online: Raum erstellen</button>
+      <button class="btn alt" data-m="join">Online: Beitreten</button>
+    </div>
+    <div id="pLocal">
+      <h2>Spieler wählen</h2>
+      <div id="slots"></div>
+      <div class="row"><button class="btn" id="start">Spiel starten</button></div>
+    </div>
+    <div id="pHost" hidden>
+      <h2>Raumcode</h2>
+      <div class="codebox" id="roomCode">…</div>
+      <div class="row"><button class="btn alt" id="copyLink">Link kopieren</button></div>
+      <p class="hint">Schicke den Code oder den Link an deine Mitspieler. Sie können Rot nicht belegen, das ist dein Platz.</p>
+      <h2>Spieler</h2>
+      <div id="hostSlots"></div>
+      <div class="row"><button class="btn" id="hostStart">Spiel starten</button></div>
+    </div>
+    <div id="pJoin" hidden>
+      <div id="joinForm">
+        <h2>Raum beitreten</h2>
+        <div class="row"><label>Raumcode</label><input id="joinCode" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase;letter-spacing:.2em"></div>
+        <div class="row"><button class="btn" id="joinBtn">Beitreten</button></div>
+      </div>
+      <div id="joinLobby" hidden>
+        <h2>Lobby</h2>
+        <div id="joinSlots"></div>
+        <p class="hint">Warte, bis der Host das Spiel startet.</p>
+        <div class="row"><button class="btn alt" id="joinLeave">Verlassen</button></div>
+      </div>
+    </div>
     <p id="setupErr" style="color:#ff7b7b;margin:6px 0 0"></p>
   </div>
 
@@ -89,7 +130,7 @@
 </div>
 
 <div class="overlay" id="winBox" hidden>
-  <div class="box"><h2 id="winTitle"></h2><p>Glückwunsch!</p><button class="btn" id="winBtn">Neues Spiel</button></div>
+  <div class="box"><h2 id="winTitle"></h2><p id="winText">Glückwunsch!</p><button class="btn" id="winBtn">Neues Spiel</button></div>
 </div>
 
 <script>
@@ -121,7 +162,14 @@ let v3=false, cfg=[], active=[], pieces=[], cur=0, token=0, pick=null, rollWait=
 const CANCEL={};
 
 const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms));
-const isHuman=p=>cfg[p]==='human';
+// cfg: 'human' = an diesem Gerät, 'remote' = Online-Spieler, 'cpu', 'off'
+const isLocal=p=>cfg[p]==='human';
+const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
+let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,mySlot=-1,canRollNet=false;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pname=p=>names[p]?` (${esc(names[p])})`:'';
+function netPush(){}                     // wird im Mehrspieler-Teil ersetzt (Host schickt den Spielstand)
+function sendHost(m){}                   // dito (Mitspieler schickt Aktionen)
 const absIdx=(p,pos)=>(p*10+pos)%40;
 function cellOf(p,i){
   const pos=pieces[p][i];
@@ -220,7 +268,7 @@ function setMsg(t){$('msg').innerHTML=t;}
 function chip(p){return `<span class="chip" style="background:${COLORS[p].c}"></span>`;}
 function showTurn(p){
   const t=$('turn');
-  t.textContent=`${COLORS[p].n} ist dran${isHuman(p)?'':' (PC)'}`;
+  t.textContent=`${COLORS[p].n}${names[p]?' ('+names[p]+')':''} ist dran${isHuman(p)?'':' (PC)'}`;
   t.style.setProperty('--pc',COLORS[p].c);
   $('game').style.setProperty('--pc',COLORS[p].c);
   t.classList.remove('bump');void t.offsetWidth;t.classList.add('bump');
@@ -231,7 +279,7 @@ function showTurn(p){
   showScores();
 }
 function showScores(){
-  $('scores').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${COLORS[p].n}${isHuman(p)?'':' (PC)'}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
+  $('scores').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${COLORS[p].n}${pname(p)}${isHuman(p)?'':' (PC)'}${netRole==='host'&&cfg[p]==='remote'?`<button class="btn alt mini" data-bot="${p}" title="Computer übernimmt">Bot</button>`:''}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
 }
 function markMovable(p,moves){
   if(v3)mark3(p,moves);
@@ -243,10 +291,14 @@ function markMovable(p,moves){
 // ---------- Ablauf ----------
 async function doRoll(p){
   const btn=$('rollBtn');
-  if(isHuman(p)){
+  if(cfg[p]==='remote'){
+    netPhase={k:'roll',p};setMsg(`${chip(p)}<b>${COLORS[p].n}${pname(p)}</b> ist am Zug …`);netPush();
+    await new Promise(res=>{remoteRoll=res;});remoteRoll=null;
+  }else if(isLocal(p)){
     btn.disabled=false;
     $('rollBtn').textContent=rollLabel();
     setMsg(`Klicke auf <b>${rollLabel()}</b>.`);
+    netPhase={k:'idle'};netPush();
     await new Promise(res=>{rollWait=res;});
     rollWait=null;btn.disabled=true;
   }else{
@@ -254,28 +306,34 @@ async function doRoll(p){
     await sleep(650);
   }
   const t=token;
+  netPhase={k:'rolling',p};netPush();
   for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(60,t);}
   const v=1+Math.floor(Math.random()*6);
   dieDone(v);lastRoll=v;
+  netPhase={k:'idle'};netPush();
   return v;
 }
 function pickMove(p,moves){
   return new Promise(async res=>{
     const t=token;
     markMovable(p,moves);
-    setMsg(`${chip(p)}Du hast eine <b>${lastRoll}</b>. Wähle eine Figur.`);
-    pick={p,moves,res};
+    setMsg(isLocal(p)?`${chip(p)}Du hast eine <b>${lastRoll}</b>. Wähle eine Figur.`:`${chip(p)}<b>${COLORS[p].n}${pname(p)}</b> hat eine <b>${lastRoll}</b> und wählt …`);
+    pick={p,moves,res};netPhase={k:'pick',p,moves:moves.map(m=>m.i)};netPush();
     if(moves.length===1){
       try{await sleep(600,t);}catch(e){return;}
-      if(pick&&pick.res===res){pick=null;markMovable(null);res(moves[0]);}
+      if(pick&&pick.res===res){pick=null;markMovable(null);netPhase={k:'idle'};res(moves[0]);}
     }
   });
 }
 function onPieceClick(p,i){
-  if(!pick||pick.p!==p)return;
+  if(netRole==='client'){
+    if(pick&&pick.p===p&&pick.moves.some(m=>m.i===i)){const r=pick.res;pick=null;markMovable(null);r({i});}
+    return;
+  }
+  if(!pick||pick.p!==p||!isLocal(p))return;
   const m=pick.moves.find(m=>m.i===i);
   if(!m)return;
-  const r=pick.res;pick=null;markMovable(null);r(m);
+  const r=pick.res;pick=null;markMovable(null);netPhase={k:'idle'};r(m);
 }
 function aiPick(p,roll,moves){
   const myAbs=pos=>absIdx(p,pos);
@@ -358,8 +416,9 @@ async function gameLoop(){
       cur=active[i%active.length];
       showTurn(cur);
       if(await playTurn(cur)){
-        $('winTitle').innerHTML=`${chip(cur)}${COLORS[cur].n} gewinnt! 🎉`;
-        $('winBox').hidden=false;return;
+        $('winTitle').innerHTML=`${chip(cur)}${COLORS[cur].n}${pname(cur)} gewinnt! 🎉`;
+        $('winText').textContent='Glückwunsch!';
+        $('winBox').hidden=false;netPhase={k:'win',p:cur};netPush();return;
       }
       i++;
     }
@@ -375,11 +434,14 @@ function buildSetup(){
   def.forEach((d,p)=>$('slot'+p).value=d);
 }
 function startGame(){
-  cfg=[0,1,2,3].map(p=>$('slot'+p).value);
-  active=[0,1,2,3].filter(p=>cfg[p]!=='off');
-  if(active.length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
+  cfg=[0,1,2,3].map(p=>$('slot'+p).value);names=[];
+  if(cfg.filter(c=>c!=='off').length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
   $('setupErr').textContent='';
-  token++;pick=null;rollWait=null;
+  launch();
+}
+function launch(){            // startet das Spiel mit den Werten in cfg und names
+  active=[0,1,2,3].filter(p=>cfg[p]!=='off');
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};
   pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
@@ -392,9 +454,262 @@ function backToSetup(){
 $('start').onclick=startGame;
 $('again').onclick=backToSetup;
 $('winBtn').onclick=backToSetup;
-$('rollBtn').onclick=()=>{if(rollWait)rollWait();};
-$('die').onclick=()=>{if(rollWait)rollWait();};
+const rollClick=()=>{
+  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'roll'});}}
+  else if(rollWait)rollWait();
+};
+$('rollBtn').onclick=rollClick;$('die').onclick=rollClick;
 buildSetup();setDie(0);
+</script>
+<script>
+// ====================== Mehrspieler (Host und Mitspieler) ======================
+// Der Host führt das Spiel und schickt nach jedem Schritt den Spielstand. Mitspieler zeigen ihn nur an
+// und melden "Würfeln" und "Figur gewählt". Verbindung: siehe ../net.js (WebRTC, Ersatzweg Relay).
+const PREFIX='mdn-v1-';
+let room=null,lobby=[],hostConn=null,joiner=null,netPlaying=false,opening=false;
+let cReady=false,lastCur=-1,cRolling=false,rollAnim=null;
+const errMsg=t=>{$('setupErr').textContent=t||'';};
+function myNameVal(){const n=($('myName').value||'').trim().slice(0,14)||'Spieler';try{localStorage.setItem('mdn-name',n);}catch(e){}return n;}
+
+// Meldungstexte vom Host nur mit <b> und den Farbpunkten zulassen
+function safeHtml(html){
+  const t=document.createElement('template');t.innerHTML=String(html);
+  const out=document.createElement('div');
+  (function walk(from,to){
+    from.childNodes.forEach(n=>{
+      if(n.nodeType===3){to.appendChild(document.createTextNode(n.nodeValue));return;}
+      if(n.nodeType!==1)return;
+      if(n.tagName==='B'){const b=document.createElement('b');walk(n,b);to.appendChild(b);}
+      else if(n.tagName==='SPAN'&&n.className==='chip'){
+        const sp=document.createElement('span');sp.className='chip';
+        const m=/#[0-9a-fA-F]{6}/.exec(n.getAttribute('style')||'');if(m)sp.style.background=m[0];to.appendChild(sp);
+      }else walk(n,to);
+    });
+  })(t.content,out);
+  return out.innerHTML;
+}
+
+// ---------- Umschalten ----------
+function showMode(m){
+  document.querySelectorAll('#modeTabs .btn').forEach(b=>b.classList.toggle('alt',b.dataset.m!==m));
+  $('pLocal').hidden=m!=='local';$('pHost').hidden=m!=='host';$('pJoin').hidden=m!=='join';errMsg('');
+}
+function leaveNet(){
+  if(netRole==='host'){
+    lobby.forEach(s=>{if(s.conn)try{s.conn.send({t:'kicked',why:'Der Host hat den Raum geschlossen'});s.conn.close();}catch(e){}});
+    try{room&&room.close();}catch(e){}
+  }
+  if(netRole==='client'){try{hostConn&&(hostConn.send({t:'bye'}),hostConn.close());}catch(e){}if(joiner)joiner.cancel();}
+  room=null;lobby=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;
+  clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';
+  $('joinForm').hidden=false;$('joinLobby').hidden=true;$('joinBtn').disabled=false;
+}
+document.querySelectorAll('#modeTabs .btn').forEach(b=>b.onclick=()=>{
+  const m=b.dataset.m;
+  if(m!=='host'&&netRole==='host')leaveNet();
+  if(m!=='join'&&netRole==='client')leaveNet();
+  showMode(m);
+  if(m==='host'&&netRole!=='host')openRoom();
+});
+
+// ---------- Host ----------
+async function openRoom(){
+  if(opening||netRole==='host')return;
+  opening=true;$('roomCode').textContent='…';errMsg('');
+  let r=null;
+  for(let i=0;i<4&&!r;i++){try{r=await Net.host(PREFIX,Net.newCode(),onConn);}catch(e){r=null;}}
+  opening=false;
+  if(!r){errMsg('Raum konnte nicht erstellt werden. Bitte nochmal versuchen.');return;}
+  room=r;netRole='host';netPlaying=false;
+  lobby=[{type:'host',name:myNameVal()},{type:'open'},{type:'open'},{type:'open'}];
+  $('roomCode').textContent=room.code;renderHostLobby();
+}
+function onConn(conn){
+  conn.on('data',m=>onHostMsg(conn,m));
+  conn.on('close',()=>dropRemote(conn));
+}
+function onHostMsg(conn,m){
+  if(!m||typeof m!=='object')return;
+  if(m.t==='hello'){
+    if(conn.slot!==undefined)return;
+    if(netPlaying){try{conn.send({t:'full',why:'Das Spiel läuft schon'});}catch(e){}setTimeout(()=>{try{conn.close();}catch(e){}},400);return;}
+    const i=lobby.findIndex(s=>s.type==='open');
+    if(i<0){try{conn.send({t:'full',why:'Der Raum ist voll'});}catch(e){}setTimeout(()=>{try{conn.close();}catch(e){}},400);return;}
+    lobby[i]={type:'remote',name:String(m.name||'Spieler').slice(0,14),conn};conn.slot=i;
+    try{conn.send({t:'welcome',slot:i});}catch(e){}
+    broadcastLobby();return;
+  }
+  if(conn.slot===undefined)return;
+  if(m.t==='roll'){if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===conn.slot)remoteRoll();}
+  else if(m.t==='pick'){
+    if(pick&&pick.p===conn.slot&&cfg[conn.slot]==='remote'){
+      const mv=pick.moves.find(x=>x.i===m.i);
+      if(mv){const r=pick.res;pick=null;markMovable(null);netPhase={k:'idle'};r(mv);}
+    }
+  }else if(m.t==='bye')dropRemote(conn);
+}
+function dropRemote(conn){            // Mitspieler weg: in der Lobby Platz freigeben, im Spiel übernimmt der Computer
+  const i=conn.slot;if(i===undefined||!lobby[i]||lobby[i].conn!==conn)return;
+  const name=lobby[i].name;conn.slot=undefined;
+  if(!netPlaying){lobby[i]={type:'open'};broadcastLobby();return;}
+  cfg[i]='cpu';lobby[i]={type:'cpu',name:''};
+  setMsg(`${chip(i)}<b>${COLORS[i].n} (${esc(name)})</b> ist weg, der Computer übernimmt.`);
+  if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===i)remoteRoll();
+  if(pick&&pick.p===i){const r=pick.res,m=aiPick(i,lastRoll,pick.moves);pick=null;markMovable(null);netPhase={k:'idle'};r(m);}
+  showScores();netPush();
+}
+function broadcastLobby(){
+  const sl=lobby.map(s=>({type:s.type,name:s.name||''}));
+  lobby.forEach((s,i)=>{if(s.conn&&s.conn.open)try{s.conn.send({t:'lobby',slots:sl,you:i});}catch(e){}});
+  renderHostLobby();
+}
+function slotRow(i,html){return `<div class="slotrow"><span class="nm"><span class="chip" style="background:${COLORS[i].c}"></span>${COLORS[i].n}</span>${html}</div>`;}
+function renderHostLobby(){
+  if(netRole!=='host')return;
+  $('hostSlots').innerHTML=lobby.map((s,i)=>{
+    if(s.type==='host')return slotRow(i,`<span class="who">Du (${esc(s.name)})</span>`);
+    if(s.type==='remote')return slotRow(i,`<span class="who">${esc(s.name)}</span><button class="btn alt mini" data-kick="${i}">Entfernen</button>`);
+    return slotRow(i,`<select data-slot="${i}"><option value="open">Offen (Online-Spieler)</option><option value="cpu">Computer</option><option value="off">Aus</option></select>`);
+  }).join('');
+  $('hostSlots').querySelectorAll('select').forEach(sel=>{sel.value=lobby[+sel.dataset.slot].type;});
+  const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length;
+  $('hostStart').disabled=n<2;
+}
+$('hostSlots').addEventListener('change',e=>{
+  const sel=e.target.closest('select');if(!sel)return;
+  const i=+sel.dataset.slot;if(lobby[i]&&lobby[i].type!=='remote'&&lobby[i].type!=='host'){lobby[i]={type:sel.value};broadcastLobby();}
+});
+$('hostSlots').addEventListener('click',e=>{
+  const b=e.target.closest('[data-kick]');if(!b)return;
+  const i=+b.dataset.kick,s=lobby[i];if(s&&s.conn){try{s.conn.send({t:'kicked',why:'Der Host hat dich entfernt'});}catch(err){}const c=s.conn;dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
+});
+$('hostStart').onclick=()=>{
+  if(netRole!=='host')return;
+  const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length;
+  if(n<2){errMsg('Mindestens 2 Spieler nötig.');return;}
+  cfg=lobby.map(s=>s.type==='host'?'human':s.type==='remote'?'remote':s.type==='cpu'?'cpu':'off');
+  names=lobby.map(s=>(s.type==='host'||s.type==='remote')?s.name:'');
+  netPlaying=true;launch();broadcastSnap();
+};
+$('copyLink').onclick=()=>{
+  if(!room)return;
+  const link=location.origin+location.pathname+'?room='+room.code;
+  (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>{$('copyLink').textContent='Kopiert';setTimeout(()=>$('copyLink').textContent='Link kopieren',1500);}).catch(()=>{prompt('Link zum Kopieren:',link);});
+};
+$('scores').addEventListener('click',e=>{
+  const b=e.target.closest('[data-bot]');if(!b||netRole!=='host')return;
+  const i=+b.dataset.bot,s=lobby[i];if(s&&s.conn){const c=s.conn;try{c.send({t:'kicked',why:'Ein Computer hat deinen Platz übernommen'});}catch(err){}dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
+});
+
+// Spielstand an alle schicken (zusammengefasst, damit nicht jeder Schritt mehrfach geht)
+let pushQ=false;
+netPush=function(){
+  if(netRole!=='host'||!netPlaying||pushQ)return;
+  pushQ=true;queueMicrotask(()=>{pushQ=false;broadcastSnap();});
+};
+function snapObj(){
+  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,msg:$('msg').innerHTML};
+}
+function broadcastSnap(){
+  if(netRole!=='host')return;
+  const s=snapObj();
+  lobby.forEach((sl,i)=>{if(sl.conn&&sl.conn.open)try{sl.conn.send({t:'snap',s,you:i});}catch(e){}});
+}
+// Der Spielstand ändert sich bei diesen Aufrufen: danach weiterschicken
+['placePiece','showTurn','setMsg','markMovable'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);netPush();return r;};});
+
+// ---------- Mitspieler ----------
+function setJoinStatus(t){errMsg(t);}
+function joinRoom(){
+  const code=($('joinCode').value||'').trim().toUpperCase();
+  if(code.length<4){errMsg('Bitte den Raumcode eingeben.');return;}
+  const name=myNameVal();errMsg('Verbinde …');$('joinBtn').disabled=true;
+  joiner=Net.join(PREFIX,code,{
+    attach(c){hostConn=c;c.on('data',onClientMsg);c.on('close',onClientClose);},
+    open(c){netRole='client';errMsg('');try{c.send({t:'hello',name});}catch(e){}},
+    fail(msg){$('joinBtn').disabled=false;hostConn=null;joiner=null;errMsg(msg||'Verbindung fehlgeschlagen.');}
+  });
+}
+sendHost=function(m){try{hostConn&&hostConn.open&&hostConn.send(m);}catch(e){}};
+function onClientMsg(m){
+  if(!m||typeof m!=='object')return;
+  if(m.t==='welcome'){mySlot=m.slot;$('joinForm').hidden=true;$('joinLobby').hidden=false;}
+  else if(m.t==='lobby'){
+    mySlot=m.you;
+    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
+    $('joinForm').hidden=true;$('joinLobby').hidden=false;
+    $('joinSlots').innerHTML=m.slots.map((s,i)=>slotRow(i,`<span class="who">${s.type==='open'?'<span style="color:var(--muted)">frei</span>':s.type==='cpu'?'Computer':s.type==='off'?'<span style="color:var(--muted)">aus</span>':esc(s.name)+(i===m.you?' (Du)':s.type==='host'?' (Host)':'')}</span>`)).join('');
+  }
+  else if(m.t==='snap')applySnap(m.s,m.you);
+  else if(m.t==='full'){const w=m.why||'Der Raum ist voll';leaveNet();showMode('join');errMsg(w);}
+  else if(m.t==='kicked'){const w=m.why||'Verbindung beendet';goMenu(w);}
+}
+function onClientClose(){if(netRole==='client')goMenu('Die Verbindung zum Host ist abgebrochen.');}
+function goMenu(why){
+  leaveNet();token++;
+  $('game').hidden=true;$('setup').hidden=false;
+  if(!$('winBox').hidden){$('winBox').hidden=true;}
+  showMode('join');errMsg(why||'');
+}
+function applySnap(s,you){
+  mySlot=you;
+  cfg=s.types;names=s.names||[];
+  const fresh=!cReady||s.active.join()!==active.join();
+  if(fresh){
+    token++;active=s.active.slice();pieces=s.pieces.map(a=>a.slice());
+    $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
+    drawBoard();setDie(s.die||0);cReady=true;lastCur=-1;pick=null;
+  }else{
+    s.pieces.forEach((arr,p)=>arr.forEach((v,i)=>{if(pieces[p][i]!==v){pieces[p][i]=v;placePiece(p,i,true);}}));
+  }
+  cur=s.cur;
+  if(cur!==lastCur){lastCur=cur;showTurn(cur);}else showScores();
+  $('msg').innerHTML=safeHtml(s.msg);
+  const ph=s.phase||{k:'idle'};
+  // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
+  if(ph.k==='rolling'){
+    if(!cRolling){cRolling=true;let k=0;clearInterval(rollAnim);rollAnim=setInterval(()=>dieFrame(k++%rollFrames),60);}
+  }else if(cRolling){cRolling=false;clearInterval(rollAnim);dieDone(s.die);}
+  // Meine Aktionen
+  const myRoll=ph.k==='roll'&&ph.p===you;
+  canRollNet=myRoll;$('rollBtn').disabled=!myRoll;$('rollBtn').textContent=rollLabel();
+  if(myRoll)$('msg').innerHTML=`${chip(you)}Du bist dran: Klicke auf <b>${esc(rollLabel())}</b>.`;
+  if(ph.k==='pick'&&ph.p===you){
+    pick={p:you,moves:ph.moves.map(i=>({i})),res:m=>sendHost({t:'pick',i:m.i})};
+    markMovable(you,pick.moves);
+    $('msg').innerHTML=`${chip(you)}Du hast eine <b>${s.die}</b>. Wähle eine Figur.`;
+  }else{pick=null;markMovable(null);}
+  document.title=(myRoll||(ph.k==='pick'&&ph.p===you))?'▶ Du bist dran! – Mensch ärgere dich nicht':'Mensch ärgere dich nicht';
+  if(ph.k==='win'){
+    $('winTitle').innerHTML=`${chip(ph.p)}${COLORS[ph.p].n}${pname(ph.p)} gewinnt! 🎉`;
+    $('winText').textContent=ph.p===you?'Glückwunsch, du hast gewonnen!':'Der Host startet eine neue Runde.';
+    $('winBox').hidden=false;
+  }
+}
+$('joinBtn').onclick=joinRoom;
+$('joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
+$('joinLeave').onclick=()=>{leaveNet();showMode('join');};
+
+// "Neues Spiel" nach einer Runde: Host zurück in die Lobby (Online-Spieler bleiben im Raum)
+const _backToSetup=backToSetup;
+backToSetup=function(){
+  _backToSetup();
+  if(netRole==='host'){netPlaying=false;showMode('host');broadcastLobby();}
+  else if(netRole==='client'){showMode('join');}
+  else showMode('local');
+  document.title='Mensch ärgere dich nicht';
+};
+$('winBtn').onclick=()=>{backToSetup();};
+$('again').onclick=()=>{if(netRole==='client'){goMenu('');}else backToSetup();};
+
+// Start: Name und Raumlink aus der Adresse
+try{$('myName').value=localStorage.getItem('mdn-name')||'';}catch(e){}
+{
+  const q=new URLSearchParams(location.search).get('room');
+  if(q){$('joinCode').value=q.toUpperCase().slice(0,5);showMode('join');}
+  else showMode('local');
+}
+addEventListener('beforeunload',()=>{try{if(netRole==='client'&&hostConn)hostConn.send({t:'bye'});}catch(e){}});
 </script>
 <script>
 // ====================== 3D-Ansicht (three.js wird erst bei Bedarf geladen) ======================
