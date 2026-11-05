@@ -87,7 +87,7 @@
       var neon = col || '#00f0ff';
       x.fillStyle = '#080b14'; x.fillRect(0, 0, 256, 320);
       x.strokeStyle = neon; x.globalAlpha = .6; x.lineWidth = 5; x.strokeRect(16, 16, 224, 288); x.globalAlpha = 1;
-      x.shadowColor = neon; x.shadowBlur = 30; x.fillStyle = neon;
+      x.shadowColor = neon; x.shadowBlur = 14; x.fillStyle = neon;
       if (tile.isJoker) { x.font = '900 190px "Segoe UI",sans-serif'; x.fillStyle = '#00f0ff'; x.fillText('★', 128, 150); x.shadowColor = '#ff2fa8'; x.fillText('★', 128, 150); }
       else { x.font = '900 ' + (tile.number > 9 ? 140 : 180) + 'px Orbitron,"Segoe UI",sans-serif'; x.fillText(String(tile.number), 128, 144); x.fillText(String(tile.number), 128, 144); }
       x.shadowBlur = 0; x.globalAlpha = .8; x.fillRect(88, 262, 80, 8); x.globalAlpha = 1;
@@ -98,14 +98,14 @@
   function bodyMat() {
     var k = 'body' + R3D.style;
     if (matCache[k]) return matCache[k];
-    return matCache[k] = cyber() ? new THREE.MeshStandardMaterial({ color: 0x0b0f1a, roughness: .28, metalness: .75, emissive: 0x00424c, emissiveIntensity: .7 })
+    return matCache[k] = cyber() ? new THREE.MeshStandardMaterial({ color: 0x0b0f1a, roughness: .28, metalness: .75, emissive: 0x00424c, emissiveIntensity: .3 })
       : new THREE.MeshStandardMaterial({ color: 0xf0e4c4, roughness: .32, metalness: 0 });
   }
   function faceMat(tile) {
     var key = 'f' + R3D.style + (tile.isJoker ? 'J' : tile.color + tile.number);
     if (matCache[key]) return matCache[key];
     var tex = faceTex(tile);
-    return matCache[key] = cyber() ? new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 })
+    return matCache[key] = cyber() ? new THREE.MeshBasicMaterial({ map: tex, color: 0x969696, polygonOffset: true, polygonOffsetFactor: -2 })
       : new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: .4, polygonOffset: true, polygonOffsetFactor: -2 });
   }
   function makeTile(tile) {
@@ -164,7 +164,7 @@
       try {
         if (!T.composer) {
           T.composer = new THREE.EffectComposer(T.r); T.composer.addPass(new THREE.RenderPass(scene, T.camera));
-          T.composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .45, .45, .6));
+          T.composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .28, .4, .85));
         }
       } catch (err) { T.composer = null; }
       if (window.Room3D) { T.rain = Room3D.rain(THREE, { count: 700, radius: 36, top: 26, bottom: -.5 }); scene.add(T.rain.obj); }

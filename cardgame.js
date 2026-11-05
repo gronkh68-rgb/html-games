@@ -75,7 +75,7 @@
       var floor = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshBasicMaterial({ color: 0x04050a })); floor.rotation.x = -Math.PI / 2; floor.position.y = -2.05; add(floor);
       this.rain = Room3D.rain(THREE, { count: 800, radius: 50, top: 28, bottom: -2 }); add(this.rain.obj);
       try {
-        if (!this.composer) { this.composer = new THREE.EffectComposer(this.r); this.composer.addPass(new THREE.RenderPass(scene, this.camera)); this.composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .5, .45, .55)); }
+        if (!this.composer) { this.composer = new THREE.EffectComposer(this.r); this.composer.addPass(new THREE.RenderPass(scene, this.camera)); this.composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .3, .4, .85)); }
       } catch (e) { this.composer = null; }
     } else {
       scene.fog = new THREE.Fog(0x2a1a10, 70, 170); this.r.setClearColor(0x2a1a10);
@@ -111,19 +111,55 @@
     var key = (cyber() ? 'c' : 'k') + (c ? c.r + '_' + c.s : 'back'), cy = cyber();
     if (this.matCache[key]) return this.matCache[key];
     var tex = this.cardTex(c);
-    var m = cy ? new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }) : new THREE.MeshStandardMaterial({ map: tex, roughness: .6 });
+    var m = cy ? new THREE.MeshBasicMaterial({ map: tex, color: 0x8c8c8c }) : new THREE.MeshStandardMaterial({ map: tex, roughness: .6 });
     return this.matCache[key] = m;
   };
   P.edgeMat = function () {
     var k = 'edge' + cyber();
-    return this.matCache[k] || (this.matCache[k] = cyber() ? new THREE.MeshBasicMaterial({ color: 0x00a8bb }) : new THREE.MeshStandardMaterial({ color: 0xf4efe0, roughness: .7 }));
+    return this.matCache[k] || (this.matCache[k] = cyber() ? new THREE.MeshBasicMaterial({ color: 0x005f6c }) : new THREE.MeshStandardMaterial({ color: 0xf4efe0, roughness: .7 }));
   };
-  var CHIPD = [500, 100, 25, 5, 1];
+  var CHIPD = [1000, 500, 100, 25, 5, 1];
+  var CHIP_R = .72, CHIP_H = .24;
+  // Chips wie am echten Tisch: Farbe nach Wert, helle Randstreifen, Wert auf der Oberseite
   P.chipMat = function (d) {
     var cy = cyber(), k = 'chip' + d + cy;
     if (this.matCache[k]) return this.matCache[k];
-    var col = cy ? { 1: 0xe8f9ff, 5: 0xff2a55, 25: 0x2dffb3, 100: 0xb06bff, 500: 0xfcee09 }[d] : { 1: 0xf0f0f0, 5: 0xc62828, 25: 0x2e8b3d, 100: 0x2a2a2a, 500: 0x6a3fa0 }[d];
-    return this.matCache[k] = cy ? new THREE.MeshStandardMaterial({ color: 0x0a0d16, emissive: col, emissiveIntensity: .9, roughness: .4 }) : new THREE.MeshStandardMaterial({ color: col, roughness: .45 });
+    var base = { 1: '#e6e6e6', 5: '#c62828', 25: '#2e8b3d', 100: '#262626', 500: '#6a3fa0', 1000: '#d4a017' }[d];
+    var dark = { 1: '#bdbdbd', 5: '#8f1d1d', 25: '#1f6329', 100: '#0c0c0c', 500: '#4a2a73', 1000: '#a37a0c' }[d];
+    var txt = (d === 1 || d === 1000) ? '#222' : '#fff';
+    var side = document.createElement('canvas'); side.width = 256; side.height = 32; var sx = side.getContext('2d');
+    sx.fillStyle = base; sx.fillRect(0, 0, 256, 32); sx.fillStyle = '#f4f4f4';
+    for (var i = 0; i < 8; i++) sx.fillRect(i * 32 + 8, 0, 16, 32);
+    var top = document.createElement('canvas'); top.width = top.height = 128; var tx = top.getContext('2d');
+    tx.fillStyle = base; tx.fillRect(0, 0, 128, 128);
+    tx.strokeStyle = '#f4f4f4'; tx.lineWidth = 7; tx.setLineDash([14, 10]); tx.beginPath(); tx.arc(64, 64, 55, 0, 6.3); tx.stroke(); tx.setLineDash([]);
+    tx.fillStyle = dark; tx.beginPath(); tx.arc(64, 64, 38, 0, 6.3); tx.fill();
+    tx.strokeStyle = '#f4f4f4'; tx.lineWidth = 3; tx.beginPath(); tx.arc(64, 64, 38, 0, 6.3); tx.stroke();
+    tx.fillStyle = txt; tx.font = 'bold ' + (String(d).length > 2 ? 30 : 40) + 'px system-ui,sans-serif'; tx.textAlign = 'center'; tx.textBaseline = 'middle'; tx.fillText(String(d), 64, 66);
+    var mk = function (cv) { var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return cy ? new THREE.MeshStandardMaterial({ map: t, roughness: .5, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .12 }) : new THREE.MeshStandardMaterial({ map: t, roughness: .45 }); };
+    var sm = mk(side), tm = mk(top);
+    return this.matCache[k] = [sm, tm, tm];
+  };
+  // Chip-Stapel: Betrag in Chips umrechnen (große Werte zuerst), je Wert ein Stapel nebeneinander
+  P.setChips = function (key, amount, pos, instant, denoms, maxStack) {
+    var o = this.chips[key];
+    if (!o) { o = this.chips[key] = { g: new THREE.Group(), amount: -1 }; this.scene.add(o.g); }
+    o.g.position.copy(pos); o.keep = true;
+    var sig = amount + '|' + (denoms || '');
+    if (o.sig === sig) return;
+    o.sig = sig; o.amount = amount;
+    while (o.g.children.length) o.g.remove(o.g.children[0]);
+    var left = amount, stacks = [], cap = maxStack || 14;
+    (denoms || CHIPD).forEach(function (d) { var n = Math.floor(left / d); left -= n * d; if (n > 0) stacks.push({ d: d, n: Math.min(n, cap) }); });
+    var self = this, geo = this.chipGeo || (this.chipGeo = new THREE.CylinderGeometry(CHIP_R, CHIP_R, CHIP_H, 28));
+    var gap = CHIP_R * 2 + .18;
+    stacks.forEach(function (s, si) {
+      for (var k = 0; k < s.n; k++) {
+        var ch = new THREE.Mesh(geo, self.chipMat(s.d));
+        ch.position.set((si - (stacks.length - 1) / 2) * gap + Math.sin(k * 7) * .03, CHIP_H / 2 + .01 + k * (CHIP_H + .015), Math.cos(k * 5) * .03); ch.rotation.y = k * 1.3;
+        o.g.add(ch);
+      }
+    });
   };
 
   // ---- Bewegung ----
@@ -185,26 +221,6 @@
     c.keep = true;
   };
 
-  // ---- Chips ----
-  P.setChips = function (key, amount, pos, instant) {
-    var o = this.chips[key];
-    if (!o) { o = this.chips[key] = { g: new THREE.Group(), amount: -1 }; this.scene.add(o.g); }
-    o.g.position.copy(pos); o.keep = true;
-    if (o.amount === amount) return;
-    o.amount = amount;
-    while (o.g.children.length) o.g.remove(o.g.children[0]);
-    var left = amount, stacks = [];
-    CHIPD.forEach(function (d) { var n = Math.floor(left / d); left -= n * d; if (n > 0) stacks.push({ d: d, n: Math.min(n, 16) }); });
-    var self = this, geo = this.chipGeo || (this.chipGeo = new THREE.CylinderGeometry(.55, .55, .17, 22));
-    stacks.forEach(function (s, si) {
-      for (var k = 0; k < s.n; k++) {
-        var ch = new THREE.Mesh(geo, self.chipMat(s.d));
-        ch.position.set((si - (stacks.length - 1) / 2) * 1.25 + (Math.sin(k * 7) * .03), .09 + k * .18, Math.cos(k * 5) * .03); ch.rotation.y = k;
-        o.g.add(ch);
-      }
-    });
-  };
-
   // ---- Namensschilder ----
   P.setLabel = function (key, text, sub, color, pos, hot) {
     var o = this.labels[key];
@@ -245,10 +261,14 @@
         if (!self.cards['s' + id + 'c' + j].placed) { self.cards['s' + id + 'c' + j].placed = true; }
       });
       if (s.bet > 0) self.setChips('bet' + id, s.bet, l.bet, instant);
+      if (s.chips > 0) {
+        var sp = v.kind === 'poker' ? l.cards.clone().add(l.tan.clone().multiplyScalar(l.mine ? -5.6 : -4.3)) : l.cards.clone().add(new THREE.Vector3(0, 0, 3.0));
+        self.setChips('stack' + id, s.chips, sp, instant, [100, 25, 5, 1], 12);
+      }
       var hot = !!s.turn, color = SEAT_COL[id % SEAT_COL.length];
       var sub = s.win ? '+' + s.win : (s.delta ? (s.delta > 0 ? '+' : '') + s.delta : (s.state ? s.state : (s.total ? String(s.total) : '')));
       var lab = s.name + (l.mine ? ' (Du)' : '') + ' · ' + s.chips;
-      self.setLabel('l' + id, s.name + (l.mine ? ' (Du)' : ''), (s.state && !s.win ? s.state + ' · ' : '') + (s.win ? '+' + s.win + ' · ' : (s.delta ? (s.delta > 0 ? '+' : '') + s.delta + ' · ' : '')) + s.chips + (s.total ? ' · ' + s.total : ''), color, l.label, hot);
+      if (!(l.mine && v.kind === 'poker')) self.setLabel('l' + id, s.name + (l.mine ? ' (Du)' : ''), (s.state && !s.win ? s.state + ' · ' : '') + (s.win ? '+' + s.win + ' · ' : (s.delta ? (s.delta > 0 ? '+' : '') + s.delta + ' · ' : '')) + s.chips + (s.total ? ' · ' + s.total : ''), color, l.label, hot);
       if (s.dealer && v.kind === 'poker') {
         var bm = self.markers.btn;
         if (!bm) { var cv = document.createElement('canvas'); cv.width = cv.height = 64; var x = cv.getContext('2d'); x.fillStyle = '#fff'; x.beginPath(); x.arc(32, 32, 30, 0, 6.3); x.fill(); x.fillStyle = '#111'; x.font = 'bold 36px system-ui'; x.textAlign = 'center'; x.fillText('D', 32, 45); var m = new THREE.Mesh(new THREE.CylinderGeometry(.7, .7, .14, 24), [new THREE.MeshBasicMaterial({ color: 0xdddddd }), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }), new THREE.MeshBasicMaterial({ color: 0xdddddd })]); self.scene.add(m); bm = self.markers.btn = m; }
