@@ -251,11 +251,11 @@
       cards.forEach(function (card, j) {
         var pos, tilt = 0, scale = 1;
         if (v.kind === 'poker') {
-          var off = (j - (n - 1) / 2) * (l.mine ? 1.6 : 1.25);
-          pos = l.cards.clone().add(l.tan.clone().multiplyScalar(off)); pos.y = .05 + j * .004;
-          if (l.mine) { tilt = .55; scale = 1.25; pos.y = .5; pos.add(l.dir.clone().multiplyScalar(1.6)); }
+          var off = (j - (n - 1) / 2) * (l.mine ? 2.75 : 2.1);
+          pos = l.cards.clone().add(l.tan.clone().multiplyScalar(off)); pos.y = .05 + j * .01;
+          if (l.mine) { tilt = .55; scale = 1.25; pos.y = .5 + j * .03; pos.add(l.dir.clone().multiplyScalar(1.6)); }
         } else {
-          pos = l.cards.clone().add(new THREE.Vector3((j - (n - 1) / 2) * 1.15, .05 + j * .05, -j * .35));
+          pos = l.cards.clone().add(new THREE.Vector3((j - (n - 1) / 2) * 1.35, .05 + j * .08, -j * .35));
         }
         self.setCard('s' + id + 'c' + j, card, pos, tilt, scale, instant);
         if (!self.cards['s' + id + 'c' + j].placed) { self.cards['s' + id + 'c' + j].placed = true; }
@@ -264,6 +264,11 @@
       if (s.chips > 0) {
         var sp = v.kind === 'poker' ? l.cards.clone().add(l.tan.clone().multiplyScalar(l.mine ? -5.6 : -4.3)) : l.cards.clone().add(new THREE.Vector3(0, 0, 3.0));
         self.setChips('stack' + id, s.chips, sp, instant, [100, 25, 5, 1], 12);
+      }
+      if (l.mine && v.kind === 'poker') {
+        var mp = l.cards.clone().add(l.tan.clone().multiplyScalar(-5.6)).add(l.dir.clone().multiplyScalar(3.6));
+        self.setLabel('money', 'Dein Geld', String(s.chips), '#ffd86b', mp, false);
+        self.labels.money.sp.scale.set(5.2, 1.8, 1);
       }
       var hot = !!s.turn, color = SEAT_COL[id % SEAT_COL.length];
       var sub = s.win ? '+' + s.win : (s.delta ? (s.delta > 0 ? '+' : '') + s.delta : (s.state ? s.state : (s.total ? String(s.total) : '')));
