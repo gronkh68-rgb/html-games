@@ -12,9 +12,11 @@
 <script src="../net-config.js"></script>
 <script src="../net.js"></script>
 <style>
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
+.wrap{max-width:1500px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+#boardWrap{width:min(100%,calc(100vh - 150px));margin:0 auto}
 @media (max-width:760px){.layout{grid-template-columns:1fr}}
-#board{width:100%;max-width:640px;height:auto;background:var(--card);border:1px solid var(--border);border-radius:18px;touch-action:manipulation}
+#board{width:100%;max-width:none;height:auto;background:var(--card);border:1px solid var(--border);border-radius:18px;touch-action:manipulation}
 .piece{transition:transform .14s ease}
 .piece circle.main{stroke:#fff;stroke-width:3}
 .piece.can{cursor:pointer}
@@ -36,9 +38,25 @@
 @keyframes basepulse{from{fill-opacity:.2}to{fill-opacity:.5}}
 .piece .ring{fill:none;stroke:var(--c);stroke-width:3;opacity:0;transform-box:fill-box}
 .piece.mine .ring{opacity:.9}
-#stage3d{width:100%;max-width:640px;aspect-ratio:1;border:2px solid var(--pc,var(--border));box-shadow:0 0 22px var(--pc,transparent);background:#05060b;touch-action:none}
+#stage3d{width:100%;max-width:none;aspect-ratio:1;border:2px solid var(--pc,var(--border));box-shadow:0 0 22px var(--pc,transparent);background:#05060b;touch-action:none}
 #stage3d canvas{display:block;width:100%;height:100%}
 .scores div.act{color:var(--text);font-weight:700}
+/* 3D als Vollbild wie bei Netrunner: Feld füllt das Fenster, Bedienfelder schweben darüber */
+body.full3d{overflow:hidden}
+body.full3d .wrap{max-width:none;padding:0}
+body.full3d #boardWrap{position:fixed;inset:0;width:auto;margin:0;z-index:20}
+body.full3d #stage3d{position:absolute;inset:0;width:auto;height:auto;aspect-ratio:auto;border:0;box-shadow:none}
+body.full3d .layout{display:block}
+body.full3d .top{position:fixed;left:10px;top:10px;z-index:30;margin:0}
+body.full3d .top h1{display:none}
+body.full3d .side{position:fixed;right:10px;top:10px;width:290px;max-height:calc(100vh - 20px);overflow:auto;z-index:30}
+body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)}
+@media (max-width:760px){
+  body.full3d .side{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:42vh;flex-direction:row;flex-wrap:wrap}
+  body.full3d .side .panel{flex:1 1 150px}
+  body.full3d .side .rules{display:none}
+  #boardWrap{width:100%}
+}
 #setup input{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:160px}
 #modeTabs{gap:8px}
 .codebox{font:900 2.2rem ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:10px 6px 10px 16px;background:var(--bg);border:1px solid var(--border);margin:6px 0}
@@ -73,14 +91,17 @@
       <h2>Raumcode</h2>
       <div class="codebox" id="roomCode">…</div>
       <div class="row"><button class="btn alt" id="copyLink">Link kopieren</button></div>
-      <p class="hint">Schicke den Code oder den Link an deine Mitspieler. Sie können Rot nicht belegen, das ist dein Platz.</p>
+      <div class="row"><label>Sichtbarkeit</label><select id="pubSel"><option value="1">Öffentlich (in der Spieleliste)</option><option value="0">Privat (nur mit Code)</option></select></div>
+      <p class="hint">Schicke den Code oder den Link an deine Mitspieler. Jeder wählt seine Farbe in der Lobby.</p>
       <h2>Spieler</h2>
       <div id="hostSlots"></div>
       <div class="row"><button class="btn" id="hostStart">Spiel starten</button></div>
     </div>
     <div id="pJoin" hidden>
       <div id="joinForm">
-        <h2>Raum beitreten</h2>
+        <h2>Offene Spiele</h2>
+        <div id="pubList" class="hint">Suche …</div>
+        <h2>Mit Code beitreten</h2>
         <div class="row"><label>Raumcode</label><input id="joinCode" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase;letter-spacing:.2em"></div>
         <div class="row"><button class="btn" id="joinBtn">Beitreten</button></div>
       </div>
@@ -494,6 +515,7 @@ function safeHtml(html){
 function showMode(m){
   document.querySelectorAll('#modeTabs .btn').forEach(b=>b.classList.toggle('alt',b.dataset.m!==m));
   $('pLocal').hidden=m!=='local';$('pHost').hidden=m!=='host';$('pJoin').hidden=m!=='join';errMsg('');
+  if(m==='join'&&netRole!=='client')startWatch();else stopWatch();
 }
 function leaveNet(){
   if(netRole==='host'){
@@ -501,6 +523,7 @@ function leaveNet(){
     try{room&&room.close();}catch(e){}
   }
   if(netRole==='client'){try{hostConn&&(hostConn.send({t:'bye'}),hostConn.close());}catch(e){}if(joiner)joiner.cancel();}
+  stopAnnounce();
   room=null;lobby=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;
   clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';
   $('joinForm').hidden=false;$('joinLobby').hidden=true;$('joinBtn').disabled=false;
@@ -523,7 +546,7 @@ async function openRoom(){
   if(!r){errMsg('Raum konnte nicht erstellt werden. Bitte nochmal versuchen.');return;}
   room=r;netRole='host';netPlaying=false;
   lobby=[{type:'host',name:myNameVal()},{type:'open'},{type:'open'},{type:'open'}];
-  $('roomCode').textContent=room.code;renderHostLobby();
+  $('roomCode').textContent=room.code;renderHostLobby();startAnnounce();
 }
 function onConn(conn){
   conn.on('data',m=>onHostMsg(conn,m));
@@ -547,6 +570,9 @@ function onHostMsg(conn,m){
       const mv=pick.moves.find(x=>x.i===m.i);
       if(mv){const r=pick.res;pick=null;markMovable(null);netPhase={k:'idle'};r(mv);}
     }
+  }else if(m.t==='color'){
+    const to=+m.slot;
+    if(!netPlaying&&Number.isInteger(to)&&lobby[to]&&lobby[to].type==='open')moveSlot(conn.slot,to);
   }else if(m.t==='bye')dropRemote(conn);
 }
 function dropRemote(conn){            // Mitspieler weg: in der Lobby Platz freigeben, im Spiel übernimmt der Computer
@@ -559,6 +585,34 @@ function dropRemote(conn){            // Mitspieler weg: in der Lobby Platz frei
   if(pick&&pick.p===i){const r=pick.res,m=aiPick(i,lastRoll,pick.moves);pick=null;markMovable(null);netPhase={k:'idle'};r(m);}
   showScores();netPush();
 }
+function moveSlot(from,to){            // Farbe wechseln: nur auf freie Plätze, nur in der Lobby
+  if(netPlaying||!lobby[from]||!lobby[to]||lobby[to].type!=='open')return;
+  lobby[to]=lobby[from];lobby[from]={type:'open'};
+  if(lobby[to].conn)lobby[to].conn.slot=to;
+  broadcastLobby();
+}
+// Öffentliche Spiele: der Host meldet sich, solange noch Plätze frei sind und das Spiel nicht läuft
+let pubAnn=null,pubWatch=null;
+function startAnnounce(){
+  if(pubAnn)return;
+  pubAnn=Net.announce(PREFIX,()=>{
+    if(netRole!=='host'||netPlaying||!room||$('pubSel').value!=='1')return null;
+    const free=lobby.filter(s=>s.type==='open').length,hum=lobby.filter(s=>s.type==='host'||s.type==='remote').length;
+    if(!free)return null;
+    const h=lobby.find(s=>s.type==='host');
+    return {code:room.code,host:h?h.name:'',count:hum,max:hum+free};
+  });
+}
+function stopAnnounce(){if(pubAnn){pubAnn.stop();pubAnn=null;}}
+function startWatch(){
+  if(pubWatch)return;
+  $('pubList').textContent='Suche …';
+  pubWatch=Net.watch(PREFIX,list=>{
+    $('pubList').innerHTML=list.length?list.map(g=>`<div class="slotrow"><span class="who">${esc(g.host||'Spiel')}</span><span class="nm">${g.count}/${g.max} Spieler</span><button class="btn mini" data-join="${esc(g.code)}">Beitreten</button></div>`).join('')
+      :'Keine offenen Spiele gefunden. Erstelle selbst eins oder gib einen Code ein.';
+  });
+}
+function stopWatch(){if(pubWatch){pubWatch.stop();pubWatch=null;}}
 function broadcastLobby(){
   const sl=lobby.map(s=>({type:s.type,name:s.name||''}));
   lobby.forEach((s,i)=>{if(s.conn&&s.conn.open)try{s.conn.send({t:'lobby',slots:sl,you:i});}catch(e){}});
@@ -570,7 +624,7 @@ function renderHostLobby(){
   $('hostSlots').innerHTML=lobby.map((s,i)=>{
     if(s.type==='host')return slotRow(i,`<span class="who">Du (${esc(s.name)})</span>`);
     if(s.type==='remote')return slotRow(i,`<span class="who">${esc(s.name)}</span><button class="btn alt mini" data-kick="${i}">Entfernen</button>`);
-    return slotRow(i,`<select data-slot="${i}"><option value="open">Offen (Online-Spieler)</option><option value="cpu">Computer</option><option value="off">Aus</option></select>`);
+    return slotRow(i,`<select data-slot="${i}"><option value="open">Offen (Online-Spieler)</option><option value="cpu">Computer</option><option value="off">Aus</option></select>${s.type==='open'?`<button class="btn alt mini" data-me="${i}">Hierher</button>`:''}`);
   }).join('');
   $('hostSlots').querySelectorAll('select').forEach(sel=>{sel.value=lobby[+sel.dataset.slot].type;});
   const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length;
@@ -581,6 +635,8 @@ $('hostSlots').addEventListener('change',e=>{
   const i=+sel.dataset.slot;if(lobby[i]&&lobby[i].type!=='remote'&&lobby[i].type!=='host'){lobby[i]={type:sel.value};broadcastLobby();}
 });
 $('hostSlots').addEventListener('click',e=>{
+  const me=e.target.closest('[data-me]');
+  if(me){const to=+me.dataset.me,from=lobby.findIndex(s=>s.type==='host');if(from>=0&&lobby[to]&&lobby[to].type==='open')moveSlot(from,to);return;}
   const b=e.target.closest('[data-kick]');if(!b)return;
   const i=+b.dataset.kick,s=lobby[i];if(s&&s.conn){try{s.conn.send({t:'kicked',why:'Der Host hat dich entfernt'});}catch(err){}const c=s.conn;dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
 });
@@ -621,10 +677,10 @@ function broadcastSnap(){
 
 // ---------- Mitspieler ----------
 function setJoinStatus(t){errMsg(t);}
-function joinRoom(){
-  const code=($('joinCode').value||'').trim().toUpperCase();
+function joinRoom(codeArg){
+  const code=((typeof codeArg==='string'?codeArg:'')||$('joinCode').value||'').trim().toUpperCase();
   if(code.length<4){errMsg('Bitte den Raumcode eingeben.');return;}
-  const name=myNameVal();errMsg('Verbinde …');$('joinBtn').disabled=true;
+  const name=myNameVal();errMsg('Verbinde …');$('joinBtn').disabled=true;stopWatch();
   joiner=Net.join(PREFIX,code,{
     attach(c){hostConn=c;c.on('data',onClientMsg);c.on('close',onClientClose);},
     open(c){netRole='client';errMsg('');try{c.send({t:'hello',name});}catch(e){}},
@@ -639,7 +695,7 @@ function onClientMsg(m){
     mySlot=m.you;
     if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
     $('joinForm').hidden=true;$('joinLobby').hidden=false;
-    $('joinSlots').innerHTML=m.slots.map((s,i)=>slotRow(i,`<span class="who">${s.type==='open'?'<span style="color:var(--muted)">frei</span>':s.type==='cpu'?'Computer':s.type==='off'?'<span style="color:var(--muted)">aus</span>':esc(s.name)+(i===m.you?' (Du)':s.type==='host'?' (Host)':'')}</span>`)).join('');
+    $('joinSlots').innerHTML=m.slots.map((s,i)=>slotRow(i,`<span class="who">${s.type==='open'?'<span style="color:var(--muted)">frei</span> <button class="btn alt mini" data-take="'+i+'">Hierher</button>':s.type==='cpu'?'Computer':s.type==='off'?'<span style="color:var(--muted)">aus</span>':esc(s.name)+(i===m.you?' (Du)':s.type==='host'?' (Host)':'')}</span>`)).join('');
   }
   else if(m.t==='snap')applySnap(m.s,m.you);
   else if(m.t==='full'){const w=m.why||'Der Raum ist voll';leaveNet();showMode('join');errMsg(w);}
@@ -687,7 +743,9 @@ function applySnap(s,you){
     $('winBox').hidden=false;
   }
 }
-$('joinBtn').onclick=joinRoom;
+$('joinBtn').onclick=()=>joinRoom();
+$('joinSlots').addEventListener('click',e=>{const b=e.target.closest('[data-take]');if(b)sendHost({t:'color',slot:+b.dataset.take});});
+$('pubList').addEventListener('click',e=>{const b=e.target.closest('[data-join]');if(b){$('joinCode').value=b.dataset.join;joinRoom(b.dataset.join);}});
 $('joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
 $('joinLeave').onclick=()=>{leaveNet();showMode('join');};
 
@@ -928,6 +986,21 @@ $('camTop3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),t
 $('camIso3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),a=Math.atan2(f.x,f.z),to=new THREE.Vector3(Math.sin(a)*15,14,Math.cos(a)*15);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};
 $('follow3').onclick=()=>{if(!T3)return;T3.follow=!T3.follow;$('follow3').textContent='Kamera folgt: '+(T3.follow?'an':'aus');if(T3.follow&&cur>=0)turn3(cur);};
 try{if(localStorage.getItem('mdn-view')==='3d')setView(true);}catch(e){}
+</script>
+<script>
+// 3D als Vollbild: Klasse am body, solange 3D an ist und das Spiel sichtbar ist
+function applyFull3d(){
+  document.body.classList.toggle('full3d',!!v3&&!$('game').hidden);
+  if(typeof resize3==='function')resize3();
+}
+['setView','launch','applySnap','backToSetup','goMenu'].forEach(n=>{
+  const f=window[n];if(typeof f!=='function')return;
+  window[n]=function(){
+    const r=f.apply(this,arguments);
+    if(r&&typeof r.then==='function')return r.then(x=>{applyFull3d();return x;});
+    applyFull3d();return r;
+  };
+});
 </script>
 </body>
 </html>

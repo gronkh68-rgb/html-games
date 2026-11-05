@@ -253,6 +253,45 @@
     });
   };
 
+  // Öffentliche Räume: Hosts melden sich alle paar Sekunden auf einem gemeinsamen MQTT-Thema,
+  // wer sucht, sammelt die Meldungen. Es werden nur Raumcode, Hostname und Plätze verschickt.
+  var PUB_EVERY = 4000, PUB_STALE = 13000;
+  function pubTopic(prefix) { return 'net-' + prefix + 'public'; }
+  Net.announce = function (prefix, getInfo) {
+    var mq = null, closed = false, timer = null;
+    async function open() {
+      mq = new MiniMqtt();
+      mq.onclose = function () { if (!closed) setTimeout(function () { open().catch(function () {}); }, 3000); };
+      await mq.connect(BROKERS);
+    }
+    open().catch(function () {});
+    function send() { var i = getInfo(); if (i && mq && mq.ready) mq.publish(pubTopic(prefix), JSON.stringify(i)); }
+    timer = setInterval(send, PUB_EVERY); setTimeout(send, 1500);
+    return { stop: function () { closed = true; clearInterval(timer); if (mq) mq.close(); }, now: send };
+  };
+  Net.watch = function (prefix, onList) {
+    var mq = null, closed = false, seen = {}, timer = null;
+    function emit() {
+      var now = Date.now(), list = [];
+      Object.keys(seen).forEach(function (k) { if (now - seen[k].t > PUB_STALE) delete seen[k]; else list.push(seen[k]); });
+      onList(list);
+    }
+    async function open() {
+      mq = new MiniMqtt();
+      mq.onmessage = function (t, s) {
+        var m; try { m = JSON.parse(s); } catch (e) { return; }
+        if (!m || typeof m.code !== 'string' || !/^[A-Z2-9]{4,8}$/.test(m.code)) return;
+        seen[m.code] = { code: m.code, host: String(m.host || '').slice(0, 14), count: +m.count || 0, max: +m.max || 4, t: Date.now() };
+        emit();
+      };
+      mq.onclose = function () { if (!closed) setTimeout(function () { open().catch(function () {}); }, 3000); };
+      await mq.connect(BROKERS); mq.subscribe(pubTopic(prefix));
+    }
+    open().catch(function () {});
+    timer = setInterval(emit, 3000);
+    return { stop: function () { closed = true; clearInterval(timer); if (mq) mq.close(); } };
+  };
+
   // Einem Raum beitreten: erst WebRTC, bei Problemen zusätzlich über den Relay.
   Net.join = function (prefix, code, cb) {
     var finished = false, peer = null, rc = null, relayStarted = false, timers = [];
