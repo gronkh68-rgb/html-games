@@ -6,6 +6,11 @@
 <title>Vier gewinnt</title>
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
 <style>
 :root{--red:#ef4444;--yel:#facc15}
 .wrap{max-width:620px}
@@ -43,6 +48,8 @@
       <select id="mode"><option value="cpu">Gegen Computer</option><option value="two">2 Spieler</option></select>
       <select id="level"><option value="2">Leicht</option><option value="4" selected>Mittel</option><option value="6">Schwer</option></select>
       <button class="btn" id="new">Neues Spiel</button>
+      <button class="btn alt" id="onlineBtn">Online</button>
+      <button class="btn alt" id="onlineEnd" hidden>Online beenden</button>
     </div>
     <div class="status" id="msg" style="text-align:center"></div>
     <div class="score" id="score"></div>
@@ -54,8 +61,9 @@
 <script>
 const ROWS=6,COLS=7;
 const $=id=>document.getElementById(id);
-let board,turn,over,busy,wins={1:0,2:0},starter=1,token=0;
-const names=()=>$('mode').value==='cpu'?{1:'Du',2:'Computer'}:{1:'Rot',2:'Gelb'};
+let board,turn,over,busy,wins={1:0,2:0},starter=1,token=0,lastMove=null,lastWin=null;
+const net={on:false,role:'local',you:-1,names:{1:'Rot',2:'Gelb'}};
+const names=()=>net.on?net.names:($('mode').value==='cpu'?{1:'Du',2:'Computer'}:{1:'Rot',2:'Gelb'});
 const dot=p=>`<span class="chip" style="background:var(${p===1?'--red':'--yel'})"></span>`;
 
 function buildBoard(){
@@ -75,12 +83,12 @@ function hoverCol(c,on){
 function newGame(){
   token++;
   board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-  over=false;busy=false;
+  over=false;busy=false;lastMove=null;lastWin=null;
   turn=starter;starter=3-starter;
   buildBoard();updateStatus();showScore();
   if(isCpu(turn))cpuMove();
 }
-const isCpu=p=>$('mode').value==='cpu'&&p===2;
+const isCpu=p=>!net.on&&$('mode').value==='cpu'&&p===2;
 function updateStatus(extra){
   const n=names();
   $('msg').innerHTML=extra||`${dot(turn)}<b>${n[turn]}</b> ${turn===1&&$('mode').value==='cpu'?'bist':'ist'} dran`;
@@ -114,7 +122,9 @@ function place(c){
   d.className=`disc p${turn} drop`;
   d.style.setProperty('--fall',r+1.2);
   slot.appendChild(d);
+  lastMove={r,c};
   const w=findWin(board,turn);
+  lastWin=w;
   if(w){
     over=true;wins[turn]++;
     setTimeout(()=>{w.forEach(([rr,cc])=>$(`s${rr}-${cc}`).classList.add('win'));},380);
@@ -127,6 +137,11 @@ function place(c){
 }
 function clickCol(c){
   if(over||busy||isCpu(turn)||dropRow(board,c)<0)return;
+  if(net.on){
+    if(turn!==net.you+1)return;                       // nur am eigenen Zug
+    if(net.role==='client'){L.send({t:'move',c});return;}
+    place(c);bcast();return;
+  }
   place(c);
   if(!over&&isCpu(turn))cpuMove();
 }
@@ -201,7 +216,72 @@ function bestMove(b,depth){
   return best;
 }
 
-$('new').onclick=()=>{wins={1:0,2:0};starter=1;newGame();};
+$('new').onclick=()=>{
+  if(net.on){if(net.role==='client'){L.send({t:'again'});}else{newGame();bcast();}return;}
+  wins={1:0,2:0};starter=1;newGame();
+};
+
+// ---------- Online ----------
+let L=null;
+function bcast(){
+  if(!(net.on&&net.role==='host'))return;
+  L.broadcast({t:'state',board,turn,over,wins,last:lastMove,win:lastWin,draw:over&&!lastWin});
+}
+function applyState(s){
+  board=s.board;turn=s.turn;over=s.over;wins=s.wins;busy=false;
+  buildBoard();
+  board.forEach((row,r)=>row.forEach((v,c)=>{
+    if(!v)return;
+    const d=document.createElement('div');d.className=`disc p${v}`;
+    if(s.last&&s.last.r===r&&s.last.c===c){d.classList.add('drop');d.style.setProperty('--fall',r+1.2);}
+    $(`s${r}-${c}`).appendChild(d);
+  }));
+  const n=names();
+  if(s.win){
+    const w=board[s.win[0][0]][s.win[0][1]];
+    setTimeout(()=>s.win.forEach(([rr,cc])=>$(`s${rr}-${cc}`).classList.add('win')),380);
+    updateStatus(`${dot(w)}<b>${n[w]}</b> ${w===net.you+1?'hast':'hat'} gewonnen! 🎉`);
+  }else if(s.draw)updateStatus('Unentschieden!');
+  else updateStatus();
+  showScore();
+}
+function updateStatus(extra){
+  const n=names();
+  const who=net.on?(turn===net.you+1?'bist':'ist'):(turn===1&&$('mode').value==='cpu'?'bist':'ist');
+  const nm=net.on&&turn===net.you+1?'Du':n[turn];
+  $('msg').innerHTML=extra||`${dot(turn)}<b>${nm}</b> ${who} dran`;
+}
+function setOnlineUi(on){
+  $('mode').hidden=on;$('level').hidden=on||$('mode').value!=='cpu';$('onlineBtn').hidden=on;$('onlineEnd').hidden=!on;
+  $('new').textContent=on&&net.role==='client'?'Revanche anfragen':'Neues Spiel';
+}
+function leaveOnline(){
+  if(L)L.leave();
+  net.on=false;net.role='local';net.you=-1;setOnlineUi(false);wins={1:0,2:0};starter=1;newGame();
+}
+L=MP.init({
+  prefix:'c4-v1-',title:'Vier gewinnt',
+  seats:[{name:'Rot',color:'#ef4444'},{name:'Gelb',color:'#facc15'}],minPlayers:2,bots:false,
+  onStart(info){
+    net.on=true;net.role=info.role;net.you=info.you;
+    net.names={1:info.seats[0].name||'Rot',2:info.seats[1].name||'Gelb'};
+    setOnlineUi(true);wins={1:0,2:0};starter=1;token++;
+    if(info.role==='host'){newGame();bcast();}
+    else{board=Array.from({length:ROWS},()=>Array(COLS).fill(0));over=false;turn=1;buildBoard();showScore();$('msg').textContent='Warte auf den Host …';}
+  },
+  onData(from,m){
+    if(!m)return;
+    if(net.role==='host'){
+      if(m.t==='move'&&!over&&turn===from+1&&Number.isInteger(m.c)&&m.c>=0&&m.c<COLS&&dropRow(board,m.c)>=0){place(m.c);bcast();}
+      else if(m.t==='again'&&over){newGame();bcast();}
+    }else if(m.t==='state')applyState(m);
+  },
+  onSeatDrop(i){over=true;L.backToLobby();},
+  onBackToLobby(){board=Array.from({length:ROWS},()=>Array(COLS).fill(0));buildBoard();$('msg').textContent='Warte in der Lobby …';},
+  onLeave(why){net.on=false;net.role='local';setOnlineUi(false);wins={1:0,2:0};starter=1;newGame();}
+});
+$('onlineBtn').onclick=()=>L.open();
+$('onlineEnd').onclick=leaveOnline;
 $('mode').onchange=()=>{wins={1:0,2:0};starter=1;$('level').hidden=$('mode').value!=='cpu';newGame();};
 newGame();
 </script>
