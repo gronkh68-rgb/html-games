@@ -6,6 +6,11 @@
 <title>Mühle</title>
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
 <style>
 .wrap{max-width:640px}
 #svg{width:100%;max-width:600px;display:block;margin:0 auto;background:#c89a5a;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.4);touch-action:manipulation}
@@ -34,6 +39,8 @@
       <select id="mode"><option value="cpu">Gegen Computer</option><option value="two">2 Spieler</option></select>
       <select id="level"><option value="1">Leicht</option><option value="3" selected>Mittel</option><option value="4">Schwer</option></select>
       <button class="btn" id="new">Neues Spiel</button>
+      <button class="btn alt" id="onlineBtn">Online</button>
+      <button class="btn alt" id="onlineEnd" hidden>Online beenden</button>
     </div>
     <div class="status" id="msg" style="text-align:center"></div>
     <div class="hand" id="hand"></div>
@@ -68,7 +75,9 @@ for(const k of [1,3,5,7])MILLS.push([k,k+8,k+16]);
 const MILLS_AT=Array.from({length:24},(_,i)=>MILLS.filter(m=>m.includes(i)));
 
 let note='',st,mode,sel=null,removing=false,busy=false,over=false,token=0,pendingMove=null;
-const nm=p=>mode==='cpu'?(p===1?'Du':'Computer'):(p===1?'Weiß':'Schwarz');
+const net={on:false,role:'local',you:-1,names:{1:'Weiß',2:'Schwarz'},proxy:false};
+const nm=p=>net.on?(p===net.you+1?'Du':net.names[p]):(mode==='cpu'?(p===1?'Du':'Computer'):(p===1?'Weiß':'Schwarz'));
+const meTurn=p=>net.on?p===net.you+1:mode==='cpu'&&p===1;
 const chip=p=>`<span class="stonechip" style="background:${p===1?'#f4f1ea':'#2b2b33'}"></span>`;
 
 function newState(){return {b:Array(24).fill(0),hand:[0,9,9],turn:1};}
@@ -140,16 +149,17 @@ function prompt_(){
   const who=`${chip(p)}<b>${nm(p)}</b>`;
   if(removing){say(`${who}: Mühle! Entferne einen gegnerischen Stein.`);return;}
   if(mode==='cpu'&&p===2){say(`${who} denkt nach …`);return;}
-  const verb=mode==='cpu'?'bist':'ist';
+  const verb=(net.on?p===net.you+1:mode==='cpu')?'bist':'ist';
   if(ph==='place')say(`${who} ${verb} dran: Stein setzen.`);
   else if(ph==='fly')say(`${who} ${verb} dran: Du darfst springen! Stein wählen.`);
   else say(`${who} ${verb} dran: Stein verschieben.`);
 }
-const canHuman=()=>!(mode==='cpu'&&st.turn===2);
+const canHuman=()=>net.on?(st.turn===net.you+1||net.proxy):!(mode==='cpu'&&st.turn===2);
 
 // ---------- Eingabe ----------
 function onPoint(i){
   if(over||busy||!canHuman())return;
+  if(net.on&&net.role==='client'){L.send({t:'click',i});return;}
   note='';
   const p=st.turn,ph=phase(st,p);
   if(removing){
@@ -182,14 +192,16 @@ function finishMove(m,rem){
   removing=false;pendingMove=null;sel=null;
   afterMove();
 }
+function showWin(p){          // p = Verlierer
+  const w=3-p;
+  $('winTitle').innerHTML=`${chip(w)}${nm(w)} ${(net.on?w===net.you+1:mode==='cpu'&&w===1)?'hast':'hat'} gewonnen! 🎉`;
+  $('winSub').textContent=count(st,p)+st.hand[p]<3?'Der Gegner hat nur noch zwei Steine.':'Der Gegner kann sich nicht mehr bewegen.';
+  $('winBox').hidden=false;
+}
 function afterMove(){
   const p=st.turn;
   if(loser(st,p)){
-    over=true;draw();
-    const w=3-p;
-    $('winTitle').innerHTML=`${chip(w)}${nm(w)} ${mode==='cpu'&&w===1?'hast':'hat'} gewonnen! 🎉`;
-    $('winSub').textContent=count(st,p)+st.hand[p]<3?'Der Gegner hat nur noch zwei Steine.':'Der Gegner kann sich nicht mehr bewegen.';
-    $('winBox').hidden=false;return;
+    over=true;draw();showWin(p);return;
   }
   draw();prompt_();
   if(mode==='cpu'&&p===2)cpuTurn();
@@ -256,7 +268,56 @@ function start(){
   note='';st=newState();sel=null;removing=false;busy=false;over=false;pendingMove=null;
   $('winBox').hidden=true;draw();prompt_();
 }
-$('new').onclick=start;$('mode').onchange=start;$('winBtn').onclick=start;
+
+// ---------- Online ----------
+let L=null,bq=false;
+function bcast(){
+  if(!(net.on&&net.role==='host'))return;
+  L.broadcast({t:'state',st,sel,removing,over});
+}
+const _draw=draw;
+draw=function(){_draw();if(net.on&&net.role==='host'&&!bq){bq=true;queueMicrotask(()=>{bq=false;bcast();});}};
+function applyState(s){
+  st=s.st;sel=s.sel;removing=s.removing;over=s.over;busy=false;note='';
+  draw();prompt_();
+  if(over)showWin(st.turn);else $('winBox').hidden=true;
+}
+function newOnline(){
+  st=newState();sel=null;removing=false;busy=false;over=false;pendingMove=null;note='';
+  $('winBox').hidden=true;draw();prompt_();
+}
+function setOnlineUi(on){
+  $('mode').hidden=on;$('level').hidden=on||$('mode').value!=='cpu';$('onlineBtn').hidden=on;$('onlineEnd').hidden=!on;
+}
+function leaveOnline(){if(L)L.leave();net.on=false;net.role='local';net.you=-1;setOnlineUi(false);start();}
+L=MP.init({
+  prefix:'mue-v1-',title:'Mühle',
+  seats:[{name:'Weiß',color:'#f4f1ea'},{name:'Schwarz',color:'#2b2b33'}],minPlayers:2,bots:false,
+  onStart(info){
+    token++;net.on=true;net.role=info.role;net.you=info.you;mode='two';
+    net.names={1:info.seats[0].name||'Weiß',2:info.seats[1].name||'Schwarz'};
+    setOnlineUi(true);
+    if(info.role==='host')newOnline();
+    else{st=newState();sel=null;removing=false;over=false;$('winBox').hidden=true;draw();$('msg').textContent='Warte auf den Host …';}
+  },
+  onData(from,m){
+    if(!m)return;
+    if(net.role==='host'){
+      if(m.t==='click'&&!over&&st.turn===from+1&&Number.isInteger(m.i)&&m.i>=0&&m.i<24){net.proxy=true;try{onPoint(m.i);}finally{net.proxy=false;}}
+      else if(m.t==='again'&&over)newOnline();
+    }else if(m.t==='state')applyState(m);
+  },
+  onSeatDrop(i){over=true;$('winBox').hidden=true;L.backToLobby();},
+  onBackToLobby(){st=newState();sel=null;removing=false;over=false;$('winBox').hidden=true;draw();$('msg').textContent='Warte in der Lobby …';},
+  onLeave(why){net.on=false;net.role='local';setOnlineUi(false);start();}
+});
+$('onlineBtn').onclick=()=>L.open();
+$('onlineEnd').onclick=leaveOnline;
+const again=()=>{
+  if(net.on){if(net.role==='client')L.send({t:'again'});else newOnline();return;}
+  start();
+};
+$('new').onclick=again;$('mode').onchange=start;$('winBtn').onclick=again;
 start();
 </script>
 </body>
