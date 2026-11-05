@@ -24,6 +24,11 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
   color:#fff;text-shadow:0 0 12px var(--accent2);pointer-events:none;opacity:0}
 #boardWrap .toast.show{animation:toast 1s ease-out}
 @keyframes toast{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.1)}70%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}
+#musicPanel .mname{font-size:.8rem;word-break:break-all;margin-bottom:6px;color:var(--text)}
+#musicPanel .mrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#musicPanel .mrow .btn{padding:6px 10px;font-size:.8rem}
+#musicPanel input[type=range]{width:100%}
+#musicPanel .mhint{font-size:.7rem;color:var(--muted);margin-top:6px}
 .touch{display:none;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px;max-width:520px;margin-left:auto;margin-right:auto}
 .touch button{font-size:1.3rem;padding:16px 0;touch-action:none}
 .keys{color:var(--muted);font-size:.8rem;line-height:1.6;margin:0}
@@ -63,6 +68,14 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
     <div class="col side" id="right">
       <div class="panel" id="nextPanel"><h2>Nächste</h2><canvas id="nextC" width="104" height="330"></canvas></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="pauseBtn">Pause</button><button class="btn alt" id="restartBtn">Neu</button></div>
+      <div class="panel" id="musicPanel">
+        <h2>Musik</h2>
+        <div id="musicName" class="mname">Keine Datei gewählt</div>
+        <div class="mrow"><button class="btn alt" id="musicBtn">♪ an</button><button class="btn alt" id="musicFile">Datei …</button></div>
+        <input type="range" id="musicVol" min="0" max="1" step="0.05" value="0.5" aria-label="Lautstärke">
+        <input type="file" id="musicPick" accept="audio/*" hidden>
+        <div class="mhint">Die Datei bleibt auf deinem Gerät.</div>
+      </div>
     </div>
   </div>
   <div class="touch" id="touch">
@@ -144,9 +157,10 @@ function startGame(){
   score=0;lines=0;level=1;b2b=false;over=false;paused=false;running=true;clearing=null;particles=[];
   updateHud();$('ov').hidden=true;$('pauseBtn').textContent='Pause';
   nextPiece();lastT=performance.now();
+  bgm.currentTime=0;musicPlay();
 }
 function gameOver(){
-  over=true;running=false;cur=null;
+  over=true;running=false;cur=null;bgm.pause();
   if(score>best){best=score;try{localStorage.setItem('tetris-best',best);}catch(e){}}
   updateHud();
   $('ovTitle').textContent='Game Over';
@@ -348,12 +362,54 @@ function setPause(p){
   if(!running&&!paused)return;
   paused=p;running=!p;
   $('pauseBtn').textContent=p?'Weiter':'Pause';
-  if(p){$('ovTitle').textContent='Pause';$('ovText').textContent='Das Spiel ist angehalten.';$('ovBtn').textContent='Weiter';$('ov').hidden=false;}
-  else{$('ov').hidden=true;lastT=performance.now();}
+  if(p){bgm.pause();$('ovTitle').textContent='Pause';$('ovText').textContent='Das Spiel ist angehalten.';$('ovBtn').textContent='Weiter';$('ov').hidden=false;}
+  else{$('ov').hidden=true;lastT=performance.now();musicPlay();}
 }
 $('pauseBtn').onclick=()=>{if(over)return;setPause(!paused);};
 $('restartBtn').onclick=()=>startGame();
 $('ovBtn').onclick=()=>{if(paused)setPause(false);else startGame();};
+
+// ---------- Hintergrundmusik ----------
+// Eigene Musikdatei: wird nur im Browser gespeichert (IndexedDB) und nicht hochgeladen.
+// Liegt eine Datei "music.mp3" neben dieser Seite, wird sie als Standard genommen.
+const bgm=new Audio();bgm.loop=true;bgm.preload='auto';
+let musicOn=true;
+try{musicOn=localStorage.getItem('tetris-music')!=='off';bgm.volume=+(localStorage.getItem('tetris-vol')||.5);}catch(e){bgm.volume=.5;}
+$('musicVol').value=bgm.volume;
+function idb(mode,fn){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open('tetris-music',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('f');
+    r.onsuccess=()=>{const tx=r.result.transaction('f',mode),q=fn(tx.objectStore('f'));tx.oncomplete=()=>res(q&&q.result);tx.onerror=()=>rej(tx.error);};
+    r.onerror=()=>rej(r.error);
+  });
+}
+function updateMusicUi(){$('musicBtn').textContent=musicOn?'♪ an':'♪ aus';}
+function setTrack(src,name){
+  if(bgm.dataset.url)URL.revokeObjectURL(bgm.dataset.url);
+  const url=typeof src==='string'?src:URL.createObjectURL(src);
+  if(typeof src!=='string')bgm.dataset.url=url;
+  bgm.src=url;$('musicName').textContent=name;
+}
+function musicPlay(){if(musicOn&&bgm.src)bgm.play().catch(()=>{});}
+async function loadSavedTrack(){
+  try{const f=await idb('readonly',s=>s.get('track'));if(f&&f.blob){setTrack(f.blob,f.name);return;}}catch(e){}
+  try{const r=await fetch('music.mp3',{method:'HEAD'});if(r.ok)setTrack('music.mp3','music.mp3');}catch(e){}
+}
+$('musicFile').onclick=()=>$('musicPick').click();
+$('musicPick').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  setTrack(f,f.name);
+  try{await idb('readwrite',s=>s.put({blob:f,name:f.name},'track'));}catch(err){$('musicName').textContent=f.name+' (nur für diese Sitzung)';}
+  if(running&&!paused)musicPlay();
+  e.target.value='';
+};
+$('musicBtn').onclick=()=>{
+  musicOn=!musicOn;try{localStorage.setItem('tetris-music',musicOn?'on':'off');}catch(e){}
+  updateMusicUi();if(musicOn){if(running&&!paused)musicPlay();}else bgm.pause();
+};
+$('musicVol').oninput=e=>{bgm.volume=+e.target.value;try{localStorage.setItem('tetris-vol',e.target.value);}catch(err){}};
+updateMusicUi();loadSavedTrack();
 
 board=newBoard();queue=[];bag=[];fillQueue();score=0;lines=0;level=1;updateHud();
 requestAnimationFrame(t=>{lastT=t;loop(t);});
