@@ -1,6 +1,6 @@
 /* Design "DEUKRO Cyber" (Voreinstellung). Umschalter unten links, Auswahl wird im Browser gemerkt. */
 (function () {
-  var KEY = 'html-games-style', FX = 'html-games-fx';
+  var KEY = 'html-games-style', FX = 'html-games-fx', RAIN = 'html-games-rain';
   var script = document.currentScript;
   var base = script.src.replace(/theme\.js.*$/, '');
   var root = document.documentElement;
@@ -30,6 +30,7 @@
 
   apply(get(KEY) !== 'standard'); // Cyber ist die Voreinstellung
   applyFx(get(FX) === 'off');
+  if (get(RAIN) === 'off') root.setAttribute('data-rain', 'off');
 
   addEventListener('DOMContentLoaded', function () {
     var css = document.createElement('style');
@@ -43,7 +44,8 @@
     box.id = 'styleSwitch';
     var b1 = document.createElement('button');
     var b2 = document.createElement('button');
-    box.appendChild(b1); box.appendChild(b2);
+    var b3 = document.createElement('button');
+    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3);
     document.body.appendChild(box);
 
     function paint() {
@@ -52,6 +54,8 @@
       b1.title = 'Design umschalten (DEUKRO Cyber)';
       b2.hidden = !on;
       b2.textContent = root.getAttribute('data-fx') === 'off' ? 'Effekte: aus' : 'Effekte: an';
+      b3.hidden = !(on && window.RAIN_OPTION);   // Regen gibt es nur in den 3D-Ansichten im Cyber-Stil
+      b3.textContent = root.getAttribute('data-rain') === 'off' ? 'Regen: aus' : 'Regen: an';
     }
     b1.onclick = function () {
       var on = root.getAttribute('data-style') !== 'cyber';
@@ -60,6 +64,11 @@
     b2.onclick = function () {
       var off = root.getAttribute('data-fx') !== 'off';
       applyFx(off); set(FX, off ? 'off' : 'on'); paint();
+    };
+    b3.onclick = function () {
+      var off = root.getAttribute('data-rain') !== 'off';
+      if (off) root.setAttribute('data-rain', 'off'); else root.removeAttribute('data-rain');
+      set(RAIN, off ? 'off' : 'on'); paint();
     };
     paint();
   });
