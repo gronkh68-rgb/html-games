@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blackjack</title>
+<link rel="stylesheet" href="../common.css">
+<script>window.RAIN_OPTION=1;</script>
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../room3d.js"></script>
+<script src="../cardgame.js"></script>
+<script src="engine.js"></script>
+</head>
+<body>
+<script>
+CG.boot({
+  key:'blackjack',title:'Blackjack',blurb:'Schlage den Geber, ohne über 21 zu kommen. Bis zu 5 Spieler, alle starten mit 500 Chips.',
+  prefix:'bjk-v1-',maxSeats:5,minPlayers:1,defaultBots:1,kind:'blackjack',
+  create:(seats,ctx)=>BlackjackEngine.create(seats,ctx)
+});
+</script>
+</body>
+</html>
