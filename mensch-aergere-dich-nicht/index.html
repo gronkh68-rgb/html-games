@@ -325,11 +325,11 @@ async function doRoll(p){
     rollWait=null;btn.disabled=true;
   }else{
     setMsg('Der Computer würfelt …');
-    await sleep(650);
+    await sleep(420);
   }
   const t=token;
   netPhase={k:'rolling',p};netPush();
-  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(60,t);}
+  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45,t);}
   const v=1+Math.floor(Math.random()*6);
   dieDone(v);lastRoll=v;
   netPhase={k:'idle'};netPush();
@@ -725,7 +725,7 @@ function applySnap(s,you){
   const ph=s.phase||{k:'idle'};
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'){
-    if(!cRolling){cRolling=true;let k=0;clearInterval(rollAnim);rollAnim=setInterval(()=>dieFrame(k++%rollFrames),60);}
+    if(!cRolling){cRolling=true;let k=0;clearInterval(rollAnim);rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}
   }else if(cRolling){cRolling=false;clearInterval(rollAnim);dieDone(s.die);}
   // Meine Aktionen
   const myRoll=ph.k==='roll'&&ph.p===you;

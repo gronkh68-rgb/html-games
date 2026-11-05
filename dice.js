@@ -2,7 +2,7 @@
 (function () {
   var PIPS = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
   var GLYPHS = '#$%&<>/\\01ABCDEF▓▒░';
-  var FRAMES = 14;
+  var FRAMES = 10;
   function el() { return document.getElementById('die'); }
   function rnd(n) { return Math.floor(Math.random() * n); }
   function hex(n) { var s = ''; for (var i = 0; i < n; i++) s += '0123456789ABCDEF'[rnd(16)]; return s; }

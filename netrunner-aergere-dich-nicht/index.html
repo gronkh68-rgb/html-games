@@ -619,10 +619,10 @@ async function doRoll(p,label){
     rollWait=null;btn.disabled=true;
   }else{
     say(`${nm(p)} würfelt …`,false);
-    await sleep(600);
+    await sleep(400);
   }
   const t=token;
-  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(60,t);}
+  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45,t);}
   const v=1+Math.floor(Math.random()*6);dieDone(v);lastRoll=v;return v;
 }
 function pickMove(p,moves){
