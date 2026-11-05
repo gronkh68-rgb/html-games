@@ -7,6 +7,11 @@
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
 <script src="../dice.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
 <style>
 html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
 #stage{position:fixed;inset:0;touch-action:none}
@@ -87,6 +92,7 @@ html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
     <button class="btn alt" id="followBtn">Kamera folgt: an</button>
     <button class="btn alt" id="glowBtn">Glow: an</button>
     <button class="btn alt" id="againBtn">Neues Spiel</button>
+    <button class="btn alt" id="onlineEnd" hidden>Online beenden</button>
   </div>
   <div class="hud" id="eventCard" hidden><span>Hack-Terminal</span><b id="eventNum"></b><span id="eventTxt"></span></div>
 </div>
@@ -98,7 +104,7 @@ html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
     <div id="slots"></div>
     <div class="row"><label style="min-width:90px">Karte</label>
       <select id="specials"><option value="1">Mit Sonderfeldern</option><option value="0">Klassisch (ohne Sonderfelder)</option></select></div>
-    <div class="row" style="justify-content:center;margin-top:16px"><button class="btn" id="start">Spiel starten</button></div>
+    <div class="row" style="justify-content:center;margin-top:16px"><button class="btn" id="start">Spiel starten</button><button class="btn alt" id="onlineBtn" style="margin-left:8px">Online spielen</button></div>
     <p id="setupErr" style="color:#ff7b7b;margin:10px 0 0;text-align:center;font-size:.9rem"></p>
   </div>
 </div>
@@ -153,10 +159,17 @@ let cfg=[],active=[],corner=[],startIdx=[],pieces=[],skip=[],cellType=[],portalP
 let cur=-1,token=0,pick=null,rollWait=null,lastRoll=0,follow=true,glow=true,useSpecials=true,logLines=[];
 const CANCEL={};
 const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms/SPEED));
-const isHuman=p=>cfg[p]==='human';
+// cfg: 'human' = an diesem Gerät, 'remote' = Online-Spieler, 'cpu', 'off'
+const isLocal=p=>cfg[p]==='human';
+const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
+let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,mySlot=-1,canRollNet=false,evState=null,netPlaying=false,cReady=false;
+const isMe=p=>netRole==='local'?isLocal(p):p===mySlot;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function netPush(){}                 // wird im Mehrspieler-Teil ersetzt (Host schickt den Stand)
+function sendHost(m){}               // dito (Mitspieler schickt Aktionen)
 const absIdx=(p,pos)=>(startIdx[p]+pos)%TL;
 const chip=p=>`<span class="chip" style="background:${hexCss(PLAYERS[p].c)}"></span>`;
-const nm=p=>`${chip(p)}<b>${PLAYERS[p].n}</b>`;
+const nm=p=>`${chip(p)}<b>${PLAYERS[p].n}${names[p]?' ('+esc(names[p])+')':''}</b>`;
 
 function onRing(p,j){const x=pieces[p][j];return x>=0&&x<TL;}
 function occupant(abs,except){ // [q,j] eines fremden Steins auf Ringfeld abs
@@ -567,6 +580,7 @@ function setupPicking(){
   renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,t:performance.now()};});
   renderer.domElement.addEventListener('pointerup',e=>{
     if(!down||!pick)return;
+    if(netRole!=='client'&&!isLocal(pick.p))return;     // Figuren von Online-Spielern darf nur ihr Besitzer ziehen
     const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y),dt=performance.now()-down.t;down=null;
     if(moved>8||dt>600)return;
     const r=renderer.domElement.getBoundingClientRect();
@@ -579,7 +593,7 @@ function setupPicking(){
     if(m)choose(m);
   });
 }
-function choose(m){if(!pick)return;const r=pick.res;pick=null;markMovable(null);r(m);}
+function choose(m){if(!pick)return;const r=pick.res;pick=null;markMovable(null);netPhase={k:'idle'};r(m);}
 function markMovable(p,moves){
   for(const k in pieceMeshes)pieceMeshes[k].can=false;
   if(p==null)return;
@@ -593,7 +607,7 @@ function say(t,keep=true){
 }
 function showTurn(p){
   const b=$('banner');
-  b.innerHTML=`${PLAYERS[p].n} ist dran<small>${isHuman(p)?'Du bist an der Reihe':'Computer'}</small>`;
+  b.innerHTML=`${PLAYERS[p].n} ist dran<small>${isMe(p)?'Du bist an der Reihe':(cfg[p]==='cpu'?'Computer':(names[p]?esc(names[p]):'Mitspieler'))}</small>`;
   b.style.setProperty('--pc',hexCss(PLAYERS[p].c));
   b.classList.remove('bump');void b.offsetWidth;b.classList.add('bump');
   for(const k in pieceMeshes)pieceMeshes[k].mine=pieceMeshes[k].p===p;
@@ -601,7 +615,7 @@ function showTurn(p){
   focusCorner(p);
 }
 function showScores(){
-  $('plist').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${PLAYERS[p].n}${isHuman(p)?'':' (PC)'}${skip[p]?' · Lag':''}</span><span class="meta">${pieces[p].filter(q=>q>=TL).length}/4 im Ziel</span></div>`).join('');
+  $('plist').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${PLAYERS[p].n}${names[p]?' ('+esc(names[p])+')':''}${isHuman(p)?'':' (PC)'}${skip[p]?' · Lag':''}${netRole==='host'&&cfg[p]==='remote'?`<button class="btn alt" data-bot="${p}" style="padding:2px 8px;font-size:.7rem;margin-left:6px" title="Computer übernimmt">Bot</button>`:''}</span><span class="meta">${pieces[p].filter(q=>q>=TL).length}/4 im Ziel</span></div>`).join('');
 }
 function buildLegend(){
   $('legend').hidden=!useSpecials;
@@ -612,9 +626,13 @@ function buildLegend(){
 // ====================== Ablauf ======================
 async function doRoll(p,label){
   const btn=$('rollBtn');
-  if(isHuman(p)){
+  if(cfg[p]==='remote'){
+    netPhase={k:'roll',p,label:label||''};say(`${nm(p)} ist am Zug …`,false);netPush();
+    await new Promise(res=>{remoteRoll=res;});remoteRoll=null;
+  }else if(isLocal(p)){
     btn.disabled=false;btn.textContent=label||rollLabel();
     say(`${nm(p)}: Klicke auf <b>${label||rollLabel()}</b>.`,false);
+    netPhase={k:'idle'};netPush();
     await new Promise(res=>{rollWait=res;});
     rollWait=null;btn.disabled=true;
   }else{
@@ -622,14 +640,17 @@ async function doRoll(p,label){
     await sleep(400);
   }
   const t=token;
+  netPhase={k:'rolling',p};netPush();
   for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45,t);}
-  const v=1+Math.floor(Math.random()*6);dieDone(v);lastRoll=v;return v;
+  const v=1+Math.floor(Math.random()*6);dieDone(v);lastRoll=v;
+  netPhase={k:'idle'};netPush();
+  return v;
 }
 function pickMove(p,moves){
   return new Promise(async res=>{
     const t=token;markMovable(p,moves);
-    say(`${nm(p)}: eine <b>${lastRoll}</b>. Tippe auf eine leuchtende Figur.`,false);
-    pick={p,moves,res};
+    say(isLocal(p)?`${nm(p)}: eine <b>${lastRoll}</b>. Tippe auf eine leuchtende Figur.`:`${nm(p)} hat eine <b>${lastRoll}</b> und wählt …`,false);
+    pick={p,moves,res};netPhase={k:'pick',p,moves:moves.map(m=>m.i)};netPush();
     if(moves.length===1){
       try{await sleep(650,t);}catch(e){return;}
       if(pick&&pick.res===res)choose(moves[0]);
@@ -744,11 +765,11 @@ async function eventChallenge(p,i){
   const target=1+Math.floor(Math.random()*6);
   $('eventNum').textContent=target;
   $('eventTxt').textContent=`${PLAYERS[p].n}: würfle die ${target}`;
-  $('eventCard').hidden=false;
+  $('eventCard').hidden=false;evState={num:target,txt:$('eventTxt').textContent};netPush();
   say(`${nm(p)}: <b>Hack-Terminal!</b> Würfle eine <b>${target}</b>: Treffer +6, sonst −2.`);
   const roll=await doRoll(p,`Hacken (${target})`);
   await sleep(500);
-  $('eventCard').hidden=true;
+  $('eventCard').hidden=true;evState=null;netPush();
   const pos=pieces[p][i];
   if(roll===target){
     say(`${nm(p)}: <b>Zugriff erfolgreich!</b> 6 Felder vor.`);
@@ -791,8 +812,8 @@ async function gameLoop(){
       cur=active[i%active.length];
       showTurn(cur);
       if(await playTurn(cur)){
-        $('winTitle').innerHTML=`${chip(cur)}${PLAYERS[cur].n} gewinnt! 🎉`;
-        $('winBox').hidden=false;return;
+        $('winTitle').innerHTML=`${chip(cur)}${PLAYERS[cur].n}${names[cur]?' ('+esc(names[cur])+')':''} gewinnt! 🎉`;
+        $('winBox').hidden=false;netPhase={k:'win',p:cur};netPush();return;
       }
       i++;
     }
@@ -808,12 +829,15 @@ function buildSetup(){
   def.forEach((d,p)=>$('slot'+p).value=d);
 }
 function startGame(){
-  cfg=PLAYERS.map((_,p)=>$('slot'+p).value);
-  active=PLAYERS.map((_,p)=>p).filter(p=>cfg[p]!=='off');
-  if(active.length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
+  cfg=PLAYERS.map((_,p)=>$('slot'+p).value);names=[];
+  if(cfg.filter(c=>c!=='off').length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
   $('setupErr').textContent='';
   useSpecials=$('specials').value==='1';
-  token++;pick=null;rollWait=null;cur=-1;logLines=[];tweens.length=0;
+  launch();
+}
+function launch(){            // startet mit den Werten in cfg, names und useSpecials
+  active=PLAYERS.map((_,p)=>p).filter(p=>cfg[p]!=='off');
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};evState=null;cur=-1;logLines=[];tweens.length=0;
   const cs=CORNER_SETS[active.length];
   corner=[];startIdx=[];skip=[];pieces=[];
   active.forEach((p,k)=>{corner[p]=cs[k];startIdx[p]=cs[k]*SEC;skip[p]=0;pieces[p]=[-1,-1,-1,-1];});
@@ -831,8 +855,139 @@ function backToSetup(){
 $('start').onclick=startGame;
 $('againBtn').onclick=backToSetup;
 $('winBtn').onclick=backToSetup;
-$('rollBtn').onclick=()=>{if(rollWait)rollWait();};
-$('die').onclick=()=>{if(rollWait)rollWait();};
+const rollClick=()=>{
+  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'roll'});}}
+  else if(rollWait)rollWait();
+};
+$('rollBtn').onclick=rollClick;$('die').onclick=rollClick;
+
+// ====================== Mehrspieler (Host und Mitspieler) ======================
+// Der Host führt das Spiel (Würfeln, Regeln, Computer) und schickt nach jedem Schritt den Stand.
+// Mitspieler zeigen ihn nur an und melden "Würfeln" und "Figur gewählt". Verbindung: ../net.js
+let L=null,pushQ=false,lastCur=-1,cRolling=false,rollAnim=null;
+function safeHtml(html){          // Meldungen vom Host nur mit <b> und den Farbpunkten zulassen
+  const t=document.createElement('template');t.innerHTML=String(html);
+  const out=document.createElement('div');
+  (function walk(from,to){
+    from.childNodes.forEach(n=>{
+      if(n.nodeType===3){to.appendChild(document.createTextNode(n.nodeValue));return;}
+      if(n.nodeType!==1)return;
+      if(n.tagName==='B'||n.tagName==='SMALL'){const b=document.createElement(n.tagName.toLowerCase());walk(n,b);to.appendChild(b);}
+      else if(n.tagName==='SPAN'&&n.className==='chip'){
+        const sp=document.createElement('span');sp.className='chip';
+        const m=/#[0-9a-fA-F]{6}/.exec(n.getAttribute('style')||'');if(m)sp.style.background=m[0];to.appendChild(sp);
+      }else walk(n,to);
+    });
+  })(t.content,out);
+  return out.innerHTML;
+}
+netPush=function(){
+  if(netRole!=='host'||!netPlaying||pushQ)return;
+  pushQ=true;queueMicrotask(()=>{pushQ=false;bcastSnap();});
+};
+function initObj(){return {cfg,names,active,corner,startIdx,skip,pieces,cellType,portalPairs,RINGW,shapeName,useSpecials};}
+function snapObj(){return {pieces,skip,cur,die:lastRoll,msg:$('msg').innerHTML,log:logLines.slice(-8),phase:netPhase,ev:evState};}
+function bcastInit(){if(netRole==='host')L.broadcast({t:'init',d:initObj()});}
+function bcastSnap(){if(netRole==='host')L.broadcast({t:'snap',s:snapObj()});}
+// Der Stand ändert sich bei diesen Aufrufen: danach weiterschicken
+['hop','tween','say','showTurn','markMovable'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);netPush();return r;};});
+
+function applyInit(d){
+  cfg=d.cfg;names=d.names||[];active=d.active;corner=d.corner;startIdx=d.startIdx;skip=d.skip||[];pieces=d.pieces;
+  cellType=d.cellType;portalPairs=d.portalPairs;RINGW=d.RINGW;shapeName=d.shapeName;useSpecials=d.useSpecials;
+  token++;pick=null;cur=-1;lastCur=-1;logLines=[];tweens.length=0;
+  buildBoard();buildLegend();
+  camera.position.set(0,50,35).multiplyScalar(camScale());controls.target.set(0,0,0);
+  $('setup').hidden=true;$('winBox').hidden=true;$('hud').hidden=false;$('eventCard').hidden=true;
+  $('log').innerHTML='';$('rollBtn').disabled=true;setDie(0);showScores();cReady=true;
+}
+function applySnap(s){
+  if(!cReady)return;
+  s.pieces.forEach((arr,p)=>{
+    if(!arr||!pieces[p])return;
+    arr.forEach((v,i)=>{
+      if(pieces[p][i]===v)return;
+      const prev=pieces[p][i];pieces[p][i]=v;
+      const pm=pieceMeshes[p+'-'+i];
+      if(pm){pm.g.scale.setScalar(1);const back=prev>=0&&v===-1;hop(pm.g,worldOf(p,i),back?520:220,back?3:.7);}
+    });
+  });
+  skip=s.skip||skip;
+  if(s.cur!==cur){cur=s.cur;showTurn(cur);}else showScores();
+  $('msg').innerHTML=safeHtml(s.msg);
+  logLines=(s.log||[]).map(safeHtml);
+  $('log').innerHTML=logLines.slice(-8).reverse().map(l=>`<div>${l}</div>`).join('');
+  const ph=s.phase||{k:'idle'};
+  if(ph.k==='rolling'){
+    if(!cRolling){cRolling=true;let k=0;clearInterval(rollAnim);rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}
+  }else if(cRolling){cRolling=false;clearInterval(rollAnim);dieDone(s.die);}
+  const myRoll=ph.k==='roll'&&ph.p===mySlot;
+  canRollNet=myRoll;$('rollBtn').disabled=!myRoll;$('rollBtn').textContent=ph.label||rollLabel();
+  if(myRoll)$('msg').innerHTML=`${chip(mySlot)}Du bist dran: Klicke auf <b>${esc(ph.label||rollLabel())}</b>.`;
+  if(ph.k==='pick'&&ph.p===mySlot){
+    pick={p:mySlot,moves:ph.moves.map(i=>({i})),res:m=>sendHost({t:'pick',i:m.i})};
+    markMovable(mySlot,pick.moves);
+    $('msg').innerHTML=`${chip(mySlot)}Du hast eine <b>${s.die}</b>. Tippe auf eine leuchtende Figur.`;
+  }else{pick=null;markMovable(null);}
+  if(s.ev){$('eventNum').textContent=s.ev.num;$('eventTxt').textContent=s.ev.txt;$('eventCard').hidden=false;}else $('eventCard').hidden=true;
+  document.title=(myRoll||(ph.k==='pick'&&ph.p===mySlot))?'▶ Du bist dran! – Netrunner ärgere dich nicht':'Netrunner ärgere dich nicht';
+  if(ph.k==='win'){
+    $('winTitle').innerHTML=`${chip(ph.p)}${PLAYERS[ph.p].n}${names[ph.p]?' ('+esc(names[ph.p])+')':''} gewinnt! 🎉`;
+    $('winBox').hidden=false;
+  }
+}
+sendHost=function(m){L.send(m);};
+
+function dropPlayer(i){            // Mitspieler weg: der Computer übernimmt
+  cfg[i]='cpu';
+  say(`${chip(i)}<b>${PLAYERS[i].n}${names[i]?' ('+esc(names[i])+')':''}</b> ist weg, der Computer übernimmt.`);
+  if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===i)remoteRoll();
+  if(pick&&pick.p===i){const r=pick.res,m=aiPick(i,lastRoll,pick.moves);pick=null;markMovable(null);netPhase={k:'idle'};r(m);}
+  showScores();netPush();
+}
+L=MP.init({
+  prefix:'ndn-v1-',title:'Netrunner ärgere dich nicht',
+  seats:PLAYERS.map(c=>({name:c.n,color:hexCss(c.c)})),minPlayers:2,bots:true,
+  onStart(info){
+    netRole=info.role;mySlot=info.you;$('onlineEnd').hidden=false;
+    if(info.role==='host'){
+      cfg=info.seats.map(x=>x.type==='host'?'human':x.type==='remote'?'remote':x.type==='cpu'?'cpu':'off');
+      names=info.seats.map(x=>(x.type==='host'||x.type==='remote')?x.name:'');
+      useSpecials=$('specials').value==='1';netPlaying=true;
+      launch();bcastInit();bcastSnap();
+    }else{cReady=false;}
+  },
+  onData(from,m){
+    if(!m)return;
+    if(netRole==='host'){
+      if(m.t==='roll'){if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===from)remoteRoll();}
+      else if(m.t==='pick'&&pick&&pick.p===from&&cfg[from]==='remote'){
+        const mv=pick.moves.find(x=>x.i===m.i);
+        if(mv){const r=pick.res;pick=null;markMovable(null);netPhase={k:'idle'};r(mv);}
+      }
+    }else if(m.t==='init')applyInit(m.d);
+    else if(m.t==='snap')applySnap(m.s);
+  },
+  onSeatDrop(i){dropPlayer(i);},
+  onBackToLobby(){token++;cReady=false;clearInterval(rollAnim);cRolling=false;$('hud').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;document.title='Netrunner ärgere dich nicht';},
+  onLeave(why){netRole='local';mySlot=-1;cReady=false;$('onlineEnd').hidden=true;token++;$('hud').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;}
+});
+function leaveOnline(){
+  L.leave();netRole='local';netPlaying=false;mySlot=-1;cReady=false;clearInterval(rollAnim);cRolling=false;
+  $('onlineEnd').hidden=true;token++;pick=null;rollWait=null;remoteRoll=null;
+  $('hud').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;document.title='Netrunner ärgere dich nicht';
+}
+$('onlineBtn').onclick=()=>L.open();
+$('onlineEnd').onclick=leaveOnline;
+$('plist').addEventListener('click',e=>{const b=e.target.closest('[data-bot]');if(b&&netRole==='host')L.kick(+b.dataset.bot);});
+// "Neues Spiel": Host zurück in die Lobby (Online-Spieler bleiben im Raum), Mitspieler warten
+const _back=backToSetup;
+backToSetup=function(){
+  if(netRole==='client'){$('winBox').hidden=true;return;}
+  _back();
+  if(netRole==='host'){netPlaying=false;L.backToLobby();}
+};
+$('winBtn').onclick=()=>backToSetup();$('againBtn').onclick=()=>backToSetup();
 buildSetup();setDie(0);
 if(!window.THREE||!initThree()){$('setup').hidden=true;$('nogl').hidden=false;}
 </script>
