@@ -1140,11 +1140,11 @@ function build3(){
     }
   }else if(AN()){
     const rd=new THREE.MeshStandardMaterial({color:0xc4262e,roughness:.5}),bk=new THREE.MeshStandardMaterial({color:0x14101e,roughness:.5}),st=new THREE.MeshStandardMaterial({color:0x8a8590,roughness:.9});
-    const pd=new THREE.Mesh(new THREE.CylinderGeometry(.8,.95,.2,10),st);pd.position.y=.1;G.add(pd);
-    [-.45,.45].forEach(x=>{const pi=new THREE.Mesh(new THREE.CylinderGeometry(.07,.09,1.5,8),rd);pi.position.set(x,.95,0);G.add(pi);});
-    const t1=new THREE.Mesh(new THREE.BoxGeometry(1.4,.11,.17),bk);t1.position.set(0,1.72,0);G.add(t1);
-    const t2=new THREE.Mesh(new THREE.BoxGeometry(1.05,.07,.12),rd);t2.position.set(0,1.42,0);G.add(t2);
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(.95,.03,8,40),new THREE.MeshStandardMaterial({color:0xe8c25a,emissive:0x8a6a1a,emissiveIntensity:.5,metalness:.5,roughness:.4}));ring.rotation.x=Math.PI/2;ring.position.y=1.1;ring.userData.s=.5;G.add(ring);T3.rings.push(ring);
+    const pd=new THREE.Mesh(new THREE.CylinderGeometry(.5,.6,.34,10),st);pd.position.y=.17;G.add(pd);
+    [-.36,.36].forEach(x=>{const pi=new THREE.Mesh(new THREE.CylinderGeometry(.06,.08,1.5,8),rd);pi.position.set(x,1.09,0);G.add(pi);});
+    const t1=new THREE.Mesh(new THREE.BoxGeometry(1.2,.11,.17),bk);t1.position.set(0,1.86,0);G.add(t1);
+    const t2=new THREE.Mesh(new THREE.BoxGeometry(.9,.07,.12),rd);t2.position.set(0,1.56,0);G.add(t2);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.62,.03,8,40),new THREE.MeshStandardMaterial({color:0xe8c25a,emissive:0x8a6a1a,emissiveIntensity:.5,metalness:.5,roughness:.4}));ring.rotation.x=Math.PI/2;ring.position.y=1.3;ring.userData.s=.5;G.add(ring);T3.rings.push(ring);
   }else{
     const wood=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.5});
     const col=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,.5,24),wood);col.position.set(0,.2,0);G.add(col);
