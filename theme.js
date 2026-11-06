@@ -52,21 +52,28 @@
     var b1 = document.createElement('button');
     var b2 = document.createElement('button');
     var b3 = document.createElement('button');
-    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3);
+    var b4 = document.createElement('button');
+    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3); box.appendChild(b4);
     document.body.appendChild(box);
 
     function paint() {
       var st = root.getAttribute('data-style'), on = st === 'cyber';
-      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'anime' ? 'Stil: Anime' : 'Stil: Standard');
+      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'anime' ? 'Stil: Japan' : 'Stil: Standard');
       b1.title = 'Design umschalten (DEUKRO Cyber)';
       b2.hidden = !on;
       b2.textContent = root.getAttribute('data-fx') === 'off' ? 'Effekte: aus' : 'Effekte: an';
       b3.hidden = !(on && window.RAIN_OPTION);   // Regen gibt es nur in den 3D-Ansichten im Cyber-Stil
       b3.textContent = root.getAttribute('data-rain') === 'off' ? 'Regen: aus' : 'Regen: an';
+      b4.hidden = !window.ANIME_STYLE;
+      b4.textContent = st === 'anime' ? '🌸 Japan: an' : '🌸 Japan';
     }
     b1.onclick = function () {
       var st = root.getAttribute('data-style') || 'standard';
-      var next = st === 'cyber' ? 'standard' : (st === 'standard' ? (window.ANIME_STYLE ? 'anime' : 'cyber') : 'cyber');
+      var next = st === 'cyber' ? 'standard' : (st === 'standard' ? 'cyber' : 'cyber');
+      apply(next); set(KEY, next); paint();
+    };
+    b4.onclick = function () {
+      var next = root.getAttribute('data-style') === 'anime' ? 'cyber' : 'anime';
       apply(next); set(KEY, next); paint();
     };
     b2.onclick = function () {

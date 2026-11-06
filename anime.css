@@ -1,43 +1,51 @@
-/* Anime-Stil (pastellig, niedlich, familienfreundlich): nur aktiv mit html[data-style="anime"] (siehe theme.js) */
+/* Japan-Stil (Tokyo am Abend, Kirschblüten, Holz & Papier; familienfreundlich): nur aktiv mit html[data-style="anime"] (siehe theme.js) */
 html[data-style="anime"]{
-  --bg:#fff0f7;--card:#ffffff;--card-hover:#ffe3f0;--text:#5a3d5c;--muted:#a07fa4;
-  --accent:#ff6fa5;--accent2:#8f7bff;--border:#ffc6dd;
-  color-scheme:light;
+  --bg:#1a1033;--card:#241947;--card-hover:#33235f;--text:#fff1ea;--muted:#c8b4e0;
+  --accent:#e0334c;--accent2:#ffb7c9;--border:#5b3f8f;
+  color-scheme:dark;
 }
 html[data-style="anime"] body{
-  font-family:"Fredoka","Nunito","Segoe UI",system-ui,sans-serif;
+  font-family:"Fredoka","Segoe UI",system-ui,sans-serif;
   background:
-    radial-gradient(700px 420px at 10% -5%,rgba(255,170,205,.55),transparent 62%),
-    radial-gradient(700px 460px at 100% 0%,rgba(170,200,255,.55),transparent 62%),
-    radial-gradient(600px 400px at 50% 110%,rgba(200,255,230,.5),transparent 62%),var(--bg);
+    radial-gradient(520px 320px at 82% 100%,rgba(255,120,100,.4),transparent 70%),
+    linear-gradient(180deg,#1c1250 0%,#3a1f66 55%,#7a3a70 100%);
   background-attachment:fixed;
 }
+/* fallende Kirschblüten: nur transform, daher sehr leicht */
 html[data-style="anime"] body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
-  background-image:radial-gradient(circle,#ffb7d0 0 3px,transparent 4px),radial-gradient(circle,#ffd9ea 0 2px,transparent 3px);
-  background-size:140px 140px,90px 90px;background-position:0 0,45px 60px;
+  content:"";position:fixed;left:0;right:0;top:-100vh;height:200vh;pointer-events:none;z-index:0;opacity:.85;
+  background-image:
+    radial-gradient(ellipse 5px 3.5px at 20px 30px,#ffc0d4 96%,transparent),
+    radial-gradient(ellipse 4px 3px at 90px 110px,#ffd2e0 96%,transparent),
+    radial-gradient(ellipse 6px 4px at 150px 60px,#ffaac4 96%,transparent);
+  background-size:170px 190px,230px 210px,290px 250px;
+  animation:sakura 26s linear infinite;
 }
+@keyframes sakura{to{transform:translateY(100vh)}}
+@media (prefers-reduced-motion:reduce){html[data-style="anime"] body::before{animation:none}}
 html[data-style="anime"] .wrap{position:relative;z-index:1}
-html[data-style="anime"] .panel,html[data-style="anime"] .overlay .box{border-width:2px;border-radius:24px;box-shadow:0 6px 0 rgba(255,150,190,.35)}
-html[data-style="anime"] .overlay{background:rgba(255,220,238,.6)}
-html[data-style="anime"] .back{border-radius:999px;border-width:2px;color:var(--accent)}
-html[data-style="anime"] .top h1{color:var(--accent);text-shadow:2px 2px 0 #fff,4px 4px 0 rgba(255,150,190,.4);letter-spacing:.02em}
-html[data-style="anime"] .btn{border-radius:999px;background:linear-gradient(135deg,#ff7fb0,#ffa6c9);box-shadow:0 4px 0 #e0558a;border:2px solid #fff}
-html[data-style="anime"] .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 0 #e0558a}
-html[data-style="anime"] .btn.alt{background:#fff;color:var(--text);border:2px solid var(--border);box-shadow:0 4px 0 rgba(255,150,190,.4)}
-html[data-style="anime"] select{border-radius:999px;border-width:2px;background:#fff}
-html[data-style="anime"] #styleSwitch button{background:#fff;color:#c2487a;border:2px solid #ffc6dd;border-radius:999px}
+html[data-style="anime"] .panel,html[data-style="anime"] .overlay .box{background:rgba(36,25,71,.92);border:2px solid #5b3f8f;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.4)}
+html[data-style="anime"] .overlay{background:rgba(14,8,34,.72)}
+html[data-style="anime"] .back{border-radius:8px;border:2px solid #ffb7c9;color:#ffb7c9;background:transparent}
+html[data-style="anime"] .top h1{font-weight:700;letter-spacing:.08em;color:#fff1ea;text-shadow:0 0 12px rgba(224,51,76,.8),2px 2px 0 #e0334c}
+html[data-style="anime"] .btn{border-radius:8px;background:linear-gradient(135deg,#e0334c,#ff6a5a);color:#fff;border:2px solid #ffd2c8;box-shadow:0 4px 0 #7a1424;letter-spacing:.03em}
+html[data-style="anime"] .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 0 #7a1424}
+html[data-style="anime"] .btn.alt{background:#33235f;color:#fff1ea;border:2px solid #5b3f8f;box-shadow:0 4px 0 #120a2e}
+html[data-style="anime"] select,html[data-style="anime"] input{border-radius:8px;border:2px solid #5b3f8f;background:#1a1033;color:#fff1ea}
+html[data-style="anime"] #styleSwitch button{background:#241947;color:#ffd2e0;border:2px solid #ffb7c9;border-radius:8px}
 
-/* Mensch ärgere dich nicht: 2D-Brett */
-html[data-style="anime"] #board{background:linear-gradient(160deg,#fff7fb,#ffe6f2);border:3px solid #ffc6dd;border-radius:28px;box-shadow:0 8px 0 rgba(255,150,190,.4)}
-html[data-style="anime"] .cell{fill:#fff;stroke:#ffc6dd;stroke-width:2.5}
-html[data-style="anime"] .cell.start{fill:var(--c);stroke:#fff;stroke-width:4}
-html[data-style="anime"] .cell.lane{fill:var(--c);fill-opacity:.6;stroke:#fff;stroke-opacity:1}
-html[data-style="anime"] .cell.bc{fill:#fff;fill-opacity:.8;stroke:var(--c);stroke-width:3}
-html[data-style="anime"] .basebox{fill-opacity:.25}
-html[data-style="anime"] .piece circle.main{stroke:#fff;stroke-width:3.5;filter:drop-shadow(0 3px 0 rgba(150,60,110,.3))}
-html[data-style="anime"] .piece[data-p="0"] circle.main{fill:#ff7fa8}
-html[data-style="anime"] .piece[data-p="1"] circle.main{fill:#6fb7ff}
-html[data-style="anime"] .piece[data-p="2"] circle.main{fill:#7fe0a8}
-html[data-style="anime"] .piece[data-p="3"] circle.main{fill:#ffd666}
+/* Mensch ärgere dich nicht: 2D-Brett aus Holz und Papier */
+html[data-style="anime"] #board{background:radial-gradient(circle at 50% 50%,#fbf1dc,#ecdcb8);border:7px solid #6b4226;border-radius:10px;box-shadow:0 0 0 2px #3a1f14,0 12px 30px rgba(0,0,0,.5)}
+html[data-style="anime"] .cell{fill:#fffaf0;stroke:#8a1c24;stroke-opacity:.65;stroke-width:1.6}
+html[data-style="anime"] .cell.start{fill:var(--c);stroke:#fff;stroke-width:3}
+html[data-style="anime"] .cell.lane{fill:var(--c);fill-opacity:.7;stroke:#fff;stroke-opacity:1}
+html[data-style="anime"] .cell.bc{fill:#f3e3c4;stroke:var(--c);stroke-width:3}
+html[data-style="anime"] .basebox{fill-opacity:.22}
+html[data-style="anime"] #board text{fill:rgba(90,30,30,.4)}
+html[data-style="anime"] .piece circle.main{stroke:#fff;stroke-width:3;filter:drop-shadow(0 2px 2px rgba(60,20,20,.5))}
+html[data-style="anime"] .piece[data-p="0"] circle.main{fill:#ff4d5e}
+html[data-style="anime"] .piece[data-p="1"] circle.main{fill:#4da6ff}
+html[data-style="anime"] .piece[data-p="2"] circle.main{fill:#3de0a0}
+html[data-style="anime"] .piece[data-p="3"] circle.main{fill:#ffc83d}
 html[data-style="anime"] .piece .face{display:inline}
+html[data-style="anime"] #lookBox .box{background:#241947}
