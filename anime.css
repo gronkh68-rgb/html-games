@@ -1,14 +1,14 @@
 /* Japan-Stil (Tokyo am Abend, Kirschblüten, Holz & Papier; familienfreundlich): nur aktiv mit html[data-style="anime"] (siehe theme.js) */
 html[data-style="anime"]{
-  --bg:#1a1033;--card:#241947;--card-hover:#33235f;--text:#fff1ea;--muted:#c8b4e0;
-  --accent:#e0334c;--accent2:#ffb7c9;--border:#5b3f8f;
+  --bg:#10142c;--card:#1a2040;--card-hover:#262d58;--text:#fff4e6;--muted:#b4bcdc;
+  --accent:#e0334c;--accent2:#e8c25a;--border:#3d4a85;
   color-scheme:dark;
 }
 html[data-style="anime"] body{
   font-family:"Fredoka","Segoe UI",system-ui,sans-serif;
   background:
-    radial-gradient(520px 320px at 82% 100%,rgba(255,120,100,.4),transparent 70%),
-    linear-gradient(180deg,#1c1250 0%,#3a1f66 55%,#7a3a70 100%);
+    radial-gradient(560px 300px at 82% 100%,rgba(255,140,80,.28),transparent 70%),
+    linear-gradient(180deg,#0e1230 0%,#1b2350 60%,#2a2a58 100%);
   background-attachment:fixed;
 }
 /* fallende Kirschblüten: nur transform, daher sehr leicht */
@@ -24,15 +24,15 @@ html[data-style="anime"] body::before{
 @keyframes sakura{to{transform:translateY(100vh)}}
 @media (prefers-reduced-motion:reduce){html[data-style="anime"] body::before{animation:none}}
 html[data-style="anime"] .wrap{position:relative;z-index:1}
-html[data-style="anime"] .panel,html[data-style="anime"] .overlay .box{background:rgba(36,25,71,.92);border:2px solid #5b3f8f;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.4)}
-html[data-style="anime"] .overlay{background:rgba(14,8,34,.72)}
-html[data-style="anime"] .back{border-radius:8px;border:2px solid #ffb7c9;color:#ffb7c9;background:transparent}
+html[data-style="anime"] .panel,html[data-style="anime"] .overlay .box{background:rgba(26,32,64,.92);border:2px solid #3d4a85;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.4)}
+html[data-style="anime"] .overlay{background:rgba(8,10,28,.74)}
+html[data-style="anime"] .back{border-radius:8px;border:2px solid #e8c25a;color:#e8c25a;background:transparent}
 html[data-style="anime"] .top h1{font-weight:700;letter-spacing:.08em;color:#fff1ea;text-shadow:0 0 12px rgba(224,51,76,.8),2px 2px 0 #e0334c}
 html[data-style="anime"] .btn{border-radius:8px;background:linear-gradient(135deg,#e0334c,#ff6a5a);color:#fff;border:2px solid #ffd2c8;box-shadow:0 4px 0 #7a1424;letter-spacing:.03em}
 html[data-style="anime"] .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 0 #7a1424}
-html[data-style="anime"] .btn.alt{background:#33235f;color:#fff1ea;border:2px solid #5b3f8f;box-shadow:0 4px 0 #120a2e}
-html[data-style="anime"] select,html[data-style="anime"] input{border-radius:8px;border:2px solid #5b3f8f;background:#1a1033;color:#fff1ea}
-html[data-style="anime"] #styleSwitch button{background:#241947;color:#ffd2e0;border:2px solid #ffb7c9;border-radius:8px}
+html[data-style="anime"] .btn.alt{background:#262d58;color:#fff4e6;border:2px solid #3d4a85;box-shadow:0 4px 0 #0a0d20}
+html[data-style="anime"] select,html[data-style="anime"] input{border-radius:8px;border:2px solid #3d4a85;background:#10142c;color:#fff4e6}
+html[data-style="anime"] #styleSwitch button{background:#1a2040;color:#f5e6b8;border:2px solid #e8c25a;border-radius:8px}
 
 /* Mensch ärgere dich nicht: 2D-Brett aus Holz und Papier */
 html[data-style="anime"] #board{background:radial-gradient(circle at 50% 50%,#fbf1dc,#ecdcb8);border:7px solid #6b4226;border-radius:10px;box-shadow:0 0 0 2px #3a1f14,0 12px 30px rgba(0,0,0,.5)}
@@ -48,4 +48,4 @@ html[data-style="anime"] .piece[data-p="1"] circle.main{fill:#4da6ff}
 html[data-style="anime"] .piece[data-p="2"] circle.main{fill:#3de0a0}
 html[data-style="anime"] .piece[data-p="3"] circle.main{fill:#ffc83d}
 html[data-style="anime"] .piece .face{display:inline}
-html[data-style="anime"] #lookBox .box{background:#241947}
+html[data-style="anime"] #lookBox .box{background:#1a2040}

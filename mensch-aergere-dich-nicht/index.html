@@ -6,7 +6,7 @@
 <title>Mensch ärgere dich nicht</title>
 <link rel="stylesheet" href="../common.css">
 <script>window.RAIN_OPTION=1;window.ANIME_STYLE=1;</script>
-<script src="../theme.js?v=anime3"></script>
+<script src="../theme.js?v=anime4"></script>
 <script src="../room3d.js"></script>
 <script src="../dice.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
@@ -977,17 +977,17 @@ function buildEnv3(){
     T3.rain=Room3D.rain(THREE,{count:500,radius:26,top:18,bottom:-.4,size:.07});add(T3.rain.obj);
   }else if(AN()){
     // Japan am Abend: Fuji, Tokyo-Skyline mit Tower, Torii, Kirschbäume, fallende Blüten (wenige, einfache Formen)
-    scene.fog=new THREE.Fog(0x3a2250,80,190);T3.r.setClearColor(0x2a1850);
-    add(new THREE.HemisphereLight(0xffd9e8,0x3a2050,1));
+    scene.fog=new THREE.Fog(0x1c2244,80,190);T3.r.setClearColor(0x161a3a);
+    add(new THREE.HemisphereLight(0xfff0dc,0x252a4a,1));
     const dl=new THREE.DirectionalLight(0xffc890,.9);dl.position.set(-10,16,8);add(dl);
     const sg=new THREE.SphereGeometry(200,20,12),cl=[];
-    for(let i=0;i<sg.attributes.position.count;i++){const y=sg.attributes.position.getY(i)/200,t=Math.max(0,Math.min(1,y*2.2+.1)),a=new THREE.Color(0xff9a7a),b=new THREE.Color(0x1c1250);a.lerp(b,Math.pow(t,.75));cl.push(a.r,a.g,a.b);}
+    for(let i=0;i<sg.attributes.position.count;i++){const y=sg.attributes.position.getY(i)/200,t=Math.max(0,Math.min(1,y*2.2+.1)),a=new THREE.Color(0xff9a7a),b=new THREE.Color(0x0c1030);a.lerp(b,Math.pow(t,.75));cl.push(a.r,a.g,a.b);}
     sg.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));
     add(new THREE.Mesh(sg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,fog:false})));
     const sun=new THREE.Mesh(new THREE.CircleGeometry(13,32),new THREE.MeshBasicMaterial({color:0xff5a4a,fog:false}));sun.position.set(60,30,-130);sun.lookAt(0,0,0);add(sun);
     const fuji=new THREE.Mesh(new THREE.ConeGeometry(40,34,18),new THREE.MeshBasicMaterial({color:0x2c2a5e}));fuji.position.set(-34,15,-125);add(fuji);
     const cap=new THREE.Mesh(new THREE.ConeGeometry(11.8,10,18),new THREE.MeshBasicMaterial({color:0xf4eef8}));cap.position.set(-34,27,-125);add(cap);
-    const gm=new THREE.Mesh(new THREE.CircleGeometry(150,40),new THREE.MeshStandardMaterial({color:0x2b1a44,roughness:1}));gm.rotation.x=-Math.PI/2;gm.position.y=-.5;add(gm);
+    const gm=new THREE.Mesh(new THREE.CircleGeometry(150,40),new THREE.MeshStandardMaterial({color:0x1a2036,roughness:1}));gm.rotation.x=-Math.PI/2;gm.position.y=-.5;add(gm);
     const tat=new THREE.Mesh(new THREE.BoxGeometry(16,.3,16),new THREE.MeshStandardMaterial({color:0x9aa56a,roughness:1}));tat.position.y=-.35;add(tat);
     const tfr=new THREE.Mesh(new THREE.BoxGeometry(17.2,.24,17.2),new THREE.MeshStandardMaterial({color:0x3a1f14,roughness:.8}));tfr.position.y=-.42;add(tfr);
     // Skyline: ein gemeinsames Fenster-Muster
@@ -1144,7 +1144,7 @@ function build3(){
     [-.45,.45].forEach(x=>{const pi=new THREE.Mesh(new THREE.CylinderGeometry(.07,.09,1.5,8),rd);pi.position.set(x,.95,0);G.add(pi);});
     const t1=new THREE.Mesh(new THREE.BoxGeometry(1.4,.11,.17),bk);t1.position.set(0,1.72,0);G.add(t1);
     const t2=new THREE.Mesh(new THREE.BoxGeometry(1.05,.07,.12),rd);t2.position.set(0,1.42,0);G.add(t2);
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(.95,.03,8,40),new THREE.MeshStandardMaterial({color:0xffb7c9,emissive:0xff8aa8,emissiveIntensity:.5}));ring.rotation.x=Math.PI/2;ring.position.y=1.1;ring.userData.s=.5;G.add(ring);T3.rings.push(ring);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.95,.03,8,40),new THREE.MeshStandardMaterial({color:0xe8c25a,emissive:0x8a6a1a,emissiveIntensity:.5,metalness:.5,roughness:.4}));ring.rotation.x=Math.PI/2;ring.position.y=1.1;ring.userData.s=.5;G.add(ring);T3.rings.push(ring);
   }else{
     const wood=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.5});
     const col=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,.5,24),wood);col.position.set(0,.2,0);G.add(col);

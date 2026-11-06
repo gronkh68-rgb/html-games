@@ -21,7 +21,7 @@
     if (mode === 'anime') {
       root.setAttribute('data-style', 'anime');
       addLink('anime-fonts', 'https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
-      addLink('anime-css', base + 'anime.css');
+      addLink('anime-css', base + 'anime.css?v=4');
     } else if (mode === 'cyber') {
       root.setAttribute('data-style', 'cyber');
       addLink('cyber-fonts', 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@700;800&family=Share+Tech+Mono&display=swap');
