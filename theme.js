@@ -15,8 +15,14 @@
     l.id = id; l.rel = 'stylesheet'; l.href = href;
     document.head.appendChild(l);
   }
-  function apply(on) {
-    if (on) {
+  function apply(mode) {
+    if (mode === true) mode = 'cyber';
+    if (mode === false) mode = 'standard';
+    if (mode === 'anime') {
+      root.setAttribute('data-style', 'anime');
+      addLink('anime-fonts', 'https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+      addLink('anime-css', base + 'anime.css');
+    } else if (mode === 'cyber') {
       root.setAttribute('data-style', 'cyber');
       addLink('cyber-fonts', 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@700;800&family=Share+Tech+Mono&display=swap');
       addLink('cyber-css', base + 'cyber.css');
@@ -28,7 +34,8 @@
     if (off) root.setAttribute('data-fx', 'off'); else root.removeAttribute('data-fx');
   }
 
-  apply(get(KEY) !== 'standard'); // Cyber ist die Voreinstellung
+  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'anime' && window.ANIME_STYLE) return 'anime'; return 'cyber'; }
+  apply(current()); // Cyber ist die Voreinstellung; Anime gibt es nur auf Seiten mit window.ANIME_STYLE
   applyFx(get(FX) === 'off');
   if (get(RAIN) === 'off') root.setAttribute('data-rain', 'off');
 
@@ -49,8 +56,8 @@
     document.body.appendChild(box);
 
     function paint() {
-      var on = root.getAttribute('data-style') === 'cyber';
-      b1.textContent = on ? 'Stil: Cyber' : 'Stil: Standard';
+      var st = root.getAttribute('data-style'), on = st === 'cyber';
+      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'anime' ? 'Stil: Anime' : 'Stil: Standard');
       b1.title = 'Design umschalten (DEUKRO Cyber)';
       b2.hidden = !on;
       b2.textContent = root.getAttribute('data-fx') === 'off' ? 'Effekte: aus' : 'Effekte: an';
@@ -58,8 +65,9 @@
       b3.textContent = root.getAttribute('data-rain') === 'off' ? 'Regen: aus' : 'Regen: an';
     }
     b1.onclick = function () {
-      var on = root.getAttribute('data-style') !== 'cyber';
-      apply(on); set(KEY, on ? 'cyber' : 'standard'); paint();
+      var st = root.getAttribute('data-style') || 'standard';
+      var next = st === 'cyber' ? 'standard' : (st === 'standard' ? (window.ANIME_STYLE ? 'anime' : 'cyber') : 'cyber');
+      apply(next); set(KEY, next); paint();
     };
     b2.onclick = function () {
       var off = root.getAttribute('data-fx') !== 'off';

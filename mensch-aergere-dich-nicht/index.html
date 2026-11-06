@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mensch ärgere dich nicht</title>
 <link rel="stylesheet" href="../common.css">
-<script>window.RAIN_OPTION=1;</script>
+<script>window.RAIN_OPTION=1;window.ANIME_STYLE=1;</script>
 <script src="../theme.js"></script>
 <script src="../room3d.js"></script>
 <script src="../dice.js"></script>
@@ -20,6 +20,7 @@
 @media (max-width:760px){.layout{grid-template-columns:1fr}}
 #board{width:100%;max-width:none;height:auto;background:var(--card);border:1px solid var(--border);border-radius:18px;touch-action:manipulation}
 .piece{transition:transform .14s ease}
+.piece .face{display:none}
 .piece circle.main{stroke:#fff;stroke-width:3}
 .piece.can{cursor:pointer}
 .piece.can circle.main{animation:pulse .7s infinite alternate;transform-box:fill-box;transform-origin:center}
@@ -274,6 +275,9 @@ function drawBoard(){
       el('circle',{class:'ring',r:24},g);
       el('circle',{class:'main',r:17,fill:COLORS[p].c},g);
       el('circle',{r:7,fill:'rgba(255,255,255,.35)',cx:-4,cy:-5},g);
+      [-6,6].forEach(x=>{el('ellipse',{class:'face',cx:x,cy:-1,rx:2.8,ry:3.8,fill:'#3a2a4a'},g);el('circle',{class:'face',cx:x+.9,cy:-2.4,r:1.2,fill:'#fff'},g);el('ellipse',{class:'face',cx:x*1.35,cy:4.5,rx:3,ry:1.7,fill:'#ff9bb8',opacity:.8},g);});
+      el('path',{class:'face',d:'M-2.5 4 Q0 7 2.5 4',fill:'none',stroke:'#3a2a4a','stroke-width':1.4,'stroke-linecap':'round'},g);
+      el('path',{class:'face',d:'M-14 -8 L-10 -19 L-3 -13 Z M14 -8 L10 -19 L3 -13 Z',fill:COLORS[p].c,stroke:'#fff','stroke-width':2.5,'stroke-linejoin':'round'},g);
       g.addEventListener('click',()=>onPieceClick(p,i));
     }
   });
@@ -776,8 +780,10 @@ addEventListener('beforeunload',()=>{try{if(netRole==='client'&&hostConn)hostCon
 // ====================== 3D-Ansicht (three.js wird erst bei Bedarf geladen) ======================
 const S3=1.1;
 const CY=()=>document.documentElement.getAttribute('data-style')==='cyber';
+const AN=()=>document.documentElement.getAttribute('data-style')==='anime';
+const ANIME_COL=['#ff7fa8','#6fb7ff','#7fe0a8','#ffd666'];
 const CLASSIC_COL=['#c62828','#1e5aa8','#2e8b3d','#e6b800'];
-const pc3=p=>CY()?parseInt(COLORS[p].c.slice(1),16):parseInt(CLASSIC_COL[p].slice(1),16);
+const pc3=p=>parseInt((CY()?COLORS[p].c:AN()?ANIME_COL[p]:CLASSIC_COL[p]).slice(1),16);
 const mixW=(h,t)=>{const r=(h>>16)&255,g=(h>>8)&255,b=h&255,f=v=>Math.round(v+(255-v)*t);return (f(r)<<16)|(f(g)<<8)|f(b);};
 const darker=(h,f)=>{const r=(h>>16)&255,g=(h>>8)&255,b=h&255,d=v=>Math.round(v*f);return (d(r)<<16)|(d(g)<<8)|d(b);};
 let T3=null,loading3=false;
@@ -831,6 +837,22 @@ function buildEnv3(){
       e.position.copy(m.position);add(e);
     }
     T3.rain=Room3D.rain(THREE,{count:500,radius:26,top:18,bottom:-.4,size:.07});add(T3.rain.obj);
+  }else if(AN()){
+    scene.fog=new THREE.Fog(0xffe0ef,55,150);T3.r.setClearColor(0xffd3e6);
+    add(new THREE.HemisphereLight(0xffffff,0xffc4dc,.95));
+    const dl=new THREE.DirectionalLight(0xfff2f8,.65);dl.position.set(8,16,6);add(dl);
+    const gm=new THREE.Mesh(new THREE.CircleGeometry(120,48),new THREE.MeshStandardMaterial({color:0xfff0f7,roughness:1}));gm.rotation.x=-Math.PI/2;gm.position.y=-.5;add(gm);
+    const cm=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,emissive:0xffe9f3,emissiveIntensity:.5});
+    for(let n=0;n<16;n++){
+      const a=Math.random()*Math.PI*2,d=48+Math.random()*34,cg=new THREE.Group();
+      for(let k=0;k<5;k++){const s=new THREE.Mesh(new THREE.SphereGeometry(3+Math.random()*3,14,10),cm);s.position.set((k-2)*4,Math.random()*1.5,Math.random()*2);cg.add(s);}
+      cg.position.set(Math.cos(a)*d,8+Math.random()*16,Math.sin(a)*d);add(cg);
+    }
+    const N=380,pos=new Float32Array(N*3),ph=new Float32Array(N);
+    for(let i=0;i<N;i++){pos[i*3]=(Math.random()-.5)*60;pos[i*3+1]=Math.random()*20-.4;pos[i*3+2]=(Math.random()-.5)*60;ph[i]=Math.random()*6.3;}
+    const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0xff9fc4,size:.34,transparent:true,opacity:.9,depthWrite:false}));add(pts);
+    let tt=0;T3.rain={obj:pts,update(dt){tt+=dt;for(let i=0;i<N;i++){pos[i*3+1]-=dt*(.9+(i%5)*.15);pos[i*3]+=Math.sin(tt*.8+ph[i])*dt*.6;if(pos[i*3+1]<-.4)pos[i*3+1]=20;}pg.attributes.position.needsUpdate=true;}};
   }else{
     scene.fog=new THREE.Fog(0x2a1a10,70,150);T3.r.setClearColor(0x2a1a10);
     T3.room=Room3D.livingRoom(THREE,{half:60,tableTopY:-.25,table:{shape:'square',size:15}});add(T3.room.group);
@@ -897,14 +919,17 @@ function build3(){
   T3.pm={};T3.bases={};T3.tw=[];
   const G=new THREE.Group();T3.group=G;scene.add(G);
   // Grundplatte
-  const plate=new THREE.Mesh(new THREE.BoxGeometry(11.6*S3,.3,11.6*S3),new THREE.MeshStandardMaterial(CY()?{color:0x0a0d16,roughness:.6,metalness:.5,emissive:0x03121a}:{color:0xc89a5a,roughness:.7}));
+  const plate=new THREE.Mesh(new THREE.BoxGeometry(11.6*S3,.3,11.6*S3),new THREE.MeshStandardMaterial(CY()?{color:0x0a0d16,roughness:.6,metalness:.5,emissive:0x03121a}:AN()?{color:0xffe3ef,roughness:.8}:{color:0xc89a5a,roughness:.7}));
   plate.position.y=-.1;G.add(plate);
   if(CY()){const pe=new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),new THREE.LineBasicMaterial({color:0x00f0ff}));pe.position.copy(plate.position);G.add(pe);}
   const tile=(c,r,h,color,emis,eI,edge,rad=.48,kind)=>{
     const g=new THREE.CylinderGeometry(rad,rad,h,CY()?8:24);g.rotateY(Math.PI/8);
     let mt,lc=edge,lo=1;
     if(CY())mt=new THREE.MeshStandardMaterial({color,emissive:emis,emissiveIntensity:eI,roughness:.45,metalness:.5});
-    else{   // klassisch: matte Mulden in Elfenbein und Spielerfarben
+    else if(AN()){
+      const col=kind==='track'?0xfff8fb:kind==='lane'?mixW(color,.5):kind==='bc'?mixW(color,.65):color;
+      mt=new THREE.MeshStandardMaterial({color:col,roughness:.6});lc=0xf2a9c6;lo=.9;
+    }else{   // klassisch: matte Mulden in Elfenbein und Spielerfarben
       const col=kind==='track'?0xf2e8cd:kind==='lane'?mixW(color,.4):kind==='bc'?darker(color,.5):color;
       mt=new THREE.MeshStandardMaterial({color:col,roughness:.55});lc=0x7a5a32;lo=.55;
     }
@@ -916,9 +941,9 @@ function build3(){
   [0,1,2,3].forEach(p=>{
     const [x0,y0]=[[0,0],[9,0],[9,9],[0,9]][p],c=pc3(p),on=active.includes(p);
     const g=new THREE.BoxGeometry(2*S3-.1,.18,2*S3-.1);
-    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial(CY()?{color:0x0b0e18,emissive:c,emissiveIntensity:on?.25:.06,roughness:.5,metalness:.6}:{color:on?c:darker(c,.45),emissive:c,emissiveIntensity:0,roughness:.6}));
+    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial(CY()?{color:0x0b0e18,emissive:c,emissiveIntensity:on?.25:.06,roughness:.5,metalness:.6}:AN()?{color:on?c:mixW(c,.6),emissive:c,emissiveIntensity:0,roughness:.6}:{color:on?c:darker(c,.45),emissive:c,emissiveIntensity:0,roughness:.6}));
     const w=w3(x0+.5,y0+.5);m.position.set(w.x,.09,w.z);G.add(m);T3.bases[p]=m;
-    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:CY()?c:0x7a5a32,transparent:true,opacity:on?1:.3}));e.position.copy(m.position);G.add(e);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:CY()?c:AN()?0xf2a9c6:0x7a5a32,transparent:true,opacity:on?1:.3}));e.position.copy(m.position);G.add(e);
     BASE[p].forEach(([bc,br])=>tile(bc,br,.12,0x05060b,c,.15,c,.38,'bc'));
   });
   TRACK.forEach(([c,r],i)=>{
@@ -937,6 +962,10 @@ function build3(){
       const ring=new THREE.Mesh(new THREE.TorusGeometry(.6+i*.18,.03,8,40),new THREE.MeshBasicMaterial({color:i%2?0xff2fa8:0x00f0ff}));
       ring.rotation.x=Math.PI/2;ring.position.set(0,.8+i*.8,0);ring.userData.s=(i%2?1:-1)*(.7+i*.2);G.add(ring);T3.rings.push(ring);
     }
+  }else if(AN()){
+    const pk=new THREE.MeshStandardMaterial({color:0xff9fc4,roughness:.5}),st=new THREE.Mesh(new THREE.CylinderGeometry(.18,.3,.9,16),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.5}));st.position.y=.45;G.add(st);
+    for(let k=0;k<5;k++){const a=k/5*Math.PI*2,pt=new THREE.Mesh(new THREE.SphereGeometry(.34,14,10),pk);pt.scale.set(1,.45,1.25);pt.position.set(Math.cos(a)*.38,1.0,Math.sin(a)*.38);pt.rotation.y=-a;G.add(pt);}
+    const ct=new THREE.Mesh(new THREE.SphereGeometry(.16,14,10),new THREE.MeshStandardMaterial({color:0xffd666,roughness:.4}));ct.position.y=1.05;G.add(ct);
   }else{
     const wood=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.5});
     const col=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,.5,24),wood);col.position.set(0,.2,0);G.add(col);
@@ -946,12 +975,25 @@ function build3(){
   active.forEach(p=>{
     for(let i=0;i<4;i++){
       const c=pc3(p),g=new THREE.Group();
-      const body=CY()?new THREE.Mesh(new THREE.CylinderGeometry(.13,.22,.5,8),new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.95,roughness:.3,metalness:.6}))
+      const an=AN();
+      const body=an?new THREE.Mesh(new THREE.CylinderGeometry(.1,.26,.42,24),new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:0,roughness:.5})):CY()?new THREE.Mesh(new THREE.CylinderGeometry(.13,.22,.5,8),new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.95,roughness:.3,metalness:.6}))
         :new THREE.Mesh(new THREE.CylinderGeometry(.08,.25,.6,24),new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:0,roughness:.4}));
-      body.position.y=CY()?.25:.3;g.add(body);
-      const head=CY()?new THREE.Mesh(new THREE.OctahedronGeometry(.14),new THREE.MeshBasicMaterial({color:0xffffff}))
+      body.position.y=an?.21:CY()?.25:.3;g.add(body);
+      const head=an?new THREE.Group():CY()?new THREE.Mesh(new THREE.OctahedronGeometry(.14),new THREE.MeshBasicMaterial({color:0xffffff}))
         :new THREE.Mesh(new THREE.SphereGeometry(.2,20,16),new THREE.MeshStandardMaterial({color:c,roughness:.35}));
-      head.position.y=CY()?.68:.7;g.add(head);
+      head.position.y=an?.62:CY()?.68:.7;g.add(head);
+      if(an){
+        const sk=new THREE.MeshStandardMaterial({color:0xffe6d6,roughness:.5}),hr=new THREE.MeshStandardMaterial({color:c,roughness:.45}),dk=new THREE.MeshBasicMaterial({color:0x2b2040}),wh=new THREE.MeshBasicMaterial({color:0xffffff});
+        head.add(new THREE.Mesh(new THREE.SphereGeometry(.27,24,18),sk));
+        const hair=new THREE.Mesh(new THREE.SphereGeometry(.295,24,14,0,Math.PI*2,0,Math.PI*.58),hr);hair.position.set(0,.02,-.015);head.add(hair);
+        for(const sx of [-1,1]){
+          const ear=new THREE.Mesh(new THREE.ConeGeometry(.1,.2,4),hr);ear.position.set(sx*.17,.3,0);ear.rotation.z=-sx*.35;head.add(ear);
+          const eye=new THREE.Mesh(new THREE.SphereGeometry(.052,12,10),dk);eye.scale.set(.85,1.35,.5);eye.position.set(sx*.1,-.01,.245);head.add(eye);
+          const hl=new THREE.Mesh(new THREE.SphereGeometry(.018,8,6),wh);hl.position.set(sx*.1+.015,.02,.268);head.add(hl);
+          const ch=new THREE.Mesh(new THREE.CircleGeometry(.045,12),new THREE.MeshBasicMaterial({color:0xff8fb0,transparent:true,opacity:.7}));ch.position.set(sx*.17,-.08,.23);ch.lookAt(sx*.4,-.08,.6);head.add(ch);
+        }
+        const fr=new THREE.Mesh(new THREE.SphereGeometry(.07,10,8),hr);fr.position.set(0,.3,.12);head.add(fr);
+      }
       const ring=new THREE.Mesh(new THREE.RingGeometry(.3,.38,32),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
       ring.rotation.x=-Math.PI/2;ring.position.y=.02;g.add(ring);
       const beam=new THREE.Mesh(new THREE.CylinderGeometry(.04,.24,2.4,12,1,true),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
@@ -1000,7 +1042,8 @@ function tick3(now){
   const t=now/1000;
   for(const k in T3.pm){
     const pm=T3.pm[k],pulse=.5+.5*Math.sin(t*6+pm.i);
-    pm.head.rotation.y+=dt*2;
+    if(AN()){pm.head.position.y=.62+Math.sin(t*3+pm.i)*.02;pm.g.rotation.y=Math.atan2(T3.camera.position.x-pm.g.position.x,T3.camera.position.z-pm.g.position.z);}
+    else pm.head.rotation.y+=dt*2;
     pm.ring.material.opacity=pm.can?.6+.4*pulse:(pm.mine?.35:0);
     pm.beam.material.opacity=pm.can?.2+.25*pulse:0;
     pm.body.material.emissiveIntensity=CY()?(pm.can?1.1+.6*pulse:(pm.mine?.95:.55)):(pm.can?.35+.3*pulse:(pm.mine?.1:0));
