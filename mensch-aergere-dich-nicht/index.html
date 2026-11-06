@@ -72,7 +72,55 @@ body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)
 }
 #setup input{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:160px}
 #modeTabs{gap:8px}
-.codebox{font:900 2.2rem ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:10px 6px 10px 16px;background:var(--bg);border:1px solid var(--border);margin:6px 0}
+.codebox{font:900 2.4rem ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:10px 6px 10px 16px;background:var(--bg);border:1px solid var(--border);border-radius:12px;margin:8px 0;cursor:pointer;user-select:all}
+.roomcard{background:var(--card-hover);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin:10px 0 16px}
+.rc-top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.1em}
+.rc-top .code{font:800 1rem ui-monospace,monospace;letter-spacing:.25em;color:var(--text)}
+.rc-actions{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.rc-actions .btn{padding:8px 14px;font-size:.88rem}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg)}
+.seg button{font:inherit;font-size:.82rem;font-weight:600;padding:6px 12px;background:transparent;color:var(--muted);border:0;cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button:not(.on):hover{color:var(--text)}
+.seg.mini button{padding:4px 9px;font-size:.74rem}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;color:#5ee08a;text-transform:none;letter-spacing:0}
+.live i{width:8px;height:8px;border-radius:50%;background:#5ee08a;animation:livep 1.4s infinite}
+@keyframes livep{50%{opacity:.25}}
+.seats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0}
+@media (max-width:560px){.seats{grid-template-columns:1fr}}
+.seat{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--card-hover);border:2px solid color-mix(in srgb,var(--c) 45%,transparent);flex-wrap:wrap;animation:seatin .3s}
+.seat.open{border-style:dashed}
+.seat.off{opacity:.45}
+.seat.me{border-color:var(--c);box-shadow:0 0 0 2px var(--c),0 0 14px color-mix(in srgb,var(--c) 55%,transparent)}
+.seat .av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:1.25rem;background:var(--c);color:#fff;flex:none;box-shadow:inset 0 -3px 0 rgba(0,0,0,.2)}
+.seat.open .av{background:transparent;border:2px dashed var(--c);color:var(--c);box-shadow:none}
+.seat.off .av{background:var(--border)}
+.seat .info{display:flex;flex-direction:column;min-width:0;flex:1}
+.seat .info b{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.seat .who{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .who em{font-style:normal;font-size:.68rem;font-weight:700;background:var(--c);color:#fff;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:.1em}
+.seat .who.wait{color:var(--muted);font-weight:600}
+.seat .acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%}
+.seat .acts .btn.mini{margin-left:0}
+.dots i{display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;margin:0 1.5px;animation:dotb 1.2s infinite}
+.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+@keyframes dotb{0%,80%,100%{opacity:.2}40%{opacity:1}}
+@keyframes seatin{from{transform:scale(.95);opacity:0}}
+.note{min-height:1.4em;color:var(--accent2);font-size:.88rem;font-weight:600;margin:6px 0}
+.count{font-size:.8rem;color:var(--muted);font-weight:600;margin-left:6px}
+.btn.big{padding:13px 30px;font-size:1.05rem}
+.btn.busy{opacity:.7;pointer-events:none}
+.publist{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
+.pubcard{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--card-hover);border:1px solid var(--border);border-radius:14px;animation:seatin .3s}
+.pubcard .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-weight:800;flex:none}
+.pubcard .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.pubcard .info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pips{display:flex;gap:4px;align-items:center}
+.pip{width:11px;height:11px;border-radius:50%;background:var(--border)}
+.pip.on{background:var(--accent2)}
+.pips span{font-size:.75rem;color:var(--muted);margin-left:6px}
+.pubempty{padding:16px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:14px}
+.waitline{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--muted)}
 .hint{color:var(--muted);font-size:.85rem;margin:6px 0}
 .mini{padding:3px 8px!important;font-size:.72rem!important;margin-left:6px}
 .slotrow{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
@@ -102,28 +150,35 @@ body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)
       <div class="row"><button class="btn" id="start">Spiel starten</button></div>
     </div>
     <div id="pHost" hidden>
-      <h2>Raumcode</h2>
-      <div class="codebox" id="roomCode">…</div>
-      <div class="row"><button class="btn alt" id="copyLink">Link kopieren</button></div>
-      <div class="row"><label>Sichtbarkeit</label><select id="pubSel"><option value="1">Öffentlich (in der Spieleliste)</option><option value="0">Privat (nur mit Code)</option></select></div>
-      <p class="hint">Schicke den Code oder den Link an deine Mitspieler. Jeder wählt seine Farbe in der Lobby.</p>
-      <h2>Spieler</h2>
-      <div id="hostSlots"></div>
-      <div class="row"><button class="btn" id="hostStart">Spiel starten</button></div>
+      <div class="roomcard">
+        <div class="rc-top"><span>Raumcode</span><span class="live"><i></i>Raum offen</span></div>
+        <div class="codebox" id="roomCode" title="Zum Kopieren klicken">…</div>
+        <div class="rc-actions"><button class="btn alt" id="copyCode">Code kopieren</button><button class="btn alt" id="copyLink">Link kopieren</button></div>
+        <div class="seg" id="pubSeg"><button data-pub="1" class="on">🌐 Öffentlich</button><button data-pub="0">🔒 Privat</button></div>
+        <select id="pubSel" hidden><option value="1">Öffentlich</option><option value="0">Privat</option></select>
+        <p class="hint" id="pubHint">Öffentlich: Dein Spiel erscheint in der Liste der offenen Spiele. Du kannst auch Code oder Link schicken.</p>
+      </div>
+      <h2>Spieler<span class="count" id="hostCount"></span></h2>
+      <div class="seats" id="hostSlots"></div>
+      <div class="note" id="lobbyNote"></div>
+      <div class="row"><button class="btn big" id="hostStart">Spiel starten</button></div>
     </div>
     <div id="pJoin" hidden>
       <div id="joinForm">
-        <h2>Offene Spiele</h2>
-        <div id="pubList" class="hint">Suche …</div>
+        <h2>Offene Spiele <span class="live"><i></i>live</span></h2>
+        <div id="pubList" class="publist"><div class="pubempty">Suche …</div></div>
         <h2>Mit Code beitreten</h2>
-        <div class="row"><label>Raumcode</label><input id="joinCode" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase;letter-spacing:.2em"></div>
-        <div class="row"><button class="btn" id="joinBtn">Beitreten</button></div>
+        <div class="row"><input id="joinCode" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase;letter-spacing:.2em;max-width:150px"><button class="btn" id="joinBtn">Beitreten</button></div>
       </div>
       <div id="joinLobby" hidden>
-        <h2>Lobby</h2>
-        <div id="joinSlots"></div>
-        <p class="hint">Warte, bis der Host das Spiel startet.</p>
-        <div class="row"><button class="btn alt" id="joinLeave">Verlassen</button></div>
+        <div class="roomcard">
+          <div class="rc-top"><span>Du bist im Raum</span><span class="code" id="joinRoomCode"></span></div>
+          <div class="waitline"><span class="dots"><i></i><i></i><i></i></span><span>Warte, bis der Host das Spiel startet. Tippe auf einen freien Platz, um die Farbe zu wechseln.</span></div>
+        </div>
+        <h2>Spieler</h2>
+        <div class="seats" id="joinSlots"></div>
+        <div class="note" id="lobbyNote2"></div>
+        <div class="row"><button class="btn alt" id="joinLeave">Raum verlassen</button></div>
       </div>
     </div>
     <p id="setupErr" style="color:#ff7b7b;margin:6px 0 0"></p>
@@ -552,7 +607,9 @@ buildSetup();setDie(0);
 // und melden "Würfeln" und "Figur gewählt". Verbindung: siehe ../net.js (WebRTC, Ersatzweg Relay).
 const PREFIX='mdn-v1-';
 let room=null,lobby=[],hostConn=null,joiner=null,netPlaying=false,opening=false;
-let cReady=false,lastCur=-1,cRolling=false,rollAnim=null;
+let cReady=false,lastCur=-1,cRolling=false,rollAnim=null,joinedCode='',prevNames=null;
+function lobbyNote(t){['lobbyNote','lobbyNote2'].forEach(id=>{const e=$(id);if(!e)return;e.textContent=t;clearTimeout(e._t);e._t=setTimeout(()=>{e.textContent='';},3800);});}
+function joinBtnReset(){const b=$('joinBtn');b.disabled=false;b.textContent='Beitreten';b.classList.remove('busy');}
 const errMsg=t=>{$('setupErr').textContent=t||'';};
 function myNameVal(){const n=($('myName').value||'').trim().slice(0,14)||'Spieler';try{localStorage.setItem('mdn-name',n);}catch(e){}return n;}
 
@@ -589,7 +646,7 @@ function leaveNet(){
   stopAnnounce();
   room=null;lobby=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;
   clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';
-  $('joinForm').hidden=false;$('joinLobby').hidden=true;$('joinBtn').disabled=false;
+  $('joinForm').hidden=false;$('joinLobby').hidden=true;joinBtnReset();prevNames=null;
 }
 document.querySelectorAll('#modeTabs .btn').forEach(b=>b.onclick=()=>{
   const m=b.dataset.m;
@@ -624,6 +681,7 @@ function onHostMsg(conn,m){
     if(i<0){try{conn.send({t:'full',why:'Der Raum ist voll'});}catch(e){}setTimeout(()=>{try{conn.close();}catch(e){}},400);return;}
     lobby[i]={type:'remote',name:String(m.name||'Spieler').slice(0,14),conn};conn.slot=i;
     try{conn.send({t:'welcome',slot:i});}catch(e){}
+    lobbyNote(`${lobby[i].name} ist beigetreten (${COLORS[i].n})`);
     broadcastLobby();return;
   }
   if(conn.slot===undefined)return;
@@ -641,7 +699,7 @@ function onHostMsg(conn,m){
 function dropRemote(conn){            // Mitspieler weg: in der Lobby Platz freigeben, im Spiel übernimmt der Computer
   const i=conn.slot;if(i===undefined||!lobby[i]||lobby[i].conn!==conn)return;
   const name=lobby[i].name;conn.slot=undefined;
-  if(!netPlaying){lobby[i]={type:'open'};broadcastLobby();return;}
+  if(!netPlaying){lobby[i]={type:'open'};lobbyNote(`${name} hat den Raum verlassen`);broadcastLobby();return;}
   cfg[i]='cpu';lobby[i]={type:'cpu',name:''};
   setMsg(`${chip(i)}<b>${COLORS[i].n} (${esc(name)})</b> ist weg, der Computer übernimmt.`);
   if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===i)remoteRoll();
@@ -671,8 +729,11 @@ function startWatch(){
   if(pubWatch)return;
   $('pubList').textContent='Suche …';
   pubWatch=Net.watch(PREFIX,list=>{
-    $('pubList').innerHTML=list.length?list.map(g=>`<div class="slotrow"><span class="who">${esc(g.host||'Spiel')}</span><span class="nm">${g.count}/${g.max} Spieler</span><button class="btn mini" data-join="${esc(g.code)}">Beitreten</button></div>`).join('')
-      :'Keine offenen Spiele gefunden. Erstelle selbst eins oder gib einen Code ein.';
+    $('pubList').innerHTML=list.length?list.map(g=>{
+      const pips=Array.from({length:g.max},(_,k)=>`<span class="pip${k<g.count?' on':''}"></span>`).join('');
+      return `<div class="pubcard"><div class="av">${esc((g.host||'?').slice(0,1).toUpperCase())}</div><div class="info"><b>${esc(g.host||'Spiel')}s Raum</b><div class="pips">${pips}<span>${g.count} von ${g.max} Plätzen</span></div></div><button class="btn" data-join="${esc(g.code)}">Beitreten</button></div>`;
+    }).join('')
+      :'<div class="pubempty">Gerade ist kein offenes Spiel da.<br>Erstelle selbst einen Raum – er erscheint hier für alle.</div>';
   });
 }
 function stopWatch(){if(pubWatch){pubWatch.stop();pubWatch=null;}}
@@ -681,28 +742,43 @@ function broadcastLobby(){
   lobby.forEach((s,i)=>{if(s.conn&&s.conn.open)try{s.conn.send({t:'lobby',slots:sl,you:i});}catch(e){}});
   renderHostLobby();
 }
-function slotRow(i,html){return `<div class="slotrow"><span class="nm"><span class="chip" style="background:${COLORS[i].c}"></span>${COLORS[i].n}</span>${html}</div>`;}
+const SEAT_ICON={host:'👑',remote:'🙂',cpu:'🤖',open:'＋',off:'–'};
+function seatCard(i,st,who,acts,me){
+  return `<div class="seat ${st}${me?' me':''}" style="--c:${COLORS[i].c}"><div class="av">${SEAT_ICON[st]}</div><div class="info"><b>${COLORS[i].n}</b><span class="who${st==='open'?' wait':''}">${who}</span></div>${acts?`<div class="acts">${acts}</div>`:''}</div>`;
+}
+const segBtns=(i,cur)=>`<div class="seg mini">${[['open','Online'],['cpu','🤖 Computer'],['off','Aus']].map(([v,n])=>`<button data-slot="${i}" data-set="${v}"${cur===v?' class="on"':''}>${n}</button>`).join('')}</div>`;
 function renderHostLobby(){
   if(netRole!=='host')return;
   $('hostSlots').innerHTML=lobby.map((s,i)=>{
-    if(s.type==='host')return slotRow(i,`<span class="who">Du (${esc(s.name)})</span>`);
-    if(s.type==='remote')return slotRow(i,`<span class="who">${esc(s.name)}</span><button class="btn alt mini" data-kick="${i}">Entfernen</button>`);
-    return slotRow(i,`<select data-slot="${i}"><option value="open">Offen (Online-Spieler)</option><option value="cpu">Computer</option><option value="off">Aus</option></select>${s.type==='open'?`<button class="btn alt mini" data-me="${i}">Hierher</button>`:''}`);
+    if(s.type==='host')return seatCard(i,'host',`${esc(s.name)}<em>Du · Host</em>`,'',true);
+    if(s.type==='remote')return seatCard(i,'remote',esc(s.name),`<button class="btn alt mini" data-kick="${i}">Entfernen</button>`);
+    if(s.type==='open')return seatCard(i,'open','Wartet auf Spieler <span class="dots"><i></i><i></i><i></i></span>',segBtns(i,'open')+`<button class="btn alt mini" data-me="${i}">Hierher setzen</button>`);
+    return seatCard(i,s.type,s.type==='cpu'?'Computer':'Aus',segBtns(i,s.type));
   }).join('');
-  $('hostSlots').querySelectorAll('select').forEach(sel=>{sel.value=lobby[+sel.dataset.slot].type;});
-  const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length;
+  const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length,hum=lobby.filter(s=>s.type==='host'||s.type==='remote').length;
+  $('hostCount').textContent=`${hum} online · ${n} im Spiel`;
   $('hostStart').disabled=n<2;
+  $('hostStart').textContent=n<2?'Mindestens 2 Spieler nötig':`Spiel starten (${n} Spieler)`;
 }
-$('hostSlots').addEventListener('change',e=>{
-  const sel=e.target.closest('select');if(!sel)return;
-  const i=+sel.dataset.slot;if(lobby[i]&&lobby[i].type!=='remote'&&lobby[i].type!=='host'){lobby[i]={type:sel.value};broadcastLobby();}
-});
 $('hostSlots').addEventListener('click',e=>{
+  const st=e.target.closest('[data-set]');
+  if(st){const i=+st.dataset.slot;if(lobby[i]&&lobby[i].type!=='remote'&&lobby[i].type!=='host'){lobby[i]={type:st.dataset.set};broadcastLobby();}return;}
   const me=e.target.closest('[data-me]');
   if(me){const to=+me.dataset.me,from=lobby.findIndex(s=>s.type==='host');if(from>=0&&lobby[to]&&lobby[to].type==='open')moveSlot(from,to);return;}
   const b=e.target.closest('[data-kick]');if(!b)return;
   const i=+b.dataset.kick,s=lobby[i];if(s&&s.conn){try{s.conn.send({t:'kicked',why:'Der Host hat dich entfernt'});}catch(err){}const c=s.conn;dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
 });
+$('pubSeg').addEventListener('click',e=>{
+  const b=e.target.closest('[data-pub]');if(!b)return;
+  $('pubSel').value=b.dataset.pub;
+  $('pubSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  $('pubHint').textContent=b.dataset.pub==='1'?'Öffentlich: Dein Spiel erscheint in der Liste der offenen Spiele. Du kannst auch Code oder Link schicken.':'Privat: Nur wer den Code oder Link hat, kommt rein.';
+});
+function copyText(txt,btn,label){
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{btn.textContent='Kopiert ✓';setTimeout(()=>btn.textContent=label,1500);}).catch(()=>{prompt('Zum Kopieren:',txt);});
+}
+$('copyCode').onclick=()=>{if(room)copyText(room.code,$('copyCode'),'Code kopieren');};
+$('roomCode').onclick=()=>{if(room)copyText(room.code,$('copyCode'),'Code kopieren');};
 $('hostStart').onclick=()=>{
   if(netRole!=='host')return;
   const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length;
@@ -711,11 +787,7 @@ $('hostStart').onclick=()=>{
   names=lobby.map(s=>(s.type==='host'||s.type==='remote')?s.name:'');
   netPlaying=true;launch();broadcastSnap();
 };
-$('copyLink').onclick=()=>{
-  if(!room)return;
-  const link=location.origin+location.pathname+'?room='+room.code;
-  (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>{$('copyLink').textContent='Kopiert';setTimeout(()=>$('copyLink').textContent='Link kopieren',1500);}).catch(()=>{prompt('Link zum Kopieren:',link);});
-};
+$('copyLink').onclick=()=>{if(!room)return;copyText(location.origin+location.pathname+'?room='+room.code,$('copyLink'),'Link kopieren');};
 $('scores').addEventListener('click',e=>{
   const b=e.target.closest('[data-bot]');if(!b||netRole!=='host')return;
   const i=+b.dataset.bot,s=lobby[i];if(s&&s.conn){const c=s.conn;try{c.send({t:'kicked',why:'Ein Computer hat deinen Platz übernommen'});}catch(err){}dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
@@ -743,22 +815,31 @@ function setJoinStatus(t){errMsg(t);}
 function joinRoom(codeArg){
   const code=((typeof codeArg==='string'?codeArg:'')||$('joinCode').value||'').trim().toUpperCase();
   if(code.length<4){errMsg('Bitte den Raumcode eingeben.');return;}
-  const name=myNameVal();errMsg('Verbinde …');$('joinBtn').disabled=true;stopWatch();
+  const name=myNameVal();errMsg('');joinedCode=code;prevNames=null;$('joinBtn').disabled=true;$('joinBtn').textContent='Verbinde …';$('joinBtn').classList.add('busy');stopWatch();
   joiner=Net.join(PREFIX,code,{
     attach(c){hostConn=c;c.on('data',onClientMsg);c.on('close',onClientClose);},
     open(c){netRole='client';errMsg('');try{c.send({t:'hello',name});}catch(e){}},
-    fail(msg){$('joinBtn').disabled=false;hostConn=null;joiner=null;errMsg(msg||'Verbindung fehlgeschlagen.');}
+    fail(msg){joinBtnReset();hostConn=null;joiner=null;errMsg(msg||'Verbindung fehlgeschlagen.');}
   });
 }
 sendHost=function(m){try{hostConn&&hostConn.open&&hostConn.send(m);}catch(e){}};
 function onClientMsg(m){
   if(!m||typeof m!=='object')return;
-  if(m.t==='welcome'){mySlot=m.slot;$('joinForm').hidden=true;$('joinLobby').hidden=false;}
+  if(m.t==='welcome'){mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();$('joinForm').hidden=true;$('joinLobby').hidden=false;}
   else if(m.t==='lobby'){
     mySlot=m.you;
     if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
     $('joinForm').hidden=true;$('joinLobby').hidden=false;
-    $('joinSlots').innerHTML=m.slots.map((s,i)=>slotRow(i,`<span class="who">${s.type==='open'?'<span style="color:var(--muted)">frei</span> <button class="btn alt mini" data-take="'+i+'">Hierher</button>':s.type==='cpu'?'Computer':s.type==='off'?'<span style="color:var(--muted)">aus</span>':esc(s.name)+(i===m.you?' (Du)':s.type==='host'?' (Host)':'')}</span>`)).join('');
+    $('joinSlots').innerHTML=m.slots.map((s,i)=>{
+      const me=i===m.you;
+      if(s.type==='host')return seatCard(i,'host',`${esc(s.name)}<em>Host</em>`,'');
+      if(s.type==='remote')return seatCard(i,'remote',`${esc(s.name)}${me?'<em>Du</em>':''}`,'',me);
+      if(s.type==='open')return seatCard(i,'open','Frei',`<button class="btn alt mini" data-take="${i}">Platz nehmen</button>`);
+      return seatCard(i,s.type,s.type==='cpu'?'Computer':'Aus','');
+    }).join('');
+    const names=m.slots.map(s=>(s.type==='host'||s.type==='remote')?s.name:null);
+    if(prevNames){names.forEach((n,i)=>{if(n&&n!==prevNames[i]&&i!==m.you&&!prevNames.includes(n))lobbyNote(`${n} ist beigetreten`);});prevNames.forEach((n,i)=>{if(n&&!names.includes(n))lobbyNote(`${n} hat den Raum verlassen`);});}
+    prevNames=names;
   }
   else if(m.t==='snap')applySnap(m.s,m.you);
   else if(m.t==='full'){const w=m.why||'Der Raum ist voll';leaveNet();showMode('join');errMsg(w);}
