@@ -16,7 +16,21 @@
 <style>
 .wrap{max-width:1500px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
-#boardWrap{width:min(100%,calc(100vh - 150px));margin:0 auto}
+#boardWrap{width:min(100%,calc(100vh - 150px));margin:0 auto;position:relative}
+/* physischer Würfel (optional): CSS-3D-Würfel über dem Brett */
+#pdie{--ds:64px;position:absolute;left:50%;top:56%;width:0;height:0;z-index:6;pointer-events:none;perspective:620px;opacity:0;transition:opacity .35s}
+#pdie .cube{position:absolute;left:calc(var(--ds)/-2);top:calc(var(--ds)/-2);width:var(--ds);height:var(--ds);transform-style:preserve-3d;will-change:transform}
+#pdie .f{position:absolute;inset:0;border-radius:14%;background:linear-gradient(135deg,#fff,#dcdfe6);box-shadow:inset 0 0 0 1px #b9bdc8,inset 0 0 8px rgba(0,0,0,.15);
+  backface-visibility:hidden;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:13%;box-sizing:border-box}
+#pdie .f i{border-radius:50%;align-self:center;justify-self:center;width:78%;height:78%}
+#pdie .f i.on{background:radial-gradient(circle at 35% 30%,#555,#111)}
+#pdie .f i.one.on{background:radial-gradient(circle at 35% 30%,#ff5a5a,#b30000);width:100%;height:100%}
+#pdie .sh{position:absolute;left:calc(var(--ds)*-.55);top:calc(var(--ds)*-.2);width:calc(var(--ds)*1.1);height:calc(var(--ds)*.4);border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%)}
+html[data-style="cyber"] #pdie .f{background:linear-gradient(135deg,#1b2433,#0a0f18);box-shadow:inset 0 0 0 2px #2fd6e8,0 0 8px rgba(47,214,232,.35)}
+html[data-style="cyber"] #pdie .f i.on{background:#2fd6e8;box-shadow:0 0 5px #2fd6e8}
+html[data-style="cyber"] #pdie .f i.one.on{background:#ff3b8b;box-shadow:0 0 6px #ff3b8b}
+html[data-style="anime"] #pdie .f{background:linear-gradient(135deg,#fff6e0,#e6d3a8);box-shadow:inset 0 0 0 2px #7a1c24}
+html[data-style="anime"] #pdie .f i.one.on{background:radial-gradient(circle at 35% 30%,#ff4d5e,#a30f22)}
 @media (max-width:760px){.layout{grid-template-columns:1fr}}
 #board{width:100%;max-width:none;height:auto;background:var(--card);border:1px solid var(--border);border-radius:18px;touch-action:manipulation}
 .piece{transition:transform .14s ease}
@@ -227,6 +241,7 @@ body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)
         <div class="panel" style="display:flex;flex-wrap:wrap;gap:8px">
           <button class="btn alt" id="view3d">3D-Ansicht</button>
           <button class="btn alt" id="lookBtn">Figuren-Look</button>
+          <button class="btn alt" id="physBtn" title="Würfel rollt als 3D-Würfel über das Brett">Physischer Würfel: aus</button>
           <span id="cam3" style="display:contents" hidden>
             <button class="btn alt" id="camIso3">Schräg</button>
             <button class="btn alt" id="camTop3">Von oben</button>
@@ -446,6 +461,89 @@ function markMovable(p,moves){
   moves.forEach(m=>$(`pc-${p}-${m.i}`).classList.add('can'));
 }
 
+// ---------- Physischer Würfel (optional, rein optisch: das Ergebnis kommt weiter aus dem fairen Zufall) ----------
+let PHYS=false;try{PHYS=localStorage.getItem('mdn-physdie')==='1';}catch(e){}
+const PD=(()=>{
+  const PIPS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+  const FACE={1:[0,0],6:[0,180],3:[0,-90],4:[0,90],2:[-90,0],5:[90,0]};   // Würfeldrehung, die Seite n nach vorne bringt
+  const POS={1:'',6:'rotateY(180deg)',3:'rotateY(90deg)',4:'rotateY(-90deg)',2:'rotateX(90deg)',5:'rotateX(-90deg)'};
+  const THROW=650,LAND=750;
+  let root,cube,sh,ds=64,st='idle',t0=0,tl=0,lastT=0,raf=0,hideT=0,res=null,prom=null;
+  let ax=0,ay=0,az=0,wx=0,wy=0,wz=0,x0=0,sx=0,sy=0,tgt=null;
+  const rr=(a,b)=>a+Math.random()*(b-a),sg=()=>Math.random()<.5?-1:1;
+  function build(){
+    if(root)return;
+    root=document.createElement('div');root.id='pdie';
+    root.innerHTML='<div class="sh"></div><div class="cube">'+[1,2,3,4,5,6].map(n=>
+      `<div class="f" style="transform:${POS[n]} translateZ(calc(var(--ds)/2))">${[0,1,2,3,4,5,6,7,8].map(k=>`<i class="${PIPS[n].includes(k)?'on':''}${n===1?' one':''}"></i>`).join('')}</div>`).join('')+'</div>';
+    $('boardWrap').appendChild(root);cube=root.querySelector('.cube');sh=root.querySelector('.sh');
+  }
+  function draw(x,y,h){
+    cube.style.transform=`translate(${x}px,${y-h}px) rotateZ(${az}deg) rotateX(${ax}deg) rotateY(${ay}deg)`;
+    const k=Math.min(h/ds,1);
+    sh.style.transform=`translate(${x}px,${y+ds*.38}px) scale(${1-k*.35})`;sh.style.opacity=String(.9-k*.5);
+  }
+  function hide(){st='idle';if(root)root.style.opacity='0';}
+  function step(now){
+    raf=0;if(st==='idle'||st==='done')return;
+    const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
+    let x=0,y=0,h=0;
+    if(st==='throw'){
+      const el=now-t0,u=Math.min(1,el/THROW),e=1-(1-u)*(1-u);
+      ax+=wx*dt;ay+=wy*dt;az+=wz*dt;
+      x=x0*(1-e);y=-ds*.9*(1-e);
+      h=u<1?ds*1.1*Math.abs(Math.sin(u*Math.PI*2.5))*(1-u*.6):0;
+      if(u>=1)st='tumble';
+      if(st==='tumble')t0=now;
+    }else if(st==='tumble'){
+      ax+=wx*dt;ay+=wy*dt;az+=wz*dt;
+      h=ds*.22*Math.abs(Math.sin((now-t0)/1000*Math.PI*3.2));
+      if(now-t0>6000){hide();return;}
+    }else if(st==='land'){
+      const u=Math.min(1,(now-tl)/LAND),e=1-Math.pow(1-u,3);
+      ax=tgt.ax0+(tgt.ax-tgt.ax0)*e;ay=tgt.ay0+(tgt.ay-tgt.ay0)*e;az=tgt.az0+(tgt.az-tgt.az0)*e;
+      x=sx*(1-e);y=sy*(1-e);
+      h=ds*.5*Math.pow(1-u,2)*Math.abs(Math.sin(u*Math.PI*2.5));
+      if(u>=1){st='done';draw(0,0,0);clearTimeout(hideT);hideT=setTimeout(hide,1300);const r=res;res=null;if(r)r();return;}
+    }
+    sx=x;sy=y;draw(x,y,h);raf=requestAnimationFrame(step);
+  }
+  const ang=(a0,base,min)=>base+360*Math.ceil((a0+min-base)/360);
+  return {
+    start(){
+      build();clearTimeout(hideT);
+      const W=$('boardWrap').clientWidth||400;
+      ds=Math.max(44,Math.min(84,W*.11));root.style.setProperty('--ds',ds+'px');
+      ax=rr(0,360);ay=rr(0,360);az=rr(0,360);wx=sg()*rr(520,880);wy=sg()*rr(520,880);wz=sg()*rr(60,220);
+      x0=-W*.58;sx=x0;sy=-ds*.9;st='throw';t0=lastT=performance.now();prom=null;res=null;
+      root.style.opacity='1';draw(x0,sy,0);
+      if(!raf)raf=requestAnimationFrame(step);
+    },
+    land(v){
+      if(st==='land'||st==='done')return prom;
+      if(st==='idle')this.start();
+      tgt={ax0:ax,ay0:ay,az0:az,ax:ang(ax,FACE[v][0],360),ay:ang(ay,FACE[v][1],360),az:ang(az,rr(-9,9),180)};
+      st='land';tl=lastT=performance.now();
+      const my=prom=new Promise(r=>{res=r;});
+      if(!raf)raf=requestAnimationFrame(step);
+      // Notbremse: in einem Hintergrund-Tab pausiert der Browser die Animation, das Spiel darf deshalb nicht hängen
+      setTimeout(()=>{
+        if(st!=='land'||prom!==my)return;
+        ax=tgt.ax;ay=tgt.ay;az=tgt.az;st='done';draw(0,0,0);
+        clearTimeout(hideT);hideT=setTimeout(hide,1300);const r=res;res=null;if(r)r();
+      },LAND+250);
+      return prom;
+    },
+    cancel(){clearTimeout(hideT);if(res){const r=res;res=null;r();}hide();},
+    get landing(){return st==='land'||st==='done';}
+  };
+})();
+function setPhys(on){
+  PHYS=on;try{localStorage.setItem('mdn-physdie',on?'1':'0');}catch(e){}
+  $('physBtn').textContent='Physischer Würfel: '+(on?'an':'aus');
+  if(!on)PD.cancel();
+}
+
 // ---------- Ablauf ----------
 async function doRoll(p){
   const btn=$('rollBtn');
@@ -465,8 +563,16 @@ async function doRoll(p){
   }
   const t=token;
   netPhase={k:'rolling',p};netPush();
-  for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45,t);}
-  const v=1+Math.floor(Math.random()*6);
+  let v;
+  if(PHYS){
+    PD.start();await sleep(700,t);
+    v=1+Math.floor(Math.random()*6);
+    netPhase={k:'rolling',p,v};netPush();      // Mitspieler lassen ihren Würfel jetzt auf diese Zahl landen
+    await PD.land(v);
+  }else{
+    for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45,t);}
+    v=1+Math.floor(Math.random()*6);
+  }
   dieDone(v);lastRoll=v;
   netPhase={k:'idle'};netPush();
   return v;
@@ -625,7 +731,7 @@ buildSetup();setDie(0);
 // und melden "Würfeln" und "Figur gewählt". Verbindung: siehe ../net.js (WebRTC, Ersatzweg Relay).
 const PREFIX='mdn-v1-';
 let room=null,lobby=[],hostConn=null,joiner=null,netPlaying=false,opening=false;
-let cReady=false,lastCur=-1,cRolling=false,rollAnim=null,joinedCode='',prevNames=null;
+let cReady=false,lastCur=-1,cRolling=false,cLand=false,rollAnim=null,joinedCode='',prevNames=null;
 function lobbyNote(t){['lobbyNote','lobbyNote2'].forEach(id=>{const e=$(id);if(!e)return;e.textContent=t;clearTimeout(e._t);e._t=setTimeout(()=>{e.textContent='';},3800);});}
 function joinBtnReset(){const b=$('joinBtn');b.disabled=false;b.textContent='Beitreten';b.classList.remove('busy');}
 const errMsg=t=>{$('setupErr').textContent=t||'';};
@@ -887,8 +993,13 @@ function applySnap(s,you){
   const ph=s.phase||{k:'idle'};
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'){
-    if(!cRolling){cRolling=true;let k=0;clearInterval(rollAnim);rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}
-  }else if(cRolling){cRolling=false;clearInterval(rollAnim);dieDone(s.die);}
+    if(!cRolling){cRolling=true;cLand=false;clearInterval(rollAnim);if(PHYS)PD.start();else{let k=0;rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}}
+    if(PHYS&&ph.v&&!cLand){cLand=true;const v=ph.v;PD.land(v).then(()=>dieDone(v));}
+  }else if(cRolling){
+    cRolling=false;clearInterval(rollAnim);
+    if(PHYS){if(!cLand){cLand=true;const v=s.die;PD.land(v).then(()=>dieDone(v));}}
+    else dieDone(s.die);
+  }
   // Meine Aktionen
   const myRoll=ph.k==='roll'&&ph.p===you;
   canRollNet=myRoll;$('rollBtn').disabled=!myRoll;$('rollBtn').textContent=rollLabel();
@@ -1275,6 +1386,7 @@ function tick3(now){
   if(T3.composer&&CY())T3.composer.render();else T3.r.render(T3.scene,T3.camera);
 }
 $('view3d').onclick=()=>setView(!v3);
+$('physBtn').onclick=()=>setPhys(!PHYS);setPhys(PHYS);
 $('lookBtn').onclick=openLook;$('lookDone').onclick=()=>$('lookBox').classList.remove('open');
 $('camTop3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),to=new THREE.Vector3(0,26,.01);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};
 $('camIso3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),a=Math.atan2(f.x,f.z),to=new THREE.Vector3(Math.sin(a)*15,14,Math.cos(a)*15);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};
