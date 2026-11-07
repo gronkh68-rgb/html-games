@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hanafuda Koi-Koi</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+.wrap{max-width:1250px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.table{--cw:clamp(34px,calc((100vw - 60px)/8.8),66px);background:radial-gradient(ellipse at 50% 40%,#1f5a3a,#123a26);border:2px solid #0b2418;border-radius:18px;padding:12px 10px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.zone{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*1.58)}
+.zone.hand{justify-content:center;flex-wrap:nowrap;gap:calc(var(--cw)*.07)}
+.zone.center{justify-content:center;align-items:flex-start;gap:12px;flex-wrap:nowrap}
+.tbl{display:flex;flex-wrap:wrap;gap:calc(var(--cw)*.1);flex:1;justify-content:center;min-height:calc(var(--cw)*3.3)}
+.pile{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;color:#d7f0dc;font-size:.75rem}
+.flip{min-height:calc(var(--cw)*1.58)}
+.pname{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#d7f0dc;font-weight:700;font-size:.9rem}
+.pname .sc{background:rgba(0,0,0,.35);padding:2px 10px;border-radius:999px}
+.caps{display:flex;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*.73 + 18px)}
+.grp{display:flex;align-items:center;flex-direction:column;gap:2px;background:rgba(0,0,0,.22);border-radius:8px;padding:4px 6px;min-width:calc(var(--cw)*.9)}
+.grp .gl{font-size:.62rem;color:#b9dcc4;letter-spacing:.05em;text-transform:uppercase}
+.grp .row{display:flex}
+.grp .row .hc{margin-right:calc(var(--cw)*-.26)}
+.grp .row .hc:last-child{margin-right:0}
+#status{background:rgba(0,0,0,.4);color:#fff;border-radius:10px;padding:8px 12px;text-align:center;min-height:2.6em;display:flex;align-items:center;justify-content:center;font-weight:600}
+
+/* Karten */
+.hc{--w:var(--cw,64px);width:var(--w);height:calc(var(--w)*1.58);border-radius:calc(var(--w)*.1);position:relative;background:#f6efdc;border:2px solid #3a2a1a;
+  box-shadow:0 2px 6px rgba(0,0,0,.4);font-size:calc(var(--w)*.14);color:#222;overflow:hidden;flex:none;transition:transform .15s,box-shadow .15s;user-select:none;box-sizing:border-box}
+.hc .mk{position:absolute;left:5%;top:3%;font-weight:800;font-size:1.25em;color:#8a1c28;line-height:1}
+.hc .pl{position:absolute;right:5%;top:3%;font-size:1.15em;line-height:1}
+.hc .em{position:absolute;left:0;right:0;top:25%;text-align:center;font-size:calc(var(--w)*.5);line-height:1}
+.hc .nm{position:absolute;left:2%;right:2%;bottom:13%;text-align:center;font-weight:700;font-size:.78em;line-height:1.05}
+.hc .tg{position:absolute;right:7%;bottom:3%;font-size:.8em;color:#555;font-weight:700}
+.hc .rib{position:absolute;left:32%;right:32%;top:24%;bottom:22%;background:#d93a3a;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.hc.s-akatan .rib{background:repeating-linear-gradient(180deg,#d93a3a 0 10%,#f7d6d6 10% 14%)}
+.hc.s-blue .rib{background:#2f66d1}
+.t-hikari{background:linear-gradient(160deg,#fff4b8,#f2c744);border-color:#a67c00}
+.t-tane{background:#e4f0ff}
+.t-tanzaku{background:#fff1e4}
+.t-kasu{background:#dfe9d2}
+.hc.back{background:repeating-linear-gradient(45deg,#8c1d2c 0 6px,#6e1421 6px 12px);border-color:#f0d9a0}
+.hc.back>*{display:none}
+.hc.mini .nm,.hc.mini .tg,.hc.mini .mk{display:none}
+.hc.mini{--w:calc(var(--cw)*.5)}
+.hc.can{cursor:pointer}
+.hc.can:hover{transform:translateY(-6px)}
+.hc.sel{transform:translateY(-12px);box-shadow:0 0 0 3px #ffd23f,0 6px 14px rgba(0,0,0,.5)}
+.hc.match{box-shadow:0 0 0 3px #3ee6a0,0 0 14px #3ee6a0;animation:mp .7s ease-in-out infinite alternate}
+@keyframes mp{from{transform:translateY(0)}to{transform:translateY(-5px)}}
+.hc.new{animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(1.4);opacity:.3}100%{transform:scale(1);opacity:1}}
+
+.side{display:flex;flex-direction:column;gap:12px}
+.side .panel{margin:0}
+.scoreline{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0}
+.scoreline b{font-size:1.5rem}
+.yk{font-size:.85rem;line-height:1.5}
+.yk .y{display:flex;justify-content:space-between;gap:8px}
+#log{font-size:.78rem;color:var(--muted);max-height:130px;overflow:auto;line-height:1.4}
+#log div{padding:1px 0;border-top:1px solid rgba(255,255,255,.06)}
+.rules ul{margin:6px 0 0;padding-left:18px;line-height:1.55;font-size:.88rem}
+.ytab{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px}
+.ytab td{padding:3px 4px;border-top:1px solid rgba(255,255,255,.08);vertical-align:top}
+.ytab td:last-child{text-align:right;white-space:nowrap;font-weight:700}
+#modal .box{max-width:430px;width:calc(100% - 24px)}
+#modal .ico{font-size:3rem;line-height:1.1}
+#modal p{margin:6px 0 14px;line-height:1.5}
+.mbtns{display:flex;flex-direction:column;gap:8px}
+.mbtns .btn{width:100%}
+.slotrow{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Hanafuda Koi-Koi</h1></div>
+
+  <div id="setup" class="panel">
+    <h2>🎴 Hanafuda: Koi-Koi gegen den Computer</h2>
+    <p style="margin:0 0 10px;color:var(--muted)">Das klassische japanische Blumenkarten-Spiel: Sammle Karten mit passendem Monat und bilde Kombinationen (Yaku). Dann entscheidest du: weiterspielen (Koi-Koi) oder Punkte kassieren (Shobu).</p>
+    <div class="slotrow"><label for="rounds">Spiellänge</label>
+      <select id="rounds"><option value="3">3 Runden (Frühling)</option><option value="6" selected>6 Runden</option><option value="12">12 Runden (ein ganzes Jahr)</option></select></div>
+    <div class="row"><button class="btn" id="start">Spiel starten</button></div>
+    <details class="rules" style="margin-top:14px"><summary><b>Regeln</b></summary><ul>
+      <li>Jeder bekommt 8 Karten, 8 liegen offen auf dem Tisch. Pro Zug spielst du eine Handkarte: Gibt es auf dem Tisch eine Karte vom <b>gleichen Monat</b>, nimmst du beide. Sonst legst du die Karte ab.</li>
+      <li>Danach wird die oberste Karte vom Stapel aufgedeckt und genauso behandelt.</li>
+      <li>Bildest du eine neue Kombination (Yaku), entscheidest du: <b>Koi-Koi</b> (weiterspielen, vielleicht mehr Punkte) oder <b>Shobu</b> (Runde beenden und die Punkte nehmen).</li>
+      <li>Hat der Gegner Koi-Koi gerufen und du gewinnst die Runde, zählen deine Punkte doppelt. Ab 7 Punkten ebenfalls doppelt.</li>
+      <li>Sind alle Karten gespielt und niemand hat gewonnen, endet die Runde unentschieden.</li>
+    </ul>
+    <table class="ytab" id="ytabSetup"></table></details>
+  </div>
+
+  <div id="game" hidden>
+    <div class="layout">
+      <div class="table" id="tableBox">
+        <div class="pname"><span id="oppName">Computer</span><span class="sc" id="oppSc">0 Punkte</span></div>
+        <div class="zone hand" id="oppHand"></div>
+        <div class="caps" id="oppCaps"></div>
+        <div id="status"></div>
+        <div class="zone center">
+          <div class="pile"><div id="pile"></div><span id="pileN"></span><div class="flip" id="flip"></div></div>
+          <div class="tbl" id="tbl"></div>
+        </div>
+        <div class="caps" id="myCaps"></div>
+        <div class="zone hand" id="hand"></div>
+        <div class="pname"><span>Du</span><span class="sc" id="mySc">0 Punkte</span></div>
+      </div>
+      <div class="side">
+        <div class="panel">
+          <div class="scoreline"><span>Runde</span><b id="rnd">1/6</b></div>
+          <div class="scoreline"><span>Monat</span><b id="mon"></b></div>
+          <div class="scoreline"><span>Du</span><b id="sDu">0</b></div>
+          <div class="scoreline"><span>Computer</span><b id="sPc">0</b></div>
+        </div>
+        <div class="panel yk" id="yk"></div>
+        <div class="panel"><div id="log"></div></div>
+        <details class="panel rules"><summary>Kombinationen (Yaku)</summary><table class="ytab" id="ytab"></table></details>
+        <button class="btn alt" id="again">Neues Spiel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal" hidden>
+  <div class="box"><div class="ico" id="mIco"></div><h2 id="mTitle"></h2><p id="mText"></p><div class="mbtns" id="mBtns"></div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const CANCEL={};
+
+// ---------- Karten ----------
+const MONTHS=[{k:'松',n:'Kiefer',e:'🌲'},{k:'梅',n:'Pflaume',e:'🌺'},{k:'桜',n:'Kirsche',e:'🌸'},{k:'藤',n:'Glyzinie',e:'🍇'},
+  {k:'菖',n:'Iris',e:'🌷'},{k:'牡',n:'Pfingstrose',e:'🌹'},{k:'萩',n:'Buschklee',e:'🌿'},{k:'芒',n:'Pampasgras',e:'🌾'},
+  {k:'菊',n:'Chrysantheme',e:'🌼'},{k:'紅',n:'Ahorn',e:'🍁'},{k:'柳',n:'Weide',e:'🌳'},{k:'桐',n:'Paulownia',e:'🍃'}];
+// H = Licht (20), S = Tier/Ding (10), A = rotes Gedichtband, R = rotes Band, B = blaues Band (je 5), K = Kasu (1)
+const DEF=[
+  ['H:Kranich:🦢:crane','A','K','K'],['S:Nachtigall:🐦','A','K','K'],['H:Vorhang:🎪:curtain','A','K','K'],['S:Kuckuck:🕊️','R','K','K'],
+  ['S:Brücke:🌉','R','K','K'],['S:Schmetterlinge:🦋:butterfly','B','K','K'],['S:Eber:🐗:boar','R','K','K'],['H:Mond:🌕:moon','S:Gänse:🦆','K','K'],
+  ['S:Sake-Schale:🍶:sake','B','K','K'],['S:Hirsch:🦌:deer','B','K','K'],['H:Regenmann:☂️:rain','S:Schwalbe:🐦','R','K'],['H:Phönix:🦚:phoenix','K','K','K']];
+const CARDS=[];
+DEF.forEach((arr,m)=>arr.forEach((code,i)=>{
+  const [ty,n,e,key]=code.split(':');
+  const c={id:m*4+i,m,key:key||''};
+  if(ty==='H'){c.t='hikari';c.n=n;c.e=e;}
+  else if(ty==='S'){c.t='tane';c.n=n;c.e=e;}
+  else if(ty==='A'){c.t='tanzaku';c.sub='akatan';c.n='Rotes Band';}
+  else if(ty==='R'){c.t='tanzaku';c.sub='red';c.n='Rotes Band';}
+  else if(ty==='B'){c.t='tanzaku';c.sub='blue';c.n='Blaues Band';}
+  else{c.t='kasu';c.n='Kasu';c.e=MONTHS[m].e;}
+  CARDS.push(c);
+}));
+const VAL={hikari:20,tane:10,tanzaku:5,kasu:1};
+const val=c=>VAL[c.t];
+const cname=c=>`${MONTHS[c.m].n} ${c.t==='kasu'?'(Kasu)':c.t==='tanzaku'?'(Band)':'– '+c.n}`;
+function cardHtml(c,cls=''){
+  if(cls.includes('back'))return `<div class="hc ${cls}"></div>`;
+  const mid=c.t==='tanzaku'?'<i class="rib"></i>':`<span class="em">${c.e}</span>`;
+  return `<div class="hc t-${c.t}${c.sub?' s-'+c.sub:''} ${cls}" data-id="${c.id}" title="${esc(MONTHS[c.m].n+': '+c.n)}">`+
+    `<span class="mk">${MONTHS[c.m].k}</span>${c.t==='kasu'?'':`<span class="pl">${MONTHS[c.m].e}</span>`}${mid}<span class="nm">${c.t==='tanzaku'?MONTHS[c.m].n:c.n}</span><span class="tg">${val(c)}</span></div>`;
+}
+
+// ---------- Kombinationen (Yaku) ----------
+function yakuOf(caps){
+  const has=k=>caps.some(c=>c.key===k);
+  const out=[],add=(n,p)=>out.push({n,p});
+  const hik=caps.filter(c=>c.t==='hikari'),nH=hik.length,rain=has('rain');
+  if(nH===5)add('Goko (5 Lichter)',10);
+  else if(nH===4)rain?add('Ame-Shiko (4 Lichter mit Regenmann)',7):add('Shiko (4 Lichter)',8);
+  else if(nH===3&&!rain)add('Sanko (3 Lichter)',5);
+  if(has('sake')&&has('curtain'))add('Hanami-zake (Kirschblüten-Sake)',5);
+  if(has('sake')&&has('moon'))add('Tsukimi-zake (Mond-Sake)',5);
+  if(has('boar')&&has('deer')&&has('butterfly'))add('Inoshikacho (Eber, Hirsch, Schmetterlinge)',5);
+  const nTane=caps.filter(c=>c.t==='tane').length;
+  if(nTane>=5)add(`Tane (${nTane} Tiere/Dinge)`,1+nTane-5);
+  const ak=caps.filter(c=>c.sub==='akatan').length,ao=caps.filter(c=>c.sub==='blue').length;
+  if(ak===3&&ao===3)add('Akatan-Aotan (alle 6 Gedichtbänder)',10);
+  else{if(ak===3)add('Akatan (3 rote Gedichtbänder)',5);if(ao===3)add('Aotan (3 blaue Bänder)',5);}
+  const nT=caps.filter(c=>c.t==='tanzaku').length;
+  if(nT>=5)add(`Tanzaku (${nT} Bänder)`,1+nT-5);
+  const nK=caps.filter(c=>c.t==='kasu'||c.key==='sake').length;
+  if(nK>=10)add(`Kasu (${nK} einfache Karten)`,1+nK-10);
+  return {list:out,total:out.reduce((a,b)=>a+b.p,0)};
+}
+const YTAB=[['Goko: 5 Lichter',10],['Shiko: 4 Lichter ohne Regenmann',8],['Ame-Shiko: 4 Lichter mit Regenmann',7],['Sanko: 3 Lichter ohne Regenmann',5],
+  ['Hanami-zake: Vorhang + Sake',5],['Tsukimi-zake: Mond + Sake',5],['Inoshikacho: Eber + Hirsch + Schmetterlinge',5],
+  ['Akatan: 3 rote Gedichtbänder (Jan–Mär)',5],['Aotan: 3 blaue Bänder (Jun, Sep, Okt)',5],['Akatan-Aotan: alle 6',10],
+  ['Tane: 5 Tiere/Dinge (je weitere +1)','1+'],['Tanzaku: 5 Bänder (je weiteres +1)','1+'],['Kasu: 10 einfache Karten (je weitere +1)','1+']];
+const ytabHtml=YTAB.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+$('ytab').innerHTML=ytabHtml;$('ytabSetup').innerHTML=ytabHtml;
+
+// ---------- Zustand ----------
+let G=null,inp=null,token=0,logLines=[];
+const sleep=ms=>{const t=token;return new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms));};
+const who=p=>p===0?'Du':'Der Computer';
+function status(t){$('status').textContent=t;logLines.unshift(t);logLines=logLines.slice(0,30);$('log').innerHTML=logLines.slice(1).map(l=>`<div>${esc(l)}</div>`).join('');}
+
+// ---------- Anzeige ----------
+const ORDER=['hikari','tane','tanzaku','kasu'],GL={hikari:'Lichter',tane:'Tiere',tanzaku:'Bänder',kasu:'Kasu'};
+function capsHtml(p){
+  const newIds=(G.last||[]).map(c=>c.id);
+  return ORDER.map(t=>{
+    const cs=G.caps[p].filter(c=>c.t===t||(t==='kasu'&&false));
+    if(!cs.length)return `<div class="grp"><span class="gl">${GL[t]}</span><div class="row" style="min-height:calc(var(--cw)*.79)"></div></div>`;
+    return `<div class="grp"><span class="gl">${GL[t]} ${cs.length}</span><div class="row">${cs.map(c=>cardHtml(c,'mini'+(newIds.includes(c.id)&&G.lastP===p?' new':''))).join('')}</div></div>`;
+  }).join('');
+}
+function render(){
+  if(!G)return;
+  const sel=inp&&inp.sel,cands=inp&&inp.mode==='target'?inp.cands:null;
+  $('oppHand').innerHTML=G.hands[1].map(()=>cardHtml({},'back')).join('');
+  $('hand').innerHTML=G.hands[0].map(c=>cardHtml(c,(inp&&inp.mode==='hand'?'can':'')+(sel===c?' sel':''))).join('');
+  const matchM=sel?sel.m:(cands&&G.flip?G.flip.m:-1);
+  $('tbl').innerHTML=G.table.map(c=>cardHtml(c,(c.m===matchM?'match can':'')+(cands&&cands.includes(c)?' can':''))).join('');
+  $('pile').innerHTML=G.deck.length?cardHtml({},'back'):'';
+  $('pileN').textContent=`Stapel: ${G.deck.length}`;
+  $('flip').innerHTML=G.flip?cardHtml(G.flip,'new'):'';
+  $('oppCaps').innerHTML=capsHtml(1);$('myCaps').innerHTML=capsHtml(0);
+  $('mySc').textContent=`${G.scores[0]} Punkte`;$('oppSc').textContent=`${G.scores[1]} Punkte`;
+  $('sDu').textContent=G.scores[0];$('sPc').textContent=G.scores[1];
+  $('rnd').textContent=`${Math.min(G.round+1,G.rounds)}/${G.rounds}`;$('mon').textContent=`${MONTHS[G.round%12].k} ${MONTHS[G.round%12].n}`;
+  const y0=yakuOf(G.caps[0]),y1=yakuOf(G.caps[1]);
+  const yl=(t,y)=>`<b>${t}</b>${y.list.length?y.list.map(x=>`<div class="y"><span>${esc(x.n)}</span><b>${x.p}</b></div>`).join(''):'<div style="color:var(--muted)">noch keine Kombination</div>'}`;
+  $('yk').innerHTML=yl('Deine Kombinationen',y0)+'<div style="height:8px"></div>'+yl('Computer',y1);
+}
+
+// ---------- Eingabe ----------
+function humanPickHand(){return new Promise(res=>{inp={mode:'hand',res,sel:null};render();});}
+function humanTarget(cands){return new Promise(res=>{inp={mode:'target',res,cands};render();});}
+$('hand').addEventListener('click',e=>{
+  const el=e.target.closest('.hc');if(!el||!inp||inp.mode!=='hand')return;
+  const c=CARDS[+el.dataset.id];
+  if(inp.sel===c){
+    const ms=G.table.filter(x=>x.m===c.m);
+    if(ms.length===2){status('Tippe die Karte auf dem Tisch an, die du nehmen willst (grün markiert).');return;}
+    const r=inp.res;inp=null;r({c,target:null});
+  }else{inp.sel=c;const ms=G.table.filter(x=>x.m===c.m);
+    status(ms.length?`${cname(c)}: Tippe sie noch einmal an oder wähle die passende Tischkarte.`:`${cname(c)}: Passt auf nichts. Tippe noch einmal an, um sie abzulegen.`);render();}
+});
+$('tbl').addEventListener('click',e=>{
+  const el=e.target.closest('.hc');if(!el||!inp)return;
+  const c=CARDS[+el.dataset.id];
+  if(inp.mode==='hand'&&inp.sel&&c.m===inp.sel.m){const s=inp.sel,r=inp.res;inp=null;r({c:s,target:c});}
+  else if(inp.mode==='target'&&inp.cands.includes(c)){const r=inp.res;inp=null;r(c);}
+});
+
+// ---------- Dialog ----------
+function dlg({ico,title,html,btns}){
+  return new Promise(res=>{
+    const t=token;let fin=false;
+    $('mIco').textContent=ico||'';$('mTitle').textContent=title||'';$('mText').innerHTML=html||'';
+    const box=$('mBtns');box.innerHTML='';
+    btns.forEach((b,i)=>{const e=document.createElement('button');e.className='btn'+(i?' alt':'');e.textContent=b;e.onclick=()=>{if(fin||t!==token)return;fin=true;$('modal').hidden=true;res(i);};box.appendChild(e);});
+    $('modal').hidden=false;
+  });
+}
+
+// ---------- Spielzüge ----------
+async function captureStep(p,c,target){
+  const ms=G.table.filter(x=>x.m===c.m);
+  G.last=null;
+  if(!ms.length){G.table.push(c);G.last=[c];G.lastP=-1;status(`${who(p)} legt ${cname(c)} ab.`);render();await sleep(700);return;}
+  let got;
+  if(ms.length===1)got=[ms[0]];
+  else if(ms.length===3)got=ms;
+  else if(target&&ms.includes(target))got=[target];
+  else if(p===0){status('Zwei Karten passen: Tippe die an, die du nehmen willst.');got=[await humanTarget(ms)];}
+  else got=[ms.reduce((a,b)=>val(b)>val(a)?b:a)];
+  G.table=G.table.filter(x=>!got.includes(x));
+  G.caps[p].push(c,...got);G.last=[c,...got];G.lastP=p;
+  status(`${who(p)} nimmt ${cname(c)} mit ${got.map(cname).join(' und ')}.`);
+  render();await sleep(800);
+}
+function aiPickHand(){
+  const p=1,mine=G.caps[p],base=yakuOf(mine).total;
+  let best=null,bs=-1e9;
+  for(const c of G.hands[p]){
+    const ms=G.table.filter(x=>x.m===c.m);let s,target=null;
+    if(!ms.length){s=-val(c)-0.5*(c.t==='hikari'?20:0)+rnd(3)*.1;}   // möglichst wertlose Karte ablegen
+    else{
+      const opts=ms.length===2?ms:[ms[0]];
+      const tg=opts.reduce((a,b)=>val(b)>val(a)?b:a);
+      const gained=ms.length===3?[c,...ms]:[c,tg];
+      s=gained.reduce((a,x)=>a+val(x),0)+(yakuOf(mine.concat(gained)).total-base)*8+rnd(3)*.1;
+      target=ms.length===2?tg:null;
+    }
+    if(s>bs){bs=s;best={c,target};}
+  }
+  return best;
+}
+function aiKoi(y){
+  const rem=G.hands[1].length;
+  if(y.total>=5||rem<=2)return 'shobu';
+  if(G.koi[0])return 'shobu';
+  return Math.random()<(y.total<=2?.6:.35)?'koi':'shobu';
+}
+async function playTurn(p){
+  G.turn=p;G.flip=null;render();
+  let pick;
+  if(p===0){status('Du bist dran: Wähle eine Karte aus deiner Hand.');pick=await humanPickHand();}
+  else{status('Der Computer überlegt …');await sleep(900);pick=aiPickHand();}
+  G.hands[p]=G.hands[p].filter(x=>x!==pick.c);
+  await captureStep(p,pick.c,pick.target);
+  const d=G.deck.pop();G.flip=d;render();status(`${who(p)} deckt ${cname(d)} auf.`);await sleep(800);
+  await captureStep(p,d,null);
+  G.flip=null;render();
+  const y=yakuOf(G.caps[p]);
+  if(y.total>G.announced[p]){
+    let choice;
+    if(G.hands[p].length===0)choice='shobu';
+    else if(p===0){
+      const i=await dlg({ico:'🎴',title:'Kombination!',html:y.list.map(x=>`${esc(x.n)}: <b>${x.p}</b>`).join('<br>')+`<br><br>Zusammen <b>${y.total} Punkte</b>.<br>Weiterspielen für mehr Punkte oder jetzt kassieren?`,
+        btns:['Koi-Koi: weiterspielen','Shobu: Runde beenden (+'+y.total+')']});
+      choice=i===0?'koi':'shobu';
+    }else choice=aiKoi(y);
+    if(choice==='koi'){G.koi[p]=true;G.announced[p]=y.total;status(`${who(p)} ruft Koi-Koi!`);
+      if(p===1)await dlg({ico:'🎴',title:'Koi-Koi!',html:`Der Computer hat <b>${y.total} Punkte</b> und spielt weiter:<br>${y.list.map(x=>esc(x.n)).join('<br>')}`,btns:['Weiter']});
+      await sleep(400);}
+    else return 'shobu';
+  }
+  return 'continue';
+}
+async function endRound(w){
+  let title,html;
+  if(w<0){title='Unentschieden';html='Alle Karten sind gespielt, niemand hat gewonnen. Keine Punkte.';}
+  else{
+    const y=yakuOf(G.caps[w]);let pts=y.total,notes=[];
+    if(pts>=7){pts*=2;notes.push('7 Punkte oder mehr: ×2');}
+    if(G.koi[1-w]){pts*=2;notes.push('Gegner hatte Koi-Koi gerufen: ×2');}
+    G.scores[w]+=pts;G.parent=w;
+    title=w===0?'Du gewinnst die Runde!':'Der Computer gewinnt die Runde';
+    html=y.list.map(x=>`${esc(x.n)}: <b>${x.p}</b>`).join('<br>')+(notes.length?'<br>'+notes.join('<br>'):'')+`<br><br><b>${pts} Punkte</b> für ${w===0?'dich':'den Computer'}.`;
+  }
+  G.round++;render();
+  const last=G.round>=G.rounds;
+  await dlg({ico:w===0?'🏆':w<0?'🤝':'🤖',title,html,btns:[last?'Ergebnis':'Nächste Runde']});
+  if(last)return finishGame();
+  return playRound();
+}
+async function finishGame(){
+  const [a,b]=G.scores;
+  const i=await dlg({ico:a>b?'🏆':a<b?'🤖':'🤝',title:a>b?'Du hast gewonnen!':a<b?'Der Computer hat gewonnen':'Unentschieden',html:`Endstand: Du <b>${a}</b> : <b>${b}</b> Computer`,btns:['Nochmal spielen','Zur Auswahl']});
+  if(i===0)return startGame();
+  backToSetup();
+}
+function newRound(){
+  let d,bad;
+  do{d=shuffle(CARDS);const t=d.slice(16,24);bad=MONTHS.some((_,m)=>t.filter(c=>c.m===m).length>=4);}while(bad);
+  const sort=a=>a.slice().sort((x,y)=>x.id-y.id);
+  G.hands=[sort(d.slice(0,8)),sort(d.slice(8,16))];G.table=d.slice(16,24);G.deck=d.slice(24);
+  G.caps=[[],[]];G.announced=[0,0];G.koi=[false,false];G.flip=null;G.last=null;
+}
+async function playRound(){
+  const t=token;
+  try{
+    newRound();render();
+    status(`Runde ${G.round+1}/${G.rounds}: ${MONTHS[G.round%12].n}. ${G.parent===0?'Du beginnst.':'Der Computer beginnt.'}`);
+    await sleep(900);
+    let p=G.parent;
+    while(true){
+      const r=await playTurn(p);
+      if(r==='shobu')return endRound(p);
+      p=1-p;
+      if(!G.hands[0].length&&!G.hands[1].length)return endRound(-1);
+    }
+  }catch(e){if(e!==CANCEL)throw e;}
+}
+function startGame(){
+  token++;inp=null;logLines=[];
+  G={round:0,rounds:+$('rounds').value,scores:[0,0],parent:0,hands:[[],[]],caps:[[],[]],table:[],deck:[],flip:null,announced:[0,0],koi:[false,false]};
+  $('setup').hidden=true;$('game').hidden=false;$('modal').hidden=true;
+  playRound();
+}
+function backToSetup(){token++;inp=null;$('game').hidden=true;$('modal').hidden=true;$('setup').hidden=false;}
+$('start').onclick=startGame;$('again').onclick=backToSetup;
+</script>
+</body>
+</html>
