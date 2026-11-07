@@ -152,6 +152,9 @@ body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)
 .pip.on{background:var(--accent2)}
 .pips span{font-size:.75rem;color:var(--muted);margin-left:6px}
 .pubempty{padding:16px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:14px}
+.rejoin{display:flex;gap:8px;align-items:stretch;margin:0 0 14px}
+.rejoin .btn{flex:1}
+.rejoin .btn.alt{flex:0 0 auto}
 .waitline{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--muted)}
 .hint{color:var(--muted);font-size:.85rem;margin:6px 0}
 .mini{padding:3px 8px!important;font-size:.72rem!important;margin-left:6px}
@@ -197,6 +200,7 @@ body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)
     </div>
     <div id="pJoin" hidden>
       <div id="joinForm">
+        <div class="rejoin" id="rejoinBox" hidden><button class="btn big" id="rejoinBtn">Zurück ins Spiel</button><button class="btn alt" id="rejoinX" title="Vergessen">✕</button></div>
         <h2>Offene Spiele <span class="live"><i></i>live</span></h2>
         <div id="pubList" class="publist"><div class="pubempty">Suche …</div></div>
         <h2>Mit Code beitreten</h2>
@@ -730,7 +734,8 @@ buildSetup();setDie(0);
 // Der Host führt das Spiel und schickt nach jedem Schritt den Spielstand. Mitspieler zeigen ihn nur an
 // und melden "Würfeln" und "Figur gewählt". Verbindung: siehe ../net.js (WebRTC, Ersatzweg Relay).
 const PREFIX='mdn-v1-';
-let room=null,lobby=[],hostConn=null,joiner=null,netPlaying=false,opening=false;
+let room=null,lobby=[],hostConn=null,joiner=null,netPlaying=false,opening=false,held=[];   // held[i]: Platz, den der Computer für einen weggegangenen Spieler hält (Token + Name)
+const newTok=()=>Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('');
 let cReady=false,lastCur=-1,cRolling=false,cLand=false,rollAnim=null,joinedCode='',prevNames=null;
 function lobbyNote(t){['lobbyNote','lobbyNote2'].forEach(id=>{const e=$(id);if(!e)return;e.textContent=t;clearTimeout(e._t);e._t=setTimeout(()=>{e.textContent='';},3800);});}
 function joinBtnReset(){const b=$('joinBtn');b.disabled=false;b.textContent='Beitreten';b.classList.remove('busy');}
@@ -755,11 +760,23 @@ function safeHtml(html){
   return out.innerHTML;
 }
 
+// ---------- Wiederbeitritt (Client merkt sich Raum und Token) ----------
+function getRejoin(){try{const r=JSON.parse(localStorage.getItem('mdn-rejoin')||'null');if(r&&r.code&&r.tok&&Date.now()-r.t<6*3600e3)return r;}catch(e){}return null;}
+function setRejoin(r){try{if(r)localStorage.setItem('mdn-rejoin',JSON.stringify(r));else localStorage.removeItem('mdn-rejoin');}catch(e){}renderRejoin();}
+function renderRejoin(){
+  const r=netRole==='client'?null:getRejoin();
+  $('rejoinBox').hidden=!r;
+  if(r)$('rejoinBtn').textContent=`↩ Zurück ins Spiel (Raum ${r.code})`;
+}
+$('rejoinBtn').onclick=()=>{const r=getRejoin();if(r){$('joinCode').value=r.code;joinRoom(r.code);}};
+$('rejoinX').onclick=()=>setRejoin(null);
+
 // ---------- Umschalten ----------
 function showMode(m){
   document.querySelectorAll('#modeTabs .btn').forEach(b=>b.classList.toggle('alt',b.dataset.m!==m));
   $('pLocal').hidden=m!=='local';$('pHost').hidden=m!=='host';$('pJoin').hidden=m!=='join';errMsg('');
   if(m==='join'&&netRole!=='client')startWatch();else stopWatch();
+  renderRejoin();
 }
 function leaveNet(){
   if(netRole==='host'){
@@ -768,7 +785,7 @@ function leaveNet(){
   }
   if(netRole==='client'){try{hostConn&&(hostConn.send({t:'bye'}),hostConn.close());}catch(e){}if(joiner)joiner.cancel();}
   stopAnnounce();
-  room=null;lobby=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;
+  room=null;lobby=[];held=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;
   clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';
   $('joinForm').hidden=false;$('joinLobby').hidden=true;joinBtnReset();prevNames=null;
 }
@@ -800,11 +817,26 @@ function onHostMsg(conn,m){
   if(!m||typeof m!=='object')return;
   if(m.t==='hello'){
     if(conn.slot!==undefined)return;
-    if(netPlaying){try{conn.send({t:'full',why:'Das Spiel läuft schon'});}catch(e){}setTimeout(()=>{try{conn.close();}catch(e){}},400);return;}
+    const nm=String(m.name||'Spieler').slice(0,14);
+    if(netPlaying){
+      // Wiederbeitritt: gleicher Token, sonst (ohne Token) gleicher Name; der Computer gibt den Platz zurück
+      let k=held.findIndex(h=>h&&m.tok&&h.tok===m.tok);
+      if(k<0&&!m.tok){const c=held.map((h,x)=>h&&h.name.toLowerCase()===nm.toLowerCase()?x:-1).filter(x=>x>=0);if(c.length===1)k=c[0];}
+      if(k>=0&&cfg[k]==='cpu'&&lobby[k]&&lobby[k].type==='cpu'){
+        const tok=held[k].tok||newTok();held[k]=null;
+        lobby[k]={type:'remote',name:nm,conn,tok};conn.slot=k;cfg[k]='remote';names[k]=nm;
+        try{conn.send({t:'welcome',slot:k,tok});}catch(e){}
+        setMsg(`${chip(k)}<b>${COLORS[k].n} (${esc(nm)})</b> ist wieder da.`);
+        showScores();broadcastSnap();return;
+      }
+      const why=held.some(Boolean)?'Das Spiel läuft schon. Zum Wiederbeitreten brauchst du denselben Namen wie vorher.':'Das Spiel läuft schon';
+      try{conn.send({t:'full',why});}catch(e){}setTimeout(()=>{try{conn.close();}catch(e){}},400);return;
+    }
     const i=lobby.findIndex(s=>s.type==='open');
     if(i<0){try{conn.send({t:'full',why:'Der Raum ist voll'});}catch(e){}setTimeout(()=>{try{conn.close();}catch(e){}},400);return;}
-    lobby[i]={type:'remote',name:String(m.name||'Spieler').slice(0,14),conn};conn.slot=i;
-    try{conn.send({t:'welcome',slot:i});}catch(e){}
+    const tok=newTok();
+    lobby[i]={type:'remote',name:nm,conn,tok};conn.slot=i;
+    try{conn.send({t:'welcome',slot:i,tok});}catch(e){}
     lobbyNote(`${lobby[i].name} ist beigetreten (${COLORS[i].n})`);
     broadcastLobby();return;
   }
@@ -820,12 +852,12 @@ function onHostMsg(conn,m){
     if(!netPlaying&&Number.isInteger(to)&&lobby[to]&&lobby[to].type==='open')moveSlot(conn.slot,to);
   }else if(m.t==='bye')dropRemote(conn);
 }
-function dropRemote(conn){            // Mitspieler weg: in der Lobby Platz freigeben, im Spiel übernimmt der Computer
+function dropRemote(conn,forget){     // Mitspieler weg: in der Lobby Platz freigeben, im Spiel übernimmt der Computer (und hält den Platz für den Wiederbeitritt)
   const i=conn.slot;if(i===undefined||!lobby[i]||lobby[i].conn!==conn)return;
-  const name=lobby[i].name;conn.slot=undefined;
+  const name=lobby[i].name,tok=lobby[i].tok;conn.slot=undefined;
   if(!netPlaying){lobby[i]={type:'open'};lobbyNote(`${name} hat den Raum verlassen`);broadcastLobby();return;}
-  cfg[i]='cpu';lobby[i]={type:'cpu',name:''};
-  setMsg(`${chip(i)}<b>${COLORS[i].n} (${esc(name)})</b> ist weg, der Computer übernimmt.`);
+  cfg[i]='cpu';lobby[i]={type:'cpu',name:''};held[i]=forget?null:{tok,name};
+  setMsg(`${chip(i)}<b>${COLORS[i].n} (${esc(name)})</b> ist weg, der Computer übernimmt${forget?'':' bis zur Rückkehr'}.`);
   if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===i)remoteRoll();
   if(pick&&pick.p===i){const r=pick.res,m=aiPick(i,lastRoll,pick.moves);pick=null;markMovable(null);netPhase={k:'idle'};r(m);}
   showScores();netPush();
@@ -890,7 +922,7 @@ $('hostSlots').addEventListener('click',e=>{
   const me=e.target.closest('[data-me]');
   if(me){const to=+me.dataset.me,from=lobby.findIndex(s=>s.type==='host');if(from>=0&&lobby[to]&&lobby[to].type==='open')moveSlot(from,to);return;}
   const b=e.target.closest('[data-kick]');if(!b)return;
-  const i=+b.dataset.kick,s=lobby[i];if(s&&s.conn){try{s.conn.send({t:'kicked',why:'Der Host hat dich entfernt'});}catch(err){}const c=s.conn;dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
+  const i=+b.dataset.kick,s=lobby[i];if(s&&s.conn){try{s.conn.send({t:'kicked',why:'Der Host hat dich entfernt'});}catch(err){}const c=s.conn;dropRemote(c,true);setTimeout(()=>{try{c.close();}catch(err){}},300);}
 });
 $('pubSeg').addEventListener('click',e=>{
   const b=e.target.closest('[data-pub]');if(!b)return;
@@ -909,12 +941,12 @@ $('hostStart').onclick=()=>{
   if(n<2){errMsg('Mindestens 2 Spieler nötig.');return;}
   cfg=lobby.map(s=>s.type==='host'?'human':s.type==='remote'?'remote':s.type==='cpu'?'cpu':'off');
   names=lobby.map(s=>(s.type==='host'||s.type==='remote')?s.name:'');
-  netPlaying=true;launch();broadcastSnap();
+  held=[];netPlaying=true;launch();broadcastSnap();
 };
 $('copyLink').onclick=()=>{if(!room)return;copyText(location.origin+location.pathname+'?room='+room.code,$('copyLink'),'Link kopieren');};
 $('scores').addEventListener('click',e=>{
   const b=e.target.closest('[data-bot]');if(!b||netRole!=='host')return;
-  const i=+b.dataset.bot,s=lobby[i];if(s&&s.conn){const c=s.conn;try{c.send({t:'kicked',why:'Ein Computer hat deinen Platz übernommen'});}catch(err){}dropRemote(c);setTimeout(()=>{try{c.close();}catch(err){}},300);}
+  const i=+b.dataset.bot,s=lobby[i];if(s&&s.conn){const c=s.conn;try{c.send({t:'kicked',why:'Ein Computer hat deinen Platz übernommen'});}catch(err){}dropRemote(c,true);setTimeout(()=>{try{c.close();}catch(err){}},300);}
 });
 
 // Spielstand an alle schicken (zusammengefasst, damit nicht jeder Schritt mehrfach geht)
@@ -942,14 +974,14 @@ function joinRoom(codeArg){
   const name=myNameVal();errMsg('');joinedCode=code;prevNames=null;$('joinBtn').disabled=true;$('joinBtn').textContent='Verbinde …';$('joinBtn').classList.add('busy');stopWatch();
   joiner=Net.join(PREFIX,code,{
     attach(c){hostConn=c;c.on('data',onClientMsg);c.on('close',onClientClose);},
-    open(c){netRole='client';errMsg('');try{c.send({t:'hello',name});}catch(e){}},
+    open(c){netRole='client';errMsg('');const rj=getRejoin();try{c.send({t:'hello',name,tok:rj&&rj.code===code?rj.tok:undefined});}catch(e){}},
     fail(msg){joinBtnReset();hostConn=null;joiner=null;errMsg(msg||'Verbindung fehlgeschlagen.');}
   });
 }
 sendHost=function(m){try{hostConn&&hostConn.open&&hostConn.send(m);}catch(e){}};
 function onClientMsg(m){
   if(!m||typeof m!=='object')return;
-  if(m.t==='welcome'){mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();$('joinForm').hidden=true;$('joinLobby').hidden=false;}
+  if(m.t==='welcome'){if(m.tok)setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();$('joinForm').hidden=true;$('joinLobby').hidden=false;}
   else if(m.t==='lobby'){
     mySlot=m.you;
     if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
@@ -966,11 +998,12 @@ function onClientMsg(m){
     prevNames=names;
   }
   else if(m.t==='snap')applySnap(m.s,m.you);
-  else if(m.t==='full'){const w=m.why||'Der Raum ist voll';leaveNet();showMode('join');errMsg(w);}
-  else if(m.t==='kicked'){const w=m.why||'Verbindung beendet';goMenu(w);}
+  else if(m.t==='full'){const w=m.why||'Der Raum ist voll';leaveNet();showMode('join');errMsg(w);}   // Token bleibt: der Host könnte später wieder erreichbar sein
+  else if(m.t==='kicked'){const w=m.why||'Verbindung beendet';setRejoin(null);goMenu(w);}
 }
 function onClientClose(){if(netRole==='client')goMenu('Die Verbindung zum Host ist abgebrochen.');}
 function goMenu(why){
+  if(!why)setRejoin(null);   // freiwillig gegangen: kein Wiederbeitritt anbieten
   leaveNet();token++;
   $('game').hidden=true;$('setup').hidden=false;
   if(!$('winBox').hidden){$('winBox').hidden=true;}
@@ -1020,7 +1053,7 @@ $('joinBtn').onclick=()=>joinRoom();
 $('joinSlots').addEventListener('click',e=>{const b=e.target.closest('[data-take]');if(b)sendHost({t:'color',slot:+b.dataset.take});});
 $('pubList').addEventListener('click',e=>{const b=e.target.closest('[data-join]');if(b){$('joinCode').value=b.dataset.join;joinRoom(b.dataset.join);}});
 $('joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
-$('joinLeave').onclick=()=>{leaveNet();showMode('join');};
+$('joinLeave').onclick=()=>{setRejoin(null);leaveNet();showMode('join');};
 
 // "Neues Spiel" nach einer Runde: Host zurück in die Lobby (Online-Spieler bleiben im Raum)
 const _backToSetup=backToSetup;
@@ -1039,6 +1072,7 @@ try{$('myName').value=localStorage.getItem('mdn-name')||'';}catch(e){}
 {
   const q=new URLSearchParams(location.search).get('room');
   if(q){$('joinCode').value=q.toUpperCase().slice(0,5);showMode('join');}
+  else if(getRejoin())showMode('join');
   else showMode('local');
 }
 addEventListener('beforeunload',()=>{try{if(netRole==='client'&&hostConn)hostConn.send({t:'bye'});}catch(e){}});
