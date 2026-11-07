@@ -65,9 +65,27 @@ body.full3d .top h1{display:none}
 body.full3d .side{position:fixed;right:10px;top:10px;width:290px;max-height:calc(100vh - 20px);overflow:auto;z-index:30}
 body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)}
 @media (max-width:760px){
-  body.full3d .side{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:42vh;flex-direction:row;flex-wrap:wrap}
-  body.full3d .side .panel{flex:1 1 150px}
+  /* Handy: Bedienleiste unter dem 3D-Bild statt darüber (Höhe wird per Skript als --bar gesetzt) */
+  body.full3d #boardWrap{inset:0 0 var(--bar,200px) 0}
+  body.full3d .side{left:0;right:0;top:auto;bottom:0;width:auto;max-height:none;overflow:visible;display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(12,14,26,.97);border-top:2px solid var(--pc,var(--border))}
+  body.full3d .side .panel{margin:0;padding:4px 6px;background:transparent;backdrop-filter:none;border:0;box-shadow:none}
+  body.full3d .side .panel:nth-child(1){grid-column:1/-1;order:0}
+  body.full3d .side .panel:nth-child(1) .turn{font-size:.95rem;padding:6px;margin:0 0 4px!important;width:auto;box-sizing:border-box}
+  body.full3d .side .panel:nth-child(1) .status{font-size:.88rem;min-height:0}
+  body.full3d .side .panel:nth-child(2){order:1;display:flex;align-items:center;gap:10px}
+  body.full3d .side .panel:nth-child(2) .die{--die:52px;margin:0;border-radius:10px}
+  body.full3d .side .panel:nth-child(2) .row{margin:0!important;flex:1}
+  body.full3d .side .panel:nth-child(2) .btn{width:100%;padding:12px 6px}
+  body.full3d .side .panel:nth-child(5){order:2;display:flex;flex-wrap:wrap;gap:4px;align-content:center}
+  body.full3d .side .panel:nth-child(5) .btn{padding:6px 8px;font-size:.74rem}
+  body.full3d .side .panel:nth-child(5) #follow3{display:none}
+  body.full3d .side .scores{order:3;grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 12px;padding:0 6px;font-size:.75rem}
+  body.full3d .side .scores div{padding:0;gap:4px}
   body.full3d .side .rules{display:none}
+  body.full3d .side>#again{order:4;grid-column:1/-1;padding:6px;font-size:.78rem}
+  body.full3d .top{top:6px;left:6px}
+  body.full3d .top .back{padding:3px 9px;font-size:.8rem;background:rgba(12,14,26,.8)}
   #boardWrap{width:100%}
 }
 #setup input{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:160px}
@@ -1265,6 +1283,13 @@ try{if(localStorage.getItem('mdn-view')==='3d')setView(true);}catch(e){}
 </script>
 <script>
 // 3D als Vollbild: Klasse am body, solange 3D an ist und das Spiel sichtbar ist
+(function(){
+  const side=document.querySelector('.side');
+  const set=()=>{document.documentElement.style.setProperty('--bar',(document.body.classList.contains('full3d')?side.offsetHeight:0)+'px');if(typeof resize3==='function')resize3();};
+  if(window.ResizeObserver)new ResizeObserver(set).observe(side);
+  addEventListener('resize',set);addEventListener('orientationchange',()=>setTimeout(set,200));
+  new MutationObserver(set).observe(document.body,{attributes:true,attributeFilter:['class']});
+})();
 function applyFull3d(){
   document.body.classList.toggle('full3d',!!v3&&!$('game').hidden);
   if(typeof resize3==='function')resize3();
