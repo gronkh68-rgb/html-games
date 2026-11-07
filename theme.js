@@ -22,6 +22,9 @@
       root.setAttribute('data-style', 'anime');
       addLink('anime-fonts', 'https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
       addLink('anime-css', base + 'anime.css?v=5');
+    } else if (mode === 'dark') {
+      root.setAttribute('data-style', 'dark');
+      addLink('dark-css', base + 'dark.css?v=1');
     } else if (mode === 'cyber') {
       root.setAttribute('data-style', 'cyber');
       addLink('cyber-fonts', 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@700;800&family=Share+Tech+Mono&display=swap');
@@ -34,7 +37,7 @@
     if (off) root.setAttribute('data-fx', 'off'); else root.removeAttribute('data-fx');
   }
 
-  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'anime' && window.ANIME_STYLE) return 'anime'; return 'cyber'; }
+  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'anime' && window.ANIME_STYLE) return 'anime'; if (v === 'dark' && window.DARK_STYLE) return 'dark'; return 'cyber'; }
   apply(current()); // Cyber ist die Voreinstellung; Anime gibt es nur auf Seiten mit window.ANIME_STYLE
   applyFx(get(FX) === 'off');
   if (get(RAIN) === 'off') root.setAttribute('data-rain', 'off');
@@ -53,12 +56,13 @@
     var b2 = document.createElement('button');
     var b3 = document.createElement('button');
     var b4 = document.createElement('button');
-    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3); box.appendChild(b4);
+    var b5 = document.createElement('button');
+    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3); box.appendChild(b4); box.appendChild(b5);
     document.body.appendChild(box);
 
     function paint() {
       var st = root.getAttribute('data-style'), on = st === 'cyber';
-      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'anime' ? 'Stil: Japan' : 'Stil: Standard');
+      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'anime' ? 'Stil: Japan' : (st === 'dark' ? 'Stil: Dunkel' : 'Stil: Standard'));
       b1.title = 'Design umschalten (DEUKRO Cyber)';
       b2.hidden = !on;
       b2.textContent = root.getAttribute('data-fx') === 'off' ? 'Effekte: aus' : 'Effekte: an';
@@ -66,6 +70,8 @@
       b3.textContent = root.getAttribute('data-rain') === 'off' ? 'Regen: aus' : 'Regen: an';
       b4.hidden = !window.ANIME_STYLE;
       b4.textContent = st === 'anime' ? '🌸 Japan: an' : '🌸 Japan';
+      b5.hidden = !window.DARK_STYLE;
+      b5.textContent = st === 'dark' ? '🌑 Dunkel: an' : '🌑 Dunkel';
     }
     b1.onclick = function () {
       var st = root.getAttribute('data-style') || 'standard';
@@ -74,6 +80,10 @@
     };
     b4.onclick = function () {
       var next = root.getAttribute('data-style') === 'anime' ? 'cyber' : 'anime';
+      apply(next); set(KEY, next); paint();
+    };
+    b5.onclick = function () {
+      var next = root.getAttribute('data-style') === 'dark' ? 'cyber' : 'dark';
       apply(next); set(KEY, next); paint();
     };
     b2.onclick = function () {

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mensch ärgere dich nicht</title>
 <link rel="stylesheet" href="../common.css">
-<script>window.RAIN_OPTION=1;window.ANIME_STYLE=1;</script>
-<script src="../theme.js?v=anime5"></script>
+<script>window.RAIN_OPTION=1;window.ANIME_STYLE=1;window.DARK_STYLE=1;</script>
+<script src="../theme.js?v=dark1"></script>
 <script src="../room3d.js"></script>
 <script src="../dice.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
@@ -155,8 +155,18 @@ body.full3d .side .panel{background:rgba(16,19,28,.82);backdrop-filter:blur(4px)
 .sw{display:flex;flex-wrap:wrap;gap:6px;width:100%;flex-basis:100%}
 .swb{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.25);padding:0;cursor:pointer;transition:transform .12s}
 .swb:hover{transform:scale(1.18)}
+.swb.cust{position:relative;overflow:hidden;background:conic-gradient(#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33)}
+.swb.cust input{position:absolute;inset:-8px;width:44px;height:44px;opacity:0;cursor:pointer}
+#setup .swb input{min-width:0;padding:0;border:0;background:none}
+.hexin{width:96px;font:inherit;font-size:.82rem;padding:3px 7px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+#setup .hexin{min-width:0;width:96px;padding:3px 7px;font-size:.82rem;border-radius:8px}
+.hexin.bad{border-color:#ff5b5b!important}
 .swb.on{border-color:#fff;box-shadow:0 0 0 2px var(--bg,#000),0 0 0 4px #fff;transform:scale(1.1)}
 /* "Du bist dran": Rahmen in deiner Farbe, Banner oben, pulsierender Würfelknopf */
+html:not([data-style]) .basebox{fill-opacity:.4;stroke-opacity:.95;stroke-width:3}
+html:not([data-style]) .basebox.off{fill-opacity:.08;stroke-opacity:.3}
+html:not([data-style]) .cell.bc{fill:var(--c);fill-opacity:.55;stroke:#fff;stroke-opacity:.8}
+html:not([data-style]) .cell.lane{fill-opacity:.8}
 #turnFrame{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;transition:opacity .25s;
   box-shadow:inset 0 0 0 5px var(--pc,#fff),inset 0 0 80px 8px color-mix(in srgb,var(--pc,#fff) 55%,transparent);animation:tfp 1s ease-in-out infinite alternate}
 #turnFrame.on{opacity:1}
@@ -288,9 +298,28 @@ const PAL=[
  {n:'Pink',c:'#ff5fd2',a:'#ff8ad8',k:'#d6338f'},{n:'Türkis',c:'#00d8e8',a:'#35d6e0',k:'#0e9aa7'},
  {n:'Weiß',c:'#f2f4ff',a:'#ffffff',k:'#d9dce6'},{n:'Limette',c:'#a6e22e',a:'#b5e84d',k:'#7fb21f'}];
 const COLORS=[0,1,2,3].map(i=>({n:PAL[i].n,c:PAL[i].c,k:i}));      // k = Index in PAL
-function setSeatColor(p,k){const q=PAL[k];if(!q||!COLORS[p])return;COLORS[p].n=q.n;COLORS[p].c=q.c;COLORS[p].k=k;}
-function swapColor(i,k){const j=COLORS.findIndex((c,x)=>x!==i&&c.k===k);if(j>=0)setSeatColor(j,COLORS[i].k);setSeatColor(i,k);}
-const swatchHtml=p=>PAL.map((q,k)=>`<button type="button" class="swb${COLORS[p].k===k?' on':''}" data-pc="${p}" data-k="${k}" title="${q.n}" style="background:${q.c}"></button>`).join('');
+const HEXRE=/^#[0-9a-f]{6}$/i;
+const validCol=k=>typeof k==='string'?HEXRE.test(k):(Number.isInteger(k)&&!!PAL[k]);
+const palOf=p=>{const k=COLORS[p].k;return typeof k==='string'?{c:k,a:k,k}:PAL[k];};   // freie HEX-Farbe: überall gleich
+function setSeatColor(p,k){
+  if(!COLORS[p])return;
+  if(typeof k==='string'){if(!HEXRE.test(k))return;k=k.toLowerCase();COLORS[p].n='Eigene';COLORS[p].c=k;COLORS[p].k=k;return;}
+  const q=PAL[k];if(!q)return;COLORS[p].n=q.n;COLORS[p].c=q.c;COLORS[p].k=k;
+}
+function colorChange(e){                 // Farbfeld oder HEX-Eingabe geändert -> {p,k} oder null
+  const t=e.target.closest&&e.target.closest('[data-pcx]');if(!t)return null;
+  let v=String(t.value||'').trim().replace(/^#/,'');
+  if(/^[0-9a-f]{3}$/i.test(v))v=v.split('').map(ch=>ch+ch).join('');
+  const ok=/^[0-9a-f]{6}$/i.test(v);t.classList.toggle('bad',!ok);
+  return ok?{p:+t.dataset.pcx,k:'#'+v.toLowerCase()}:null;
+}
+function swapColor(i,k){if(typeof k==='string'){setSeatColor(i,k);return;}const j=COLORS.findIndex((c,x)=>x!==i&&c.k===k);if(j>=0)setSeatColor(j,COLORS[i].k);setSeatColor(i,k);}
+const swatchHtml=p=>{
+  const cu=typeof COLORS[p].k==='string';
+  return PAL.map((q,k)=>`<button type="button" class="swb${COLORS[p].k===k?' on':''}" data-pc="${p}" data-k="${k}" title="${q.n}" style="background:${q.c}"></button>`).join('')+
+    `<label class="swb cust${cu?' on':''}" title="Eigene Farbe wählen"${cu?` style="background:${COLORS[p].c}"`:''}><input type="color" data-pcx="${p}" value="${palOf(p).c}"></label>`+
+    `<input class="hexin" data-pcx="${p}" maxlength="7" placeholder="#RRGGBB" spellcheck="false" autocomplete="off" value="${cu?COLORS[p].c:''}">`;
+};
 const CELL=50, NS='http://www.w3.org/2000/svg';
 const $=id=>document.getElementById(id);
 
@@ -402,7 +431,7 @@ function drawBoard(){
   active.forEach(p=>{
     for(let i=0;i<4;i++){
       const g=el('g',{class:'piece',id:`pc-${p}-${i}`,'data-p':p},layer);
-      g.style.setProperty('--c',COLORS[p].c);g.style.setProperty('--ca',PAL[COLORS[p].k].a);
+      g.style.setProperty('--c',COLORS[p].c);g.style.setProperty('--ca',palOf(p).a);
       el('circle',{class:'ring',r:24},g);
       el('circle',{class:'main',r:17,fill:COLORS[p].c},g);
       el('circle',{r:7,fill:'rgba(255,255,255,.35)',cx:-4,cy:-5},g);
@@ -731,6 +760,7 @@ function buildSetup(){
   prev.forEach((d,p)=>$('slot'+p).value=d);
 }
 $('slots').addEventListener('click',e=>{const b=e.target.closest('[data-pc]');if(!b)return;swapColor(+b.dataset.pc,+b.dataset.k);buildSetup();});
+$('slots').addEventListener('change',e=>{const r=colorChange(e);if(r){swapColor(r.p,r.k);buildSetup();}});
 
 // ---------- "Du bist dran" ----------
 function setMine(on,p){
@@ -884,7 +914,7 @@ function onHostMsg(conn,m){
       const mv=pick.moves.find(x=>x.i===m.i);
       if(mv){const r=pick.res;pick=null;markMovable(null);netPhase={k:'idle'};r(mv);}
     }
-  }else if(m.t==='pcol'){if(!netPlaying&&Number.isInteger(m.k))setLobbyColor(conn.slot,m.k);
+  }else if(m.t==='pcol'){if(!netPlaying&&validCol(m.k))setLobbyColor(conn.slot,m.k);
   }else if(m.t==='color'){
     const to=+m.slot;
     if(!netPlaying&&Number.isInteger(to)&&lobby[to]&&lobby[to].type==='open')moveSlot(conn.slot,to);
@@ -900,7 +930,7 @@ function dropRemote(conn,forget){     // Mitspieler weg: in der Lobby Platz frei
   if(pick&&pick.p===i){const r=pick.res,m=aiPick(i,lastRoll,pick.moves);pick=null;markMovable(null);netPhase={k:'idle'};r(m);}
   showScores();netPush();
 }
-function setLobbyColor(i,k){if(netPlaying||!PAL[k]||!lobby[i]||!Number.isInteger(k))return;swapColor(i,k);broadcastLobby();}
+function setLobbyColor(i,k){if(netPlaying||!validCol(k)||!lobby[i])return;swapColor(i,k);broadcastLobby();}
 function moveSlot(from,to){            // Farbe wechseln: nur auf freie Plätze, nur in der Lobby
   if(netPlaying||!lobby[from]||!lobby[to]||lobby[to].type!=='open')return;
   lobby[to]=lobby[from];lobby[from]={type:'open'};
@@ -956,6 +986,7 @@ function renderHostLobby(){
   $('hostStart').disabled=n<2;
   $('hostStart').textContent=n<2?'Mindestens 2 Spieler nötig':`Spiel starten (${n} Spieler)`;
 }
+$('hostSlots').addEventListener('change',e=>{const r=colorChange(e);if(r)setLobbyColor(r.p,r.k);});
 $('hostSlots').addEventListener('click',e=>{
   const pcb=e.target.closest('[data-pc]');if(pcb){setLobbyColor(+pcb.dataset.pc,+pcb.dataset.k);return;}
   const st=e.target.closest('[data-set]');
@@ -1093,6 +1124,7 @@ function applySnap(s,you){
   }
 }
 $('joinBtn').onclick=()=>joinRoom();
+$('joinSlots').addEventListener('change',e=>{const r=colorChange(e);if(r&&r.p===mySlot)sendHost({t:'pcol',k:r.k});});
 $('joinSlots').addEventListener('click',e=>{const c=e.target.closest('[data-pc]');if(c&&+c.dataset.pc===mySlot){sendHost({t:'pcol',k:+c.dataset.k});return;}const b=e.target.closest('[data-take]');if(b)sendHost({t:'color',slot:+b.dataset.take});});
 $('pubList').addEventListener('click',e=>{const b=e.target.closest('[data-join]');if(b){$('joinCode').value=b.dataset.join;joinRoom(b.dataset.join);}});
 $('joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
@@ -1125,9 +1157,10 @@ addEventListener('beforeunload',()=>{try{if(netRole==='client'&&hostConn)hostCon
 const S3=1.1;
 const CY=()=>document.documentElement.getAttribute('data-style')==='cyber';
 const AN=()=>document.documentElement.getAttribute('data-style')==='anime';
+const DK=()=>document.documentElement.getAttribute('data-style')==='dark';
 const ANIME_COL=['#ff4d5e','#4da6ff','#3de0a0','#ffc83d'];
 const CLASSIC_COL=['#c62828','#1e5aa8','#2e8b3d','#e6b800'];
-const pc3=p=>parseInt(PAL[COLORS[p].k][CY()?'c':AN()?'a':'k'].slice(1),16);
+const pc3=p=>parseInt(palOf(p)[CY()?'c':AN()?'a':'k'].slice(1),16);
 const mixW=(h,t)=>{const r=(h>>16)&255,g=(h>>8)&255,b=h&255,f=v=>Math.round(v+(255-v)*t);return (f(r)<<16)|(f(g)<<8)|f(b);};
 const darker=(h,f)=>{const r=(h>>16)&255,g=(h>>8)&255,b=h&255,d=v=>Math.round(v*f);return (d(r)<<16)|(d(g)<<8)|d(b);};
 let T3=null,loading3=false;
@@ -1164,7 +1197,12 @@ function buildEnv3(){
   const {scene}=T3;
   (T3.env||[]).forEach(o=>scene.remove(o));T3.env=[];T3.rain=null;T3.room=null;
   const add=o=>{scene.add(o);T3.env.push(o);return o;};
-  if(CY()){
+  if(DK()){   // Dunkel: ruhiger schwarzer Raum, nur Licht und Brett
+    scene.fog=new THREE.Fog(0x0b0d12,60,140);T3.r.setClearColor(0x0b0d12);
+    add(new THREE.HemisphereLight(0xdfe6ff,0x1a1d26,.95));
+    const dl=new THREE.DirectionalLight(0xffffff,.6);dl.position.set(6,14,5);add(dl);
+    const fl=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshBasicMaterial({color:0x0b0d12}));fl.rotation.x=-Math.PI/2;fl.position.y=-.3;add(fl);
+  }else if(CY()){
     scene.fog=new THREE.FogExp2(0x05060b,.011);T3.r.setClearColor(0x05060b);
     add(new THREE.AmbientLight(0x3a4a70,.6));
     const dl=new THREE.DirectionalLight(0xaaccff,.4);dl.position.set(6,14,5);add(dl);
@@ -1301,7 +1339,7 @@ function build3(){
   T3.pm={};T3.bases={};T3.tw=[];
   const G=new THREE.Group();T3.group=G;scene.add(G);
   // Grundplatte
-  const plate=new THREE.Mesh(new THREE.BoxGeometry(11.6*S3,.3,11.6*S3),new THREE.MeshStandardMaterial(CY()?{color:0x0a0d16,roughness:.6,metalness:.5,emissive:0x03121a}:AN()?{color:0x6b4226,roughness:.6}:{color:0xc89a5a,roughness:.7}));
+  const plate=new THREE.Mesh(new THREE.BoxGeometry(11.6*S3,.3,11.6*S3),new THREE.MeshStandardMaterial(CY()?{color:0x0a0d16,roughness:.6,metalness:.5,emissive:0x03121a}:AN()?{color:0x6b4226,roughness:.6}:DK()?{color:0x161a23,roughness:.85}:{color:0xc89a5a,roughness:.7}));
   plate.position.y=-.1;G.add(plate);
   if(CY()){const pe=new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),new THREE.LineBasicMaterial({color:0x00f0ff}));pe.position.copy(plate.position);G.add(pe);}
   const tile=(c,r,h,color,emis,eI,edge,rad=.48,kind)=>{
@@ -1311,8 +1349,11 @@ function build3(){
     else if(AN()){
       const col=kind==='track'?0xf5ecd7:kind==='lane'?mixW(color,.15):kind==='bc'?mixW(color,.55):color;
       mt=new THREE.MeshStandardMaterial({color:col,roughness:.7});lc=0x7a1c24;lo=.7;
+    }else if(DK()){   // dunkel: flache graue Felder, Spielerfarben nur an Start/Ziel/Haus
+      const col=kind==='track'?0x2a303c:kind==='lane'?darker(emis,.7):kind==='bc'?0x12151c:color;
+      mt=new THREE.MeshStandardMaterial({color:col,roughness:.6});lc=kind==='bc'?emis:0x0b0d12;lo=kind==='bc'?.9:.8;
     }else{   // klassisch: matte Mulden in Elfenbein und Spielerfarben
-      const col=kind==='track'?0xf2e8cd:kind==='lane'?mixW(color,.4):kind==='bc'?darker(color,.5):color;
+      const col=kind==='track'?0xf2e8cd:kind==='lane'?mixW(emis,.4):kind==='bc'?mixW(emis,.45):color;
       mt=new THREE.MeshStandardMaterial({color:col,roughness:.55});lc=0x7a5a32;lo=.55;
     }
     const m=new THREE.Mesh(g,mt);
@@ -1323,9 +1364,9 @@ function build3(){
   [0,1,2,3].forEach(p=>{
     const [x0,y0]=[[0,0],[9,0],[9,9],[0,9]][p],c=pc3(p),on=active.includes(p);
     const g=new THREE.BoxGeometry(2*S3-.1,.18,2*S3-.1);
-    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial(CY()?{color:0x0b0e18,emissive:c,emissiveIntensity:on?.25:.06,roughness:.5,metalness:.6}:AN()?{color:on?c:darker(c,.45),emissive:c,emissiveIntensity:0,roughness:.5,metalness:.2}:{color:on?c:darker(c,.45),emissive:c,emissiveIntensity:0,roughness:.6}));
+    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial(CY()?{color:0x0b0e18,emissive:c,emissiveIntensity:on?.25:.06,roughness:.5,metalness:.6}:AN()?{color:on?c:darker(c,.45),emissive:c,emissiveIntensity:0,roughness:.5,metalness:.2}:DK()?{color:on?darker(c,.5):0x15181f,emissive:c,emissiveIntensity:0,roughness:.7}:{color:on?c:darker(c,.45),emissive:c,emissiveIntensity:0,roughness:.6}));
     const w=w3(x0+.5,y0+.5);m.position.set(w.x,.09,w.z);G.add(m);T3.bases[p]=m;
-    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:CY()?c:AN()?0x3a1a10:0x7a5a32,transparent:true,opacity:on?1:.3}));e.position.copy(m.position);G.add(e);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:CY()?c:AN()?0x3a1a10:DK()?0x0b0d12:0x7a5a32,transparent:true,opacity:on?1:.3}));e.position.copy(m.position);G.add(e);
     BASE[p].forEach(([bc,br])=>tile(bc,br,.12,0x05060b,c,.15,c,.38,'bc'));
   });
   TRACK.forEach(([c,r],i)=>{
@@ -1353,7 +1394,7 @@ function build3(){
     const ring=new THREE.Mesh(new THREE.TorusGeometry(.62,.03,8,40),new THREE.MeshStandardMaterial({color:0xe8c25a,emissive:0x8a6a1a,emissiveIntensity:.5,metalness:.5,roughness:.4}));ring.rotation.x=Math.PI/2;ring.position.y=1.3;ring.userData.s=.5;G.add(ring);T3.rings.push(ring);T3.tint.push(ring.material);
     const orb=new THREE.Mesh(new THREE.SphereGeometry(.2,20,14),new THREE.MeshStandardMaterial({color:0xe8c25a,emissive:0xe8c25a,emissiveIntensity:.7,roughness:.3}));orb.position.y=1.3;G.add(orb);T3.tint.push(orb.material);
   }else{
-    const wood=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.5});
+    const wood=new THREE.MeshStandardMaterial({color:DK()?0x2a303c:0x8a5a2b,roughness:.5});
     const col=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,.5,24),wood);col.position.set(0,.2,0);G.add(col);
     const knob=new THREE.Mesh(new THREE.SphereGeometry(.34,20,14),new THREE.MeshStandardMaterial({color:0xd9b24a,emissive:0xd9b24a,emissiveIntensity:.55,roughness:.3,metalness:.2}));knob.position.set(0,.65,0);G.add(knob);T3.tint.push(knob.material);
   }

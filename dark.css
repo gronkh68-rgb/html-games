@@ -1,0 +1,28 @@
+/* Dunkler Stil: schlicht, flach, ohne Leuchteffekte (nur aktiv mit html[data-style="dark"], siehe theme.js) */
+html[data-style="dark"]{
+  --bg:#0b0d12;--card:#141821;--card-hover:#1c212c;--text:#e8ebf2;--muted:#8d95a6;
+  --accent:#4c7cf0;--accent2:#9db8f5;--border:#2a2f3b;
+  color-scheme:dark;
+}
+html[data-style="dark"] body{background:#0b0d12;font-family:system-ui,"Segoe UI",sans-serif}
+html[data-style="dark"] .panel,html[data-style="dark"] .overlay .box{background:#141821;border:1px solid #2a2f3b;border-radius:12px;box-shadow:none}
+html[data-style="dark"] .overlay{background:rgba(5,6,9,.78)}
+html[data-style="dark"] .back{border-radius:8px;border:1px solid #2a2f3b;color:#9db8f5;background:#141821}
+html[data-style="dark"] .top h1{color:#e8ebf2;font-weight:700}
+html[data-style="dark"] .btn{background:#3b6be0;color:#fff;border:0;border-radius:10px;box-shadow:none;letter-spacing:0}
+html[data-style="dark"] .btn:hover:not(:disabled){background:#4c7cf0;transform:none;box-shadow:none}
+html[data-style="dark"] .btn.alt{background:#1c212c;color:#e8ebf2;border:1px solid #2a2f3b}
+html[data-style="dark"] .btn.alt:hover:not(:disabled){background:#252b38}
+html[data-style="dark"] select,html[data-style="dark"] input{border-radius:8px;border:1px solid #2a2f3b;background:#0b0d12;color:#e8ebf2}
+html[data-style="dark"] #styleSwitch button{background:#141821;color:#cfd5e4;border:1px solid #2a2f3b;border-radius:8px}
+
+/* Mensch ärgere dich nicht: flaches dunkles Brett */
+html[data-style="dark"] #board{background:#0d0f14;border:2px solid #2a2f3b;border-radius:14px;box-shadow:none}
+html[data-style="dark"] #stage3d{border:2px solid #2a2f3b;box-shadow:none}
+html[data-style="dark"] .cell{fill:#1b1f29;stroke:#343b4a;stroke-width:1.5}
+html[data-style="dark"] .cell.start{fill:var(--c);stroke:#0d0f14;stroke-width:2}
+html[data-style="dark"] .cell.lane{fill:var(--c);fill-opacity:.5;stroke:#0d0f14}
+html[data-style="dark"] .cell.bc{fill:#12151c;stroke:var(--c);stroke-width:2.5}
+html[data-style="dark"] .basebox{fill-opacity:.1;stroke-opacity:.45}
+html[data-style="dark"] #board text{fill:rgba(255,255,255,.22)}
+html[data-style="dark"] .piece circle.main{stroke:#0d0f14;stroke-width:3}
