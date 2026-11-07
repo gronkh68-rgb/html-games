@@ -43,9 +43,6 @@ html[data-style="anime"] .cell.bc{fill:#f3e3c4;stroke:var(--c);stroke-width:3}
 html[data-style="anime"] .basebox{fill-opacity:.22}
 html[data-style="anime"] #board text{fill:rgba(90,30,30,.4)}
 html[data-style="anime"] .piece circle.main{stroke:#fff;stroke-width:3;filter:drop-shadow(0 2px 2px rgba(60,20,20,.5))}
-html[data-style="anime"] .piece[data-p="0"] circle.main{fill:#ff4d5e}
-html[data-style="anime"] .piece[data-p="1"] circle.main{fill:#4da6ff}
-html[data-style="anime"] .piece[data-p="2"] circle.main{fill:#3de0a0}
-html[data-style="anime"] .piece[data-p="3"] circle.main{fill:#ffc83d}
+html[data-style="anime"] .piece circle.main{fill:var(--ca,#ff4d5e)}
 html[data-style="anime"] .piece .face{display:inline}
 html[data-style="anime"] #lookBox .box{background:#1a2040}
