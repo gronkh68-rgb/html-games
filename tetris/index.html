@@ -24,25 +24,37 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
   color:#fff;text-shadow:0 0 12px var(--accent2);pointer-events:none;opacity:0}
 #boardWrap .toast.show{animation:toast 1s ease-out}
 @keyframes toast{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.1)}70%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}
-#musicPanel .mname{font-size:.8rem;word-break:break-all;margin-bottom:6px;color:var(--text)}
 #musicPanel .mrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 #musicPanel .mrow .btn{padding:6px 10px;font-size:.8rem}
 #musicPanel input[type=range]{width:100%}
-#musicPanel .mhint{font-size:.7rem;color:var(--muted);margin-top:6px}
-.touch{display:none;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px;max-width:520px;margin-left:auto;margin-right:auto}
-.touch button{font-size:1.3rem;padding:16px 0;touch-action:none}
 .keys{color:var(--muted);font-size:.8rem;line-height:1.6;margin:0}
 .keys b{color:var(--text)}
+/* Touch-Leiste: feste Bedienleiste am unteren Rand (Handy und Tablet) */
+.touch{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;grid-template-columns:repeat(3,1fr) 10px repeat(3,1fr);gap:6px;
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(10,12,22,.96);border-top:1px solid var(--border)}
+.touch button{font-size:1.7rem;line-height:1;height:68px;padding:0;touch-action:none;border-radius:16px;-webkit-tap-highlight-color:transparent;user-select:none}
+.touch button:active,.touch button.on{background:var(--accent);color:#fff;transform:scale(.96)}
+.touch button.big{background:var(--accent);color:#fff}
+@media (pointer:coarse){.touch{display:grid}body{padding-bottom:92px}}
 @media (max-width:760px){
-  .game{grid-template-columns:auto;justify-items:center;gap:8px}
-  .col.side{flex-direction:row;flex-wrap:wrap;justify-content:center;width:100%}
-  .col.side .panel{flex:1 1 90px;min-width:0}
-  #board{height:min(56vh,560px)}
-  .touch{display:grid}
+  .touch{display:grid}body{padding-bottom:92px}
+  .wrap{padding:6px 8px 4px}
+  .top{margin-bottom:6px}.top h1{font-size:1.2rem}
+  .game{grid-template-columns:auto 72px;grid-template-areas:"board left" "board right";gap:8px;justify-content:center;align-items:start}
+  #boardWrap{grid-area:board}#left{grid-area:left}#right{grid-area:right}
+  .col.side{flex-direction:column;flex-wrap:nowrap;width:72px;gap:6px}
+  .col.side .panel{flex:none;padding:6px 7px}
+  .panel h2{font-size:.62rem;margin-bottom:3px}
+  .stat{flex-direction:column;align-items:flex-start;gap:0;padding:1px 0}
+  .stat b{font-size:.95rem}.stat span{font-size:.58rem}
   .keys{display:none}
-  #nextPanel{order:-1}
+  #board{height:min(calc(100vh - 168px),calc((100vw - 100px)*2));height:min(calc(100dvh - 168px),calc((100vw - 100px)*2))}
+  #nextPanel{order:0}
+  #right>div:nth-child(2){flex-direction:column}
+  #right .btn{width:100%;padding:7px 4px;font-size:.8rem}
+  #musicPanel h2,#musicPanel input[type=range]{display:none}
+  #musicPanel{padding:0;background:none;border:0}#musicPanel .mrow{margin:0}#musicPanel .mrow .btn{width:100%}
 }
-@media (pointer:coarse){.touch{display:grid}}
 </style>
 </head>
 <body>
@@ -70,21 +82,19 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="pauseBtn">Pause</button><button class="btn alt" id="restartBtn">Neu</button></div>
       <div class="panel" id="musicPanel">
         <h2>Musik</h2>
-        <div id="musicName" class="mname">Keine Datei gewählt</div>
-        <div class="mrow"><button class="btn alt" id="musicBtn">♪ an</button><button class="btn alt" id="musicFile">Datei …</button></div>
+        <div class="mrow"><button class="btn alt" id="musicBtn">♪ an</button></div>
         <input type="range" id="musicVol" min="0" max="1" step="0.05" value="0.5" aria-label="Lautstärke">
-        <input type="file" id="musicPick" accept="audio/*" hidden>
-        <div class="mhint">Die Datei bleibt auf deinem Gerät.</div>
       </div>
     </div>
   </div>
   <div class="touch" id="touch">
-    <button class="btn alt" data-a="left">◀</button>
-    <button class="btn alt" data-a="rot">↻</button>
-    <button class="btn alt" data-a="right">▶</button>
-    <button class="btn alt" data-a="down">▼</button>
-    <button class="btn alt" data-a="drop">⤓</button>
-    <button class="btn alt" data-a="hold">H</button>
+    <button class="btn alt" data-a="left" aria-label="Links">◀</button>
+    <button class="btn alt" data-a="down" aria-label="Schneller fallen">▼</button>
+    <button class="btn alt" data-a="right" aria-label="Rechts">▶</button>
+    <span></span>
+    <button class="btn big" data-a="rot" aria-label="Drehen">↻</button>
+    <button class="btn alt" data-a="drop" aria-label="Fallen lassen">⤓</button>
+    <button class="btn alt" data-a="hold" aria-label="Halten">H</button>
   </div>
 </div>
 
@@ -339,8 +349,9 @@ addEventListener('keyup',e=>{const k=KEYMAP[e.key];if(k)releaseAct(k[0]);});
 addEventListener('blur',()=>{Object.keys(held).forEach(releaseAct);if(running&&!paused)setPause(true);});
 document.querySelectorAll('#touch button').forEach(b=>{
   const a=b.dataset.a,rep=a==='left'||a==='right'||a==='down';
-  b.addEventListener('pointerdown',e=>{e.preventDefault();pressAct(a,rep);});
-  ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>releaseAct(a)));
+  b.addEventListener('pointerdown',e=>{e.preventDefault();b.classList.add('on');try{navigator.vibrate&&navigator.vibrate(8);}catch(err){}pressAct(a,rep);});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>{b.classList.remove('on');releaseAct(a);}));
+  b.addEventListener('contextmenu',e=>e.preventDefault());
 });
 // Wischen auf dem Spielfeld: links/rechts bewegen, nach oben drehen, nach unten fallen lassen, Tippen dreht
 let sw=null;
@@ -370,46 +381,27 @@ $('restartBtn').onclick=()=>startGame();
 $('ovBtn').onclick=()=>{if(paused)setPause(false);else startGame();};
 
 // ---------- Hintergrundmusik ----------
-// Eigene Musikdatei: wird nur im Browser gespeichert (IndexedDB) und nicht hochgeladen.
-// Liegt eine Datei "music.mp3" neben dieser Seite, wird sie als Standard genommen.
-const bgm=new Audio();bgm.loop=true;bgm.preload='auto';
+// Die Musik (music.mp3 neben dieser Seite) startet automatisch mit dem Spiel. Browser erlauben Ton erst nach der ersten Berührung,
+// deshalb startet sie spätestens mit "Spiel starten" bzw. dem ersten Tastendruck oder Antippen.
+const bgm=new Audio('music.mp3');bgm.loop=true;bgm.preload='auto';
 let musicOn=true;
 try{musicOn=localStorage.getItem('tetris-music')!=='off';bgm.volume=+(localStorage.getItem('tetris-vol')||.5);}catch(e){bgm.volume=.5;}
 $('musicVol').value=bgm.volume;
-function idb(mode,fn){
-  return new Promise((res,rej)=>{
-    const r=indexedDB.open('tetris-music',1);
-    r.onupgradeneeded=()=>r.result.createObjectStore('f');
-    r.onsuccess=()=>{const tx=r.result.transaction('f',mode),q=fn(tx.objectStore('f'));tx.oncomplete=()=>res(q&&q.result);tx.onerror=()=>rej(tx.error);};
-    r.onerror=()=>rej(r.error);
-  });
-}
 function updateMusicUi(){$('musicBtn').textContent=musicOn?'♪ an':'♪ aus';}
-function setTrack(src,name){
-  if(bgm.dataset.url)URL.revokeObjectURL(bgm.dataset.url);
-  const url=typeof src==='string'?src:URL.createObjectURL(src);
-  if(typeof src!=='string')bgm.dataset.url=url;
-  bgm.src=url;$('musicName').textContent=name;
+function musicPlay(){if(musicOn)bgm.play().catch(()=>{});}
+// Ton freischalten: beim ersten Tippen/Taste läuft die Musik sofort an (auch im Startbildschirm)
+function unlockMusic(){
+  removeEventListener('pointerdown',unlockMusic);removeEventListener('keydown',unlockMusic);
+  if(musicOn&&!paused)musicPlay();
 }
-function musicPlay(){if(musicOn&&bgm.src)bgm.play().catch(()=>{});}
-async function loadSavedTrack(){
-  try{const f=await idb('readonly',s=>s.get('track'));if(f&&f.blob){setTrack(f.blob,f.name);return;}}catch(e){}
-  try{const r=await fetch('music.mp3',{method:'HEAD'});if(r.ok)setTrack('music.mp3','music.mp3');}catch(e){}
-}
-$('musicFile').onclick=()=>$('musicPick').click();
-$('musicPick').onchange=async e=>{
-  const f=e.target.files[0];if(!f)return;
-  setTrack(f,f.name);
-  try{await idb('readwrite',s=>s.put({blob:f,name:f.name},'track'));}catch(err){$('musicName').textContent=f.name+' (nur für diese Sitzung)';}
-  if(running&&!paused)musicPlay();
-  e.target.value='';
-};
+addEventListener('pointerdown',unlockMusic);addEventListener('keydown',unlockMusic);
+musicPlay();                                   // klappt, wenn der Browser Autoplay erlaubt
 $('musicBtn').onclick=()=>{
   musicOn=!musicOn;try{localStorage.setItem('tetris-music',musicOn?'on':'off');}catch(e){}
   updateMusicUi();if(musicOn){if(running&&!paused)musicPlay();}else bgm.pause();
 };
 $('musicVol').oninput=e=>{bgm.volume=+e.target.value;try{localStorage.setItem('tetris-vol',e.target.value);}catch(err){}};
-updateMusicUi();loadSavedTrack();
+updateMusicUi();
 
 board=newBoard();queue=[];bag=[];fillQueue();score=0;lines=0;level=1;updateHud();
 requestAnimationFrame(t=>{lastT=t;loop(t);});
