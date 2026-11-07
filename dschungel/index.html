@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dschungel-Jagd</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="../dice.js"></script>
+<style>
+.wrap{max-width:1300px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+#boardWrap{width:100%}
+#board{width:100%;height:auto;display:block;background:#0c1a14;border:2px solid var(--pc,#2a4a3a);border-radius:16px}
+.fld rect{stroke:#07110c;stroke-width:3}
+.fld .num{font:700 12px system-ui,sans-serif;fill:rgba(255,255,255,.55)}
+.fld .ico{font-size:34px;text-anchor:middle;dominant-baseline:central}
+.tok{transition:transform .11s ease}
+.tok circle{stroke:#fff;stroke-width:2.5}
+.tok text{font:800 11px system-ui,sans-serif;fill:#000;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.tok.act circle{animation:tp .7s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+@keyframes tp{from{transform:scale(1)}to{transform:scale(1.35)}}
+.side{display:flex;flex-direction:column;gap:12px}
+.side .panel{margin:0}
+.turn{font-weight:800;font-size:1.25rem;text-align:center;padding:12px 8px;margin:-6px -6px 10px;background:var(--pc,#888);color:#000;letter-spacing:.06em;text-transform:uppercase}
+.voice{font-style:italic;min-height:3.2em;line-height:1.35;color:var(--text)}
+#log{font-size:.78rem;color:var(--muted);max-height:96px;overflow:auto;margin-top:8px;line-height:1.4}
+#log div{padding:1px 0;border-top:1px solid rgba(255,255,255,.06)}
+#rollBtn:not(:disabled){animation:go .8s ease-in-out infinite alternate}
+@keyframes go{from{box-shadow:0 0 0 0 transparent}to{box-shadow:0 0 22px 4px var(--pc,#fff)}}
+.actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;min-height:0}
+.actions .btn.on{outline:3px solid #ffd23f}
+.sc{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 6px;border-radius:10px;font-size:.9rem}
+.sc.act{background:rgba(255,255,255,.08);font-weight:700}
+.sc .l{display:flex;align-items:center;gap:7px;min-width:0}
+.sc .dot{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid #fff}
+.sc .it{font-size:1.05rem;letter-spacing:2px;white-space:nowrap}
+.sc .pos{color:var(--muted);font-size:.78rem;margin-left:4px}
+.legend{display:grid;grid-template-columns:1fr;gap:5px;font-size:.82rem;margin-top:8px}
+.legend div{display:flex;gap:8px;align-items:flex-start}
+.legend b{flex:none;width:26px;text-align:center;font-size:1.05rem}
+.slotrow{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.slotrow .dot{width:18px;height:18px;border-radius:50%;border:2px solid #fff;flex:none}
+.slotrow input{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:0;width:150px}
+.rules ul{margin:6px 0 0;padding-left:18px;line-height:1.55;font-size:.9rem}
+#modal .box{max-width:420px;width:calc(100% - 24px)}
+#modal .ico{font-size:3rem;line-height:1.1}
+#modal p{margin:6px 0 14px;line-height:1.45}
+.mbtns{display:flex;flex-direction:column;gap:8px}
+.mbtns .btn{width:100%}
+@media (max-width:900px){
+  .turn{font-size:1rem;padding:8px}
+  .voice{min-height:2.6em}
+  #log{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Dschungel-Jagd</h1></div>
+
+  <div id="setup" class="panel">
+    <h2>Wer wagt sich in den Dschungel?</h2>
+    <p style="margin:0 0 10px;color:var(--muted)">Ein Brettspiel mit Karten und Aktionsfeldern: Wer zuerst das Herz des Dschungels erreicht, gewinnt. Aber der Dschungel spielt mit …</p>
+    <div id="slots"></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="start">Spiel starten</button></div>
+    <p id="setupErr" style="color:#ff7b7b;margin:6px 0 0"></p>
+    <details class="rules" style="margin-top:14px" open><summary><b>So funktioniert's</b></summary><ul>
+      <li>Würfle und ziehe deine Figur. Auf Aktionsfeldern passiert etwas: Karten, Rätsel, Gefahren, Abkürzungen.</li>
+      <li>Fundstücke (bis zu 3 im Rucksack) helfen dir: <b>🔦 Fackel</b> schützt vor Tieren, <b>🪢 Seil</b> vor Fallen, <b>🛡️ Schild</b> vor jedem Unglück, <b>🪓 Machete</b> gibt +2 auf den Wurf, <b>🧪 Zaubertrank</b> würfelt neu.</li>
+      <li>Nach jeder Runde kann der Dschungel erwachen und alle überraschen.</li>
+      <li>Wer das letzte Feld erreicht oder überschreitet, gewinnt.</li>
+    </ul></details>
+  </div>
+
+  <div id="game" hidden>
+    <div class="layout">
+      <div id="boardWrap"><svg id="board" viewBox="0 0 800 520"></svg></div>
+      <div class="side">
+        <div class="panel">
+          <div class="turn" id="turn"></div>
+          <div class="voice" id="voice"></div>
+          <div id="log"></div>
+        </div>
+        <div class="panel">
+          <div class="die" id="die"></div>
+          <div class="row" style="justify-content:center;margin-top:14px"><button class="btn" id="rollBtn" disabled>Würfeln</button></div>
+          <div class="actions" id="actions"></div>
+        </div>
+        <div class="panel" id="scores"></div>
+        <details class="panel rules"><summary>Felder und Gegenstände</summary><div class="legend" id="legend"></div></details>
+        <button class="btn alt" id="again">Neues Spiel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal" hidden>
+  <div class="box"><div class="ico" id="mIco"></div><h2 id="mTitle"></h2><p id="mText"></p><div class="mbtns" id="mBtns"></div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const NS='http://www.w3.org/2000/svg';
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const CANCEL={};
+
+// ---------- Brett ----------
+const GOAL=39;
+const TYPES={
+  start:{e:'🏁',c:'#2e8b57',n:'Start',d:'Hier beginnt die Jagd.'},
+  goal:{e:'🏆',c:'#d9a521',n:'Herz des Dschungels',d:'Wer hier ankommt (oder darüber hinaus), gewinnt.'},
+  plain:{e:'',c:'#27382f',n:'Dschungelpfad',d:'Nichts passiert.'},
+  card:{e:'🎴',c:'#7b4fd6',n:'Dschungelkarte',d:'Ziehe eine Ereigniskarte: Glück oder Pech.'},
+  item:{e:'🎒',c:'#2f7fd1',n:'Fundstück',d:'Du findest einen Gegenstand für den Rucksack.'},
+  riddle:{e:'❓',c:'#e07b20',n:'Rätsel',d:'Richtig beantwortet: 3 Felder vor. Falsch: 2 zurück.'},
+  vine:{e:'🌿',c:'#2e9b4f',n:'Liane',d:'Du schwingst 4 Felder nach vorn.'},
+  treasure:{e:'💎',c:'#c99a14',n:'Schatz',d:'Ein Gegenstand und noch ein Wurf.'},
+  camp:{e:'⛺',c:'#1c9a8e',n:'Lagerfeuer',d:'Du ruhst dich aus und findest einen Gegenstand.'},
+  swap:{e:'🔄',c:'#c64a9b',n:'Platztausch',d:'Du tauschst den Platz mit dem Führenden (bist du vorn: mit dem Letzten).'},
+  snake:{e:'🐍',c:'#b83a2e',n:'Schlange',d:'3 Felder zurück. 🔦 schützt.'},
+  stampede:{e:'🦏',c:'#a8462a',n:'Stampede',d:'5 Felder zurück. 🔦 schützt.'},
+  quicksand:{e:'🕳️',c:'#8a6a3d',n:'Treibsand',d:'Eine Runde aussetzen. 🪢 schützt.'},
+  swarm:{e:'🐝',c:'#b9941f',n:'Moskitoschwarm',d:'Ein Gegenstand weg (sonst 2 zurück). 🔦 schützt.'}
+};
+const MAP=['start','plain','item','plain','card','vine','plain','snake','riddle','plain',
+  'camp','card','quicksand','plain','item','swap','plain','vine','stampede','riddle',
+  'camp','plain','card','snake','treasure','plain','item','quicksand','card','vine',
+  'swarm','riddle','plain','stampede','card','swap','plain','snake','camp','goal'];
+const ITEMS={
+  fackel:{e:'🔦',n:'Fackel',d:'Schützt vor Schlange, Stampede, Löwe und Moskitos.'},
+  seil:{e:'🪢',n:'Seil',d:'Schützt vor Treibsand, Stolperfalle und Aussetzen.'},
+  schild:{e:'🛡️',n:'Schild',d:'Schützt vor einem beliebigen Unglück.'},
+  machete:{e:'🪓',n:'Machete',d:'+2 auf deinen nächsten Wurf (vor dem Würfeln einsetzen).'},
+  trank:{e:'🧪',n:'Zaubertrank',d:'Nach dem Wurf noch einmal würfeln.'}
+};
+const PCOL=['#ff4d6d','#3ea6ff','#37d67a','#ffd23f'];
+const DEFNAME=['Rot','Blau','Grün','Gelb'];
+const fpos=i=>{const row=Math.floor(i/8),k=i%8,col=row%2===0?k:7-k;return {x:col*100+50,y:(4-row)*100+60};};
+
+// ---------- Zustand ----------
+let P=[],cur=0,token=0,round=0,over=false,rollWait=null,useMachete=false,deck=[],rdeck=[],lines=[];
+const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms));
+const human=p=>p.type==='human';
+
+// ---------- Setup ----------
+function buildSetup(){
+  const def=['human','cpu','cpu','off'];
+  $('slots').innerHTML=[0,1,2,3].map(i=>`<div class="slotrow"><span class="dot" style="background:${PCOL[i]}"></span>
+    <input id="nm${i}" maxlength="12" placeholder="${DEFNAME[i]}" value="">
+    <select id="ty${i}"><option value="human">Mensch</option><option value="cpu">Computer</option><option value="off">Aus</option></select></div>`).join('');
+  def.forEach((d,i)=>$('ty'+i).value=d);
+}
+function startGame(){
+  const pl=[];
+  for(let i=0;i<4;i++){
+    const t=$('ty'+i).value;if(t==='off')continue;
+    const nm=($('nm'+i).value||'').trim()||(t==='cpu'?DEFNAME[i]+' (PC)':DEFNAME[i]);
+    pl.push({i,name:nm.slice(0,16),type:t,col:PCOL[i],pos:0,items:[],skip:0,extra:false});
+  }
+  if(pl.length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
+  $('setupErr').textContent='';
+  P=pl;cur=0;round=0;over=false;token++;lines=[];$('log').innerHTML='';
+  deck=shuffle(CARDS.map((_,i)=>i));rdeck=shuffle(RIDDLES.map((_,i)=>i));
+  $('setup').hidden=true;$('game').hidden=false;$('modal').hidden=true;
+  drawBoard();setDie(0);renderScores();
+  say('Der Dschungel erwacht … wer wagt es, mein Herz zu suchen?');
+  loop();
+}
+function backToSetup(){token++;over=true;rollWait=null;$('game').hidden=true;$('modal').hidden=true;$('setup').hidden=false;buildSetup();}
+$('start').onclick=startGame;$('again').onclick=backToSetup;
+
+// ---------- Zeichnen ----------
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function drawBoard(){
+  const svg=$('board');svg.innerHTML='';
+  const pts=MAP.map((_,i)=>fpos(i));
+  el('polyline',{points:pts.map(p=>p.x+','+(p.y-8)).join(' '),fill:'none',stroke:'rgba(120,200,150,.25)','stroke-width':10,'stroke-linecap':'round','stroke-linejoin':'round','stroke-dasharray':'2 16'},svg);
+  MAP.forEach((t,i)=>{
+    const m=TYPES[t],p=pts[i],g=el('g',{class:'fld'},svg);
+    el('rect',{x:p.x-44,y:p.y-52,width:88,height:88,rx:14,fill:m.c},g);
+    if(t==='plain'){el('circle',{cx:p.x,cy:p.y-12,r:5,fill:'rgba(255,255,255,.18)'},g);}
+    else{const e=el('text',{class:'ico',x:p.x,y:p.y-14},g);e.textContent=m.e;}
+    const n=el('text',{class:'num',x:p.x-38,y:p.y-36},g);n.textContent=i;
+  });
+  P.forEach((pl,k)=>{
+    const g=el('g',{class:'tok',id:'tok'+k},svg);
+    el('circle',{r:10,fill:pl.col},g);
+    const t=el('text',{},g);t.textContent=pl.name.slice(0,1).toUpperCase();
+  });
+  P.forEach((_,k)=>place(k));
+  $('legend').innerHTML=Object.keys(TYPES).filter(k=>k!=='plain').map(k=>`<div><b>${TYPES[k].e}</b><span><b style="width:auto;display:inline">${TYPES[k].n}:</b> ${TYPES[k].d}</span></div>`).join('')+
+    Object.keys(ITEMS).map(k=>`<div><b>${ITEMS[k].e}</b><span><b style="width:auto;display:inline">${ITEMS[k].n}:</b> ${ITEMS[k].d}</span></div>`).join('');
+}
+function place(k){
+  const pl=P[k],p=fpos(pl.pos),x=p.x+(k-(P.length-1)/2)*24,y=p.y+22;
+  $('tok'+k).style.transform=`translate(${x}px,${y}px)`;
+}
+function say(t){
+  $('voice').textContent=t;
+  lines.unshift(t);lines=lines.slice(0,24);
+  $('log').innerHTML=lines.slice(1).map(l=>`<div>${l.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>`).join('');
+}
+function renderScores(){
+  $('scores').innerHTML=P.map((p,k)=>`<div class="sc${k===cur&&!over?' act':''}"><span class="l"><span class="dot" style="background:${p.col}"></span><span>${k===cur&&!over?'▶ ':''}${esc(p.name)}</span><span class="pos">Feld ${p.pos}/${GOAL}${p.skip?' · 💤':''}</span></span><span class="it">${p.items.map(i=>`<span title="${ITEMS[i].n}: ${ITEMS[i].d}">${ITEMS[i].e}</span>`).join('')||'<span style="opacity:.35">leer</span>'}</span></div>`).join('');
+}
+const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+function showTurn(){
+  const p=P[cur];
+  $('turn').textContent=`${p.name} ist dran`;
+  document.body.style.setProperty('--pc',p.col);$('board').style.setProperty('--pc',p.col);
+  document.querySelectorAll('.tok').forEach((g,k)=>g.classList.toggle('act',k===cur));
+  renderScores();
+}
+
+// ---------- Dialog ----------
+function ask({ico,title,text,btns,auto,pick,lock}){
+  return new Promise(res=>{
+    const t=token;let fin=false;
+    $('mIco').textContent=ico||'';$('mTitle').textContent=title||'';$('mText').textContent=text||'';
+    const box=$('mBtns');box.innerHTML='';
+    const done=i=>{if(fin||t!==token)return;fin=true;$('modal').hidden=true;res(i);};
+    btns.forEach((b,i)=>{const e=document.createElement('button');e.className='btn'+(i?' alt':'');e.textContent=b;e.disabled=!!lock;e.onclick=()=>done(i);box.appendChild(e);});
+    $('modal').hidden=false;
+    if(auto)setTimeout(()=>done(typeof pick==='function'?pick():(pick||0)),auto);
+  });
+}
+
+// ---------- Bewegung ----------
+async function walk(p,to){
+  to=Math.max(0,Math.min(GOAL,to));const k=P.indexOf(p),d=Math.sign(to-p.pos);
+  while(p.pos!==to){p.pos+=d;place(k);await sleep(110);}
+  renderScores();
+}
+const mv=(p,n)=>walk(p,p.pos+n);
+function leaderOf(excl){const o=P.filter(q=>q!==excl);return o.length?o.reduce((a,b)=>b.pos>a.pos?b:a):null;}
+function lastOf(excl){const o=P.filter(q=>q!==excl);return o.length?o.reduce((a,b)=>b.pos<a.pos?b:a):null;}
+function protect(p,kind){
+  const k=p.items.includes(kind)?kind:(p.items.includes('schild')?'schild':null);
+  if(!k)return false;
+  p.items.splice(p.items.indexOf(k),1);renderScores();
+  say(`${ITEMS[k].e} ${p.name} setzt ${ITEMS[k].n} ein und bleibt verschont!`);return true;
+}
+function gain(p){
+  const keys=Object.keys(ITEMS),k=keys[rnd(keys.length)];
+  if(p.items.length>=3){say(`${p.name}: Der Rucksack ist voll, ${ITEMS[k].e} ${ITEMS[k].n} bleibt liegen.`);return;}
+  p.items.push(k);renderScores();say(`${p.name} findet ${ITEMS[k].e} ${ITEMS[k].n}!`);
+}
+async function swapWith(p,q){
+  if(!q||q===p)return;
+  const a=p.pos,b=q.pos;p.pos=b;q.pos=a;place(P.indexOf(p));place(P.indexOf(q));renderScores();await sleep(500);
+}
+
+// ---------- Karten ----------
+const CARDS=[
+  {e:'🍃',t:'Rückenwind',x:'Ein warmer Wind trägt dich: 3 Felder vor.',f:async p=>{await mv(p,3);}},
+  {e:'🌊',t:'Wasserfall-Floß',x:'Ein Floß reißt dich mit: 5 Felder vor!',f:async p=>{await mv(p,5);}},
+  {e:'🪤',t:'Stolperfalle',x:'Du verfängst dich im Gestrüpp: 2 Felder zurück. (🪢 schützt)',f:async p=>{if(!protect(p,'seil'))await mv(p,-2);}},
+  {e:'⛈️',t:'Gewitter',x:'Alle Spieler gehen 2 Felder zurück. (🛡️ schützt)',f:async()=>{for(const q of P){if(!protect(q,'schild'))await mv(q,-2);}}},
+  {e:'🐒',t:'Affenbande',x:'Ein Affe klaut einen Gegenstand aus dem Rucksack, sonst 1 Feld zurück. (🔦 schützt)',f:async p=>{
+    if(protect(p,'fackel'))return;
+    if(p.items.length){const k=p.items.splice(rnd(p.items.length),1)[0];renderScores();say(`${p.name} verliert ${ITEMS[k].e} ${ITEMS[k].n} an den Affen!`);}else await mv(p,-1);}},
+  {e:'🗺️',t:'Alte Schatzkarte',x:'Du findest einen Gegenstand.',f:async p=>{gain(p);}},
+  {e:'🦜',t:'Tukan-Express',x:'Du tauschst den Platz mit dem Spieler an der Spitze.',f:async p=>{const l=leaderOf(p);if(l&&l.pos>p.pos){say(`${p.name} tauscht mit ${l.name}!`);await swapWith(p,l);}else say('Du bist schon vorn. Der Tukan fliegt weiter.');}},
+  {e:'🐊',t:'Krokodil im Flussbett',x:'Der Spieler an der Spitze geht 3 Felder zurück. (🛡️ schützt)',f:async p=>{const l=P.reduce((a,b)=>b.pos>a.pos?b:a);if(!protect(l,'schild')){say(`${l.name} wird erwischt!`);await mv(l,-3);}}},
+  {e:'🦁',t:'Löwengebrüll',x:'Ein Löwe jagt dich: 4 Felder zurück. (🔦 schützt)',f:async p=>{if(!protect(p,'fackel'))await mv(p,-4);}},
+  {e:'🍍',t:'Zauberfrucht',x:'Du darfst noch einmal würfeln!',f:async p=>{p.extra=true;}},
+  {e:'🌴',t:'Dschungelgunst',x:'Der Dschungel hilft dem Letzten: Er geht 4 Felder vor.',f:async p=>{const l=P.reduce((a,b)=>b.pos<a.pos?b:a);say(`${l.name} wird vom Dschungel getragen.`);await mv(l,4);}},
+  {e:'🧰',t:'Schatztruhe',x:'Du findest einen Gegenstand und gehst 1 Feld vor.',f:async p=>{gain(p);await mv(p,1);}},
+  {e:'😴',t:'Schlafblume',x:'Ihr Duft macht dich müde: eine Runde aussetzen. (🪢 schützt)',f:async p=>{if(!protect(p,'seil')){p.skip=1;say(`${p.name} schläft ein …`);}}},
+  {e:'🎁',t:'Dschungelfest',x:'Alle anderen bekommen einen Gegenstand, du gehst 3 Felder vor.',f:async p=>{for(const q of P)if(q!==p)gain(q);await mv(p,3);}}
+];
+const GLOBAL=[
+  {e:'🥁',t:'Dschungeltrommeln!',x:'Der Spieler an der Spitze wird zurückgerufen: 4 Felder zurück. (🛡️ schützt)',f:async()=>{const l=P.reduce((a,b)=>b.pos>a.pos?b:a);if(!protect(l,'schild'))await mv(l,-4);}},
+  {e:'🌧️',t:'Dschungelregen',x:'Der Regen erfrischt alle: Jeder geht 1 Feld vor.',f:async()=>{for(const q of P)await mv(q,1);}},
+  {e:'🎁',t:'Geschenk des Dschungels',x:'Jeder Spieler findet einen Gegenstand.',f:async()=>{for(const q of P)gain(q);}}
+];
+const RIDDLES=[
+  {q:'Ich habe Städte ohne Häuser, Berge ohne Bäume und Wasser ohne Fische. Was bin ich?',a:['Eine Landkarte','Eine Wüste','Ein Traum'],c:0},
+  {q:'Je mehr du davon wegnimmst, desto größer wird es. Was ist das?',a:['Ein Loch','Ein Berg','Ein Schatten'],c:0},
+  {q:'Was hat einen Hals, aber keinen Kopf?',a:['Eine Giraffe','Eine Flasche','Ein Hemd'],c:1},
+  {q:'Was wird nass, während es trocknet?',a:['Ein Schwamm','Ein Regenschirm','Ein Handtuch'],c:2},
+  {q:'Was gehört dir, wird aber meistens von anderen benutzt?',a:['Dein Name','Dein Fahrrad','Dein Zimmer'],c:0},
+  {q:'Was hat Zähne, aber beißt nicht?',a:['Ein Kamm','Ein Zebra','Eine Säge'],c:0},
+  {q:'Ich fliege ohne Flügel und weine ohne Augen. Was bin ich?',a:['Ein Drache','Eine Wolke','Ein Blatt'],c:1},
+  {q:'Was kann man zerbrechen, ohne es zu berühren?',a:['Ein Ei','Ein Versprechen','Eine Welle'],c:1},
+  {q:'Je mehr davon da ist, desto weniger siehst du.',a:['Licht','Sand','Dunkelheit'],c:2},
+  {q:'Was hat viele Tasten, aber öffnet keine Tür?',a:['Ein Klavier','Ein Schlüsselbund','Ein Safe'],c:0},
+  {q:'Was hat ein Auge, aber kann nicht sehen?',a:['Eine Nadel','Ein Sturm','Eine Kartoffel'],c:0},
+  {q:'Was wird mehr, wenn man es teilt?',a:['Kuchen','Geld','Wissen'],c:2},
+  {q:'Welches Tier hat 6 Beine und baut Bauten aus Sand, Erde oder Holz?',a:['Die Ameise','Die Spinne','Die Schnecke'],c:0},
+  {q:'Welcher Dschungelbewohner ist das größte Landtier der Erde?',a:['Das Nashorn','Der Elefant','Das Krokodil'],c:1}
+];
+
+// ---------- Ablauf ----------
+async function drawCard(p){
+  if(!deck.length)deck=shuffle(CARDS.map((_,i)=>i));
+  const c=CARDS[deck.pop()];
+  await ask({ico:c.e,title:c.t,text:c.x,btns:['Weiter'],auto:human(p)?0:2200});
+  say(`${p.name} zieht „${c.t}“.`);
+  await c.f(p);
+}
+async function riddle(p){
+  if(!rdeck.length)rdeck=shuffle(RIDDLES.map((_,i)=>i));
+  const r=RIDDLES[rdeck.pop()],order=shuffle([0,1,2]);
+  const pick=()=>Math.random()<.55?order.indexOf(r.c):rnd(3);
+  const i=await ask({ico:'❓',title:'Rätsel des Dschungels',text:r.q,btns:order.map(k=>r.a[k]),auto:human(p)?0:2400,pick,lock:!human(p)});
+  if(order[i]===r.c){say(`${p.name} löst das Rätsel! 3 Felder vor.`);await ask({ico:'✅',title:'Richtig!',text:'Du gehst 3 Felder vor.',btns:['Weiter'],auto:human(p)?0:1100});await mv(p,3);}
+  else{
+    await ask({ico:'❌',title:'Falsch!',text:`Richtig wäre: ${r.a[r.c]}. Du gehst 2 Felder zurück.`,btns:['Weiter'],auto:human(p)?0:1300});
+    if(!protect(p,'schild')){say(`${p.name} liegt falsch.`);await mv(p,-2);}
+  }
+}
+async function land(p){
+  const t=MAP[p.pos],m=TYPES[t];
+  if(t==='plain'||t==='start')return;
+  const note=txt=>say(`${m.e} ${p.name}: ${txt}`);
+  switch(t){
+    case 'card':await drawCard(p);break;
+    case 'riddle':await riddle(p);break;
+    case 'item':case 'camp':gain(p);await sleep(500);break;
+    case 'treasure':gain(p);p.extra=true;note('Ein Schatz! Noch ein Wurf.');await sleep(500);break;
+    case 'vine':note('Du schwingst dich an einer Liane vor!');await mv(p,4);break;
+    case 'snake':if(!protect(p,'fackel')){note('Eine Schlange! 3 Felder zurück.');await mv(p,-3);}break;
+    case 'stampede':if(!protect(p,'fackel')){note('Stampede! 5 Felder zurück.');await mv(p,-5);}break;
+    case 'quicksand':if(!protect(p,'seil')){p.skip=1;note('Treibsand! Du setzt eine Runde aus.');}break;
+    case 'swarm':
+      if(protect(p,'fackel'))break;
+      if(p.items.length){const k=p.items.splice(rnd(p.items.length),1)[0];renderScores();note(`Moskitos! ${ITEMS[k].e} ${ITEMS[k].n} ist weg.`);}
+      else{note('Moskitos! 2 Felder zurück.');await mv(p,-2);}
+      break;
+    case 'swap':{
+      const l=leaderOf(p),s=(l&&l.pos>p.pos)?l:lastOf(p);
+      if(s&&s.pos!==p.pos){note(`Du tauschst mit ${s.name}.`);await swapWith(p,s);}else note('Niemand zum Tauschen.');
+      break;}
+  }
+  renderScores();
+}
+async function getRoll(p){
+  const btn=$('rollBtn');useMachete=false;renderActions(p,true);
+  if(human(p)){
+    btn.disabled=false;btn.textContent=rollLabel();say(`${p.name}, du bist dran. Würfle!`);
+    await new Promise(res=>{rollWait=res;});rollWait=null;btn.disabled=true;
+  }else{
+    if(p.items.includes('machete')&&p.pos<=33&&Math.random()<.6)useMachete=true;
+    say(`${p.name} würfelt …`);await sleep(700);
+  }
+  renderActions(p,false);
+  const roll=async()=>{for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45);}const v=1+rnd(6);dieDone(v);return v;};
+  let v=await roll();
+  if(p.items.includes('trank')){
+    let again=false;
+    if(human(p)){again=(await ask({ico:'🧪',title:`Du hast eine ${v} gewürfelt`,text:'Zaubertrank trinken und neu würfeln?',btns:['Behalten','Neu würfeln']}))===1;}
+    else again=v<=2;
+    if(again){p.items.splice(p.items.indexOf('trank'),1);renderScores();say(`${p.name} trinkt den Zaubertrank und würfelt neu.`);v=await roll();}
+  }
+  let bonus=0;
+  if(useMachete&&p.items.includes('machete')){p.items.splice(p.items.indexOf('machete'),1);bonus=2;renderScores();}
+  say(bonus?`${p.name}: ${v} + 2 (Machete) = ${v+bonus}`:`${p.name} würfelt eine ${v}.`);
+  return v+bonus;
+}
+function renderActions(p,waiting){
+  const a=$('actions');a.innerHTML='';
+  if(!waiting||!human(p)||!p.items.includes('machete'))return;
+  const b=document.createElement('button');b.className='btn alt';b.textContent='🪓 Machete: +2';b.title=ITEMS.machete.d;
+  b.onclick=()=>{useMachete=!useMachete;b.classList.toggle('on',useMachete);b.textContent=useMachete?'🪓 Machete: +2 ✓':'🪓 Machete: +2';};
+  a.appendChild(b);
+}
+async function win(p){
+  over=true;
+  renderScores();say(`${p.name} erreicht das Herz des Dschungels!`);
+  const i=await ask({ico:'🏆',title:`${p.name} gewinnt!`,text:'Das Herz des Dschungels gehört dir. Der Dschungel verneigt sich.',btns:['Nochmal spielen','Zur Auswahl']});
+  if(i===0){const same=P.map(q=>({type:q.type,name:q.name,i:q.i}));
+    P=same.map(q=>({i:q.i,name:q.name,type:q.type,col:PCOL[q.i],pos:0,items:[],skip:0,extra:false}));
+    cur=0;round=0;over=false;token++;lines=[];$('log').innerHTML='';deck=shuffle(CARDS.map((_,i)=>i));rdeck=shuffle(RIDDLES.map((_,i)=>i));
+    drawBoard();setDie(0);renderScores();say('Der Dschungel erwacht erneut …');loop();}
+  else backToSetup();
+}
+async function roundEnd(){
+  round++;
+  if(Math.random()<.25){
+    const g=GLOBAL[rnd(GLOBAL.length)];
+    await ask({ico:g.e,title:'Der Dschungel erwacht!',text:`${g.t} ${g.x}`,btns:['Weiter'],auto:3200});
+    say(`Der Dschungel erwacht: ${g.t}`);
+    await g.f();
+  }
+}
+async function loop(){
+  const t=token;
+  try{
+    while(!over&&t===token){
+      const p=P[cur];showTurn();
+      if(p.skip>0){p.skip--;say(`${p.name} setzt diese Runde aus.`);await sleep(1300);}
+      else{
+        p.extra=false;
+        const v=await getRoll(p);
+        await walk(p,p.pos+v);
+        if(p.pos>=GOAL){await win(p);return;}
+        await land(p);
+        if(p.pos>=GOAL){await win(p);return;}
+        for(const q of P)if(q.pos>=GOAL){await win(q);return;}
+      }
+      if(p.extra&&p.skip===0){say(`${p.name} darf nochmal!`);await sleep(600);continue;}
+      cur=(cur+1)%P.length;
+      if(cur===0)await roundEnd();
+      for(const q of P)if(q.pos>=GOAL){await win(q);return;}
+    }
+  }catch(e){if(e!==CANCEL)throw e;}
+}
+$('rollBtn').onclick=()=>{if(rollWait)rollWait();};
+$('die').onclick=()=>{if(rollWait)rollWait();};
+buildSetup();setDie(0);
+</script>
+</body>
+</html>
