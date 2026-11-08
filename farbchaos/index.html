@@ -79,12 +79,20 @@
 .uc.back::before{background:#e53935}
 .hx{display:none}
 .uc.back .big{color:#fff;font-size:calc(var(--w)*.34);text-shadow:0 1px 3px #000}
-html[data-style="cyber"] .uc{--hx:polygon(50% 0,100% 16%,100% 84%,50% 100%,0 84%,0 16%);background:transparent;border:0;box-shadow:none;overflow:visible;border-radius:0;filter:drop-shadow(0 0 5px var(--c))}
+html[data-style="cyber"] .uc{--hx:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);height:calc(var(--w)*1.1547);background:transparent;border:0;box-shadow:none;overflow:visible;border-radius:0;filter:drop-shadow(0 0 5px var(--c))}
 html[data-style="cyber"] .uc::before{display:none}
 html[data-style="cyber"] .hx{display:block;position:absolute;inset:0;background:var(--c);clip-path:var(--hx)}
-html[data-style="cyber"] .hx::after{content:'';position:absolute;inset:calc(var(--w)*.05);background:linear-gradient(160deg,#0b1424,#04070d);clip-path:var(--hx)}
-html[data-style="cyber"] .uc .big{color:var(--c);text-shadow:0 0 10px var(--c)}
-html[data-style="cyber"] .uc .cn{color:var(--c);text-shadow:0 0 6px var(--c)}
+html[data-style="cyber"] .hx::after{content:'';position:absolute;inset:calc(var(--w)*.045);background:linear-gradient(160deg,#0b1424,#04070d);clip-path:var(--hx)}
+html[data-style="cyber"] .uc .big{color:var(--c);text-shadow:0 0 10px var(--c);font-size:calc(var(--w)*.46)}
+html[data-style="cyber"] .uc .big.sm{font-size:calc(var(--w)*.36)}
+html[data-style="cyber"] #disc .uc{margin:calc(var(--cw)*-.58) 0 0 calc(var(--cw)*-.5)}
+html[data-style="cyber"] #disc{height:calc(var(--cw)*1.3)}
+html[data-style="cyber"] .hand .uc{margin-right:calc(var(--cw)*-.06)}
+html[data-style="cyber"] .opp .obacks .uc{margin-right:calc(var(--cw)*-.2)}
+html[data-style="cyber"] .uc .cn{color:var(--c);text-shadow:0 0 6px var(--c);font-size:calc(var(--w)*.15)}
+html[data-style="cyber"] .uc .cn.a{left:17%;top:29%}
+html[data-style="cyber"] .uc .cn.b{right:17%;bottom:29%}
+html[data-style="cyber"] .spinmode .uc.spin::after{bottom:15%;font-size:calc(var(--w)*.2)}
 html[data-style="cyber"] .uc.wild{--c:#fff}
 html[data-style="cyber"] .uc.wild .hx{background:conic-gradient(#ff2a55 0 25%,#fcee09 0 50%,#2dff7a 0 75%,#00f0ff 0)}
 html[data-style="cyber"] .uc.wild .big{color:#fff;text-shadow:0 0 8px #fff,0 0 14px #00f0ff}
@@ -110,7 +118,8 @@ html[data-style="cyber"] #turnBanner.me{background:linear-gradient(90deg,#c9bd00
 #modal .box{max-width:430px;width:calc(100% - 24px)}
 #modal .ico{font-size:3rem;line-height:1.1}
 #modal p{margin:6px 0 14px;line-height:1.5}
-.mbtns{display:flex;flex-direction:column;gap:8px}
+.mbtns{display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow:auto}
+.spinmode .uc.spin::after{content:'🌀';position:absolute;left:0;right:0;bottom:7%;text-align:center;font-size:calc(var(--w)*.26);line-height:1;z-index:4}
 .mbtns .btn{width:100%}
 .mbtns.cols{display:grid;grid-template-columns:1fr 1fr}
 .mbtns .btn.col0{background:#e53935;color:#fff}.mbtns .btn.col1{background:#f9a825;color:#222}.mbtns .btn.col2{background:#2e9a4a;color:#fff}.mbtns .btn.col3{background:#1e6fd0;color:#fff}
@@ -138,13 +147,14 @@ html[data-style="cyber"] #turnBanner.me{background:linear-gradient(90deg,#c9bd00
     <div class="slotrow"><label for="nopp">Computer-Gegner</label>
       <select id="nopp"><option value="1">1 Gegner</option><option value="2" selected>2 Gegner</option><option value="3">3 Gegner</option></select></div>
     <div class="slotrow"><label for="goal">Spielziel</label>
-      <select id="goal"><option value="0">Eine Runde</option><option value="100">Bis 100 Punkte</option><option value="250" selected>Bis 250 Punkte</option></select></div>
+      <select id="goal"><option value="0">Eine Runde</option><option value="100">Bis 100 Punkte</option><option value="250" selected>Bis 250 Punkte</option><option value="500">Bis 500 Punkte (wie im Original)</option></select></div>
     <h3 style="margin:14px 0 4px;font-size:.95rem">Zusatzregeln (optional)</h3>
     <div class="opts">
       <label><input type="checkbox" id="oStack"><span><b>Plus-Karten kontern (stapeln)</b><small>Wer eine +2 oder +4 bekommt, kann mit einer Plus-Karte kontern und die Strafe weitergeben. Auf +2 passt jede +2 oder +4. Auf eine +4 mit Farbwahl Gelb passt nur eine gelbe +2 (oder wieder eine +4). Wer nicht kontern kann, zieht alles.</small></span></label>
       <label><input type="checkbox" id="oChal"><span><b>+4 anzweifeln</b><small>Der Betroffene darf zweifeln: Hatte der Spieler die bisherige Farbe auf der Hand, zieht er selbst 4. Sonst zieht der Zweifler 6.</small></span></label>
+      <label><input type="checkbox" id="oUno"><span><b>UNO selbst rufen</b><small>Du musst den UNO-Knopf drücken, bevor du die vorletzte Karte legst, sonst ziehst du 2 Strafkarten. Ohne diese Option wird UNO für dich automatisch gerufen.</small></span></label>
       <label><input type="checkbox" id="oSeven"><span><b>7 und 0 (Tauschregel)</b><small>Eine 7 tauscht deine Hand mit einem Spieler deiner Wahl, eine 0 lässt alle Hände in Spielrichtung weiterwandern.</small></span></label>
-      <label><input type="checkbox" id="oSpin"><span><b>Glücksrad (Spin)</b><small>Bei jeder Farbwahl-Karte dreht sich ein Rad mit 8 Überraschungen: alle ziehen, Richtungswechsel, aussetzen, Handtausch, Hände weitergeben und mehr.</small></span></label>
+      <label><input type="checkbox" id="oSpin"><span><b>UNO-Spin-Modus (Rad)</b><small>Wie das Mattel-Spiel UNO Spin: Die Zahlen 1 bis 5 gibt es je Farbe einmal als Spin-Karte (🌀). Wer nach einer Spin-Karte dran ist, muss das Rad drehen statt zu spielen: Beinahe UNO, Zahlen oder Farben ablegen, Zieh Rot/Blau, Karten austauschen, Karten zeigen, Stechen oder UNO Spin.</small></span></label>
     </div>
     <div class="row"><button class="btn" id="start">Gegen den Computer</button><button class="btn alt" id="online">🌐 Online spielen</button><button class="btn alt" id="rejoinBtn" hidden>↩ Wieder ins laufende Spiel</button></div>
     <details class="rules" style="margin-top:14px"><summary><b>Regeln</b></summary><ul>
@@ -207,7 +217,7 @@ const SYM={10:'⊘',11:'⇄',12:'+2',13:'★',14:'+4'};
 const CARDS=[];
 for(let col=0;col<4;col++){
   CARDS.push({id:CARDS.length,col,k:0});
-  for(let k=1;k<=9;k++){CARDS.push({id:CARDS.length,col,k});CARDS.push({id:CARDS.length,col,k});}
+  for(let k=1;k<=9;k++){CARDS.push({id:CARDS.length,col,k});CARDS.push({id:CARDS.length,col,k,spin:k<=5});}
   for(let k=10;k<=12;k++){CARDS.push({id:CARDS.length,col,k});CARDS.push({id:CARDS.length,col,k});}
 }
 for(let i=0;i<4;i++){CARDS.push({id:CARDS.length,col:4,k:13});CARDS.push({id:CARDS.length,col:4,k:14});}
@@ -218,7 +228,7 @@ const cname=c=>c.col===4?(c.k===14?'Farbwahl +4':'Farbwahl'):`${COLN[c.col]} ${c
 function cardHtml(c,cls='',extra=''){
   if(cls.includes('back'))return `<div class="uc back ${cls}"><i class="hx"></i><span class="big">✦</span></div>`;
   const s=sym(c),sm=s.length>1?' sm':'';
-  return `<div class="uc ${c.col===4?'wild':'c'+c.col} ${cls}" data-id="${c.id}" ${extra} title="${esc(cname(c))}"><i class="hx"></i><span class="cn a">${s}</span><span class="big${sm}">${s}</span><span class="cn b">${s}</span></div>`;
+  return `<div class="uc ${c.col===4?'wild':'c'+c.col}${c.spin?' spin':''} ${cls}" data-id="${c.id}" ${extra} title="${esc(cname(c))}"><i class="hx"></i><span class="cn a">${s}</span><span class="big${sm}">${s}</span><span class="cn b">${s}</span></div>`;
 }
 
 /* =====================================================================================
@@ -305,12 +315,12 @@ function uiAsk(spec){
 }
 function answerTurn(a){
   if(!inp||inp.mode!=='turn')return;
-  const r=inp.res;inp=null;hintTxt='';a.uno=unoOn;unoOn=false;unoWarned=false;unoCheck();refresh();r(a);
+  const r=inp.res;inp=null;hintTxt='';a.uno=(V.opts&&V.opts.unoManual)?unoOn:true;unoOn=false;unoWarned=false;unoCheck();refresh();r(a);
 }
 function clickHand(id){
   if(!inp||inp.mode!=='turn')return;
   if(!inp.can.includes(id)){hint('Diese Karte passt nicht: Du brauchst die Farbe '+COLN[V.color]+' oder dasselbe Symbol.');return;}
-  if(V.hand.length===2&&!unoOn&&!confirmUno()){return;}
+  if(V.opts&&V.opts.unoManual&&V.hand.length===2&&!unoOn&&!confirmUno()){return;}
   answerTurn({c:id});
 }
 let unoWarned=false;
@@ -319,11 +329,19 @@ function confirmUno(){   // einmalige Erinnerung statt stiller Strafe
   unoWarned=true;hint('Drücke zuerst UNO!, sonst musst du 2 Karten ziehen. Tippe die Karte nochmal an, wenn du es trotzdem willst.');return false;
 }
 function unoCheck(){
-  const b=$('unoBtn'),mine=inp&&inp.mode==='turn'&&V&&V.hand.length===2;
+  const b=$('unoBtn'),man=!!(V&&V.opts&&V.opts.unoManual);b.style.display=man?'':'none';
+  const mine=man&&inp&&inp.mode==='turn'&&V&&V.hand.length===2;
   b.classList.toggle('ready',!!mine&&!unoOn);b.classList.toggle('on',unoOn);b.textContent=unoOn?'UNO! ✓':'UNO!';
 }
-$('unoBtn').onclick=()=>{if(inp&&inp.mode==='turn'&&V.hand.length===2){unoOn=!unoOn;unoCheck();if(unoOn)sfx('take');}};
-$('hand').addEventListener('click',e=>{const el=e.target.closest('.uc');if(el)clickHand(+el.dataset.id);});
+$('unoBtn').onclick=()=>{if(V.opts&&V.opts.unoManual&&inp&&inp.mode==='turn'&&V.hand.length===2){unoOn=!unoOn;unoCheck();if(unoOn)sfx('take');}};
+$('hand').addEventListener('click',e=>{
+  let el=e.target.closest('.uc');
+  if(inp&&inp.mode==='turn'){   // bei überlappenden Karten die spielbare unter dem Zeiger nehmen
+    const stack=document.elementsFromPoint(e.clientX,e.clientY).map(x=>x.closest&&x.closest('#hand .uc')).filter(Boolean);
+    const ok=stack.find(x=>inp.can.includes(+x.dataset.id));if(ok)el=ok;
+  }
+  if(el)clickHand(+el.dataset.id);
+});
 $('drawPile').addEventListener('click',()=>{if(inp&&inp.mode==='turn'){answerTurn({c:null});}});
 function hint(t){hintTxt=t;$('status').textContent=t;}
 
@@ -391,16 +409,16 @@ function updateBanner(){
   if(me&&!(prevV&&prevV.cur===V.me&&prevV.round===V.round))sfx('ping');
 }
 function ruleText(o){
-  const l=['Farbe oder Zahl/Symbol passt. Wer nicht legen kann, zieht eine Karte (und darf sie legen, wenn sie passt).','UNO! vor der vorletzten Karte drücken, sonst 2 Strafkarten.'];
+  const l=['Farbe oder Zahl/Symbol passt. Wer nicht legen kann, zieht eine Karte (und darf sie legen, wenn sie passt).',o.unoManual?'UNO! vor der vorletzten Karte drücken, sonst 2 Strafkarten.':'UNO wird für dich automatisch gerufen.'];
   if(o.stack)l.push('<b>Kontern:</b> +2 auf +2 oder +4, auf eine +4 nur +4 oder eine +2 in der gewählten Farbe. Wer nicht kontern kann, zieht alles.');
   if(o.challenge)l.push('<b>+4 anzweifeln:</b> Hatte der Spieler die bisherige Farbe, zieht er 4, sonst zieht der Zweifler 6.');
   if(o.sevenzero)l.push('<b>7 und 0:</b> 7 = Hand mit Wunschspieler tauschen, 0 = alle Hände weitergeben.');
-  if(o.spin)l.push('<b>Glücksrad:</b> Bei jeder Farbwahl-Karte dreht sich das Rad mit 8 Überraschungen.');
+  if(o.spin)l.push('<b>UNO Spin:</b> Nach einer Spin-Karte (🌀, Zahl 1 bis 5) muss der Nächste das Rad drehen statt zu spielen. Felder: Beinahe UNO, Zahlen ablegen, Farben ablegen, Zieh Rot, Zieh Blau, Karten austauschen, Karten zeigen, Stechen, UNO Spin.');
   if(!o.stack&&!o.challenge&&!o.sevenzero&&!o.spin)l.push('Keine Zusatzregeln aktiv.');
   return '<ul style="margin:0;padding-left:18px">'+l.map(x=>`<li>${x}</li>`).join('')+'</ul>';
 }
 function renderSide(){
-  updateBanner();$('ruleList').innerHTML=ruleText(V.opts||{});$('penTxt').textContent=V.pen?`Strafe: +${V.pen.n}`:'';
+  document.body.classList.toggle('spinmode',!!(V.opts&&V.opts.spin));updateBanner();$('ruleList').innerHTML=ruleText(V.opts||{});$('penTxt').textContent=V.pen?`Strafe: +${V.pen.n}`:'';
   $('status').textContent=hintTxt||V.status;
   $('log').innerHTML=V.log.map(l=>`<div>${esc(l)}</div>`).join('');
   $('rnd').textContent=V.round+1;
@@ -489,7 +507,7 @@ async function set3d(on){
     try{
       await FC3D.load();
       $('board').hidden=true;$('stage3d').hidden=false;
-      FC3D.init($('stage3d'),{CARDS,COLN,sym,cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard:id=>clickHand(id),onDraw:()=>{if(inp&&inp.mode==='turn')answerTurn({c:null});}});
+      FC3D.init($('stage3d'),{CARDS,COLN,sym,spinMode:()=>!!(V&&V.opts&&V.opts.spin),cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard:id=>clickHand(id),onDraw:()=>{if(inp&&inp.mode==='turn')answerTurn({c:null});}});
       FC3D.setActive(true);use3d=true;
       if(V)FC3D.update(V,inp,true);
     }catch(e){$('board').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
@@ -504,7 +522,7 @@ async function set3d(on){
 $('v3d').onclick=()=>set3d(!use3d);
 try{want3d=localStorage.getItem('fc-3d')==='1';}catch(e){}
 // Zusatzregeln merken
-const OPT_IDS={oStack:'stack',oChal:'challenge',oSeven:'sevenzero',oSpin:'spin'};
+const OPT_IDS={oStack:'stack',oChal:'challenge',oSeven:'sevenzero',oSpin:'spin',oUno:'unoManual'};
 function readOpts(){const o={};for(const id in OPT_IDS)o[OPT_IDS[id]]=$(id).checked;try{localStorage.setItem('fc-opts',JSON.stringify(o));}catch(e){}return o;}
 try{const o=JSON.parse(localStorage.getItem('fc-opts')||'{}');for(const id in OPT_IDS)$(id).checked=!!o[OPT_IDS[id]];}catch(e){}
 // ---------- Computer ----------
@@ -551,24 +569,90 @@ async function drawCards(p,n,quick){
     push();await sleep(quick?170:300);
   }
 }
+// ---------- UNO-Spin-Modus: Spin-Karten (Zahlen 1-5 mit Wirbel) und das Rad ----------
 function rotateHands(){const nh=[];G.hands.forEach((h,i)=>{nh[nextOf(i)]=h;});G.hands=nh.map(sortHand);}
+const uniqCards=a=>{const seen={},o=[];a.forEach(c=>{const k=c.col+'_'+c.k;if(!seen[k]){seen[k]=1;o.push(c);}});return o;};
+function aiPickDiscard(p,list){      // Karte oben legen, die zur häufigsten Farbe der Hand passt
+  const cnt=[0,0,0,0];G.hands[p].forEach(c=>{if(c.col<4)cnt[c.col]++;});
+  let b=0,bs=-1;list.forEach((c,i)=>{const s=c.col===4?-1:cnt[c.col];if(s>bs){bs=s;b=i;}});return b;
+}
+async function pickCard(p,list,title,html){
+  if(list.length===1)return list[0];
+  const i=await ask(p,{k:'dlg',ico:'🃏',title,html,btns:list.map(cname)},()=>aiPickDiscard(p,list));
+  return list[i];
+}
+// Mehrere Karten ablegen: der Spieler bestimmt, welche oben liegt (sie legt Farbe und Zahl für den Weiterspielenden fest)
+async function discardSet(p,cards,what){
+  if(!cards.length)return;
+  const top=await pickCard(p,uniqCards(cards),'Welche Karte soll oben liegen?','Sie bestimmt Farbe und Zahl für den nächsten Spieler.');
+  G.hands[p]=G.hands[p].filter(c=>!cards.includes(c));
+  cards.filter(c=>c!==top).forEach(c=>{G.disc.push(c);G.src[c.id]='hand'+p;});
+  G.disc.push(top);G.src[top.id]='hand'+p;
+  if(top.col===4)G.color=await ask(p,{k:'dlg',ico:'🎨',title:'Farbe wählen',html:'Welche Farbe soll es sein?',btns:COLN,cols:true},()=>aiColor(p));
+  else G.color=top.col;
+  say(p,`${nm(p)} legt ${cards.length} Karte${cards.length>1?'n':''} ab (${what}), oben liegt ${cname(top)}.`,`Du legst ${cards.length} Karte${cards.length>1?'n':''} ab (${what}), oben liegt ${cname(top)}.`);
+  push();await sleep(1000);
+}
+async function drawUntil(p,colr){
+  for(let i=0;i<40;i++){
+    await drawCards(p,1,true);const c=G.hands[p][G.hands[p].length-1];
+    if(!c)return;if(c.col===colr||c.col===4)return;
+    const last=G.src;  // (nur zur Lesbarkeit)
+  }
+}
 const SPINS=[
-  {i:'🃏',t:'Alle anderen ziehen 1 Karte',f:async p=>{for(let q=0;q<N();q++)if(q!==p)await drawCards(q,1,true);}},
-  {i:'🔄',t:'Richtungswechsel',f:async p=>{G.dir*=-1;}},
-  {i:'⊘',t:'Der Nächste setzt aus',f:async p=>{G.extraSkip=true;}},
-  {i:'😖',t:'Pech: Der Spieler zieht 2 Karten',f:async p=>{await drawCards(p,2,true);}},
-  {i:'🎁',t:'Der Spieler gibt eine Zufallskarte ab',f:async p=>{const h=G.hands[p];if(h.length>2){const c=h.splice(rnd(h.length),1)[0];G.deck.unshift(c);}}},
-  {i:'🤝',t:'Handtausch mit dem Nächsten',f:async p=>{const x=nextOf(p);[G.hands[p],G.hands[x]]=[G.hands[x],G.hands[p]];}},
-  {i:'🔁',t:'Alle geben ihre Hand weiter',f:async p=>{rotateHands();}},
-  {i:'😌',t:'Nichts passiert',f:async p=>{}}];
-async function spinWheel(p){
+  {i:'🎯',t:'Beinahe UNO: alle Karten bis auf zwei ablegen',f:async s=>{
+    if(G.hands[s].length<=2){say(-1,'Nur zwei oder weniger Karten: nichts passiert.');return;}
+    const keep=[];let left=G.hands[s].slice();
+    for(let k=1;k<=2;k++){const c=await pickCard(s,uniqCards(left),`Behalte Karte ${k} von 2`,'Alle anderen Karten werden abgelegt.');keep.push(c);left.splice(left.indexOf(c),1);}
+    await discardSet(s,G.hands[s].filter(c=>!keep.includes(c)),'Beinahe UNO');}},
+  {i:'🔢',t:'Zahlen ablegen: alle Karten einer Zahl',f:async s=>{
+    const nums=[...new Set(G.hands[s].filter(c=>c.k<=9).map(c=>c.k))].sort((a,b)=>a-b);
+    if(!nums.length){say(-1,'Keine Zahlenkarten: nichts passiert.');return;}
+    const best=()=>{let b=0,bs=0;nums.forEach((n,i)=>{const c=G.hands[s].filter(x=>x.k===n).length;if(c>bs){bs=c;b=i;}});return b;};
+    const i=await ask(s,{k:'dlg',ico:'🔢',title:'Zahlen ablegen',html:'Welche Zahl legst du ab? Alle Karten mit dieser Zahl gehen weg.',btns:nums.map(n=>String(n))},best);
+    await discardSet(s,G.hands[s].filter(c=>c.k===nums[i]),'Zahl '+nums[i]);}},
+  {i:'🎨',t:'Farben ablegen: alle Karten einer Farbe',f:async s=>{
+    const cols=[0,1,2,3].filter(c=>G.hands[s].some(x=>x.col===c));
+    if(!cols.length){say(-1,'Keine Farbkarten: nichts passiert.');return;}
+    const best=()=>{let b=0,bs=0;cols.forEach((c,i)=>{const n=G.hands[s].filter(x=>x.col===c).length;if(n>bs){bs=n;b=i;}});return b;};
+    const i=await ask(s,{k:'dlg',ico:'🎨',title:'Farben ablegen',html:'Welche Farbe legst du ab? Alle Karten dieser Farbe gehen weg.',btns:cols.map(c=>COLN[c]),cols:cols.length===4},best);
+    await discardSet(s,G.hands[s].filter(c=>c.col===cols[i]),COLN[cols[i]]);}},
+  {i:'🟥',t:'Zieh Rot: ziehen, bis eine rote Karte oder ein Joker kommt',f:async s=>{await drawUntil(s,0);}},
+  {i:'🟦',t:'Zieh Blau: ziehen, bis eine blaue Karte oder ein Joker kommt',f:async s=>{await drawUntil(s,3);}},
+  {i:'🔁',t:'Karten austauschen: alle geben ihre Hand weiter',f:async s=>{rotateHands();say(-1,'Alle geben ihre Hand an den Nachbarn weiter.');push();await sleep(900);}},
+  {i:'👀',t:'Die Karten zeigen: der Spieler zeigt seine Hand',f:async s=>{
+    const list=G.hands[s].map(cname).join(', ')||'keine Karten';
+    await dlgAll(q=>({ico:'👀',title:q===s?'Du zeigst deine Karten':`${esc(nm(s))} zeigt die Karten`,html:esc(list),btns:['Weiter']}),0);}},
+  {i:'⚔️',t:'Stechen: alle legen ihre höchste Zahlenkarte, die höchste darf abgelegt werden',f:async s=>{
+    const es=[];for(let k=0;k<N();k++){const q=(s+k)%N(),nums=G.hands[q].filter(c=>c.k<=9).sort((a,b)=>b.k-a.k);if(nums.length)es.push({q,c:nums[0]});}
+    if(!es.length){say(-1,'Niemand hat eine Zahlenkarte: nichts passiert.');return;}
+    let best=es[0];es.forEach(e=>{if(e.c.k>best.c.k)best=e;});
+    const txt=es.map(e=>`${esc(nm(e.q))}: ${esc(cname(e.c))}`).join('<br>');
+    await dlgAll(q=>({ico:'⚔️',title:'Stechen',html:txt+`<br><br><b>${best.q===q?'Du legst':esc(nm(best.q))+' legt'} die höchste Karte ab.</b>`,btns:['Weiter']}),0);
+    await discardSet(best.q,[best.c],'Stechen');}},
+  {i:'📣',t:'UNO Spin: wer zuerst ruft, legt eine Karte seiner Wahl ab',f:async s=>{
+    const winner=await new Promise(res=>{let done=false;const fin=q=>{if(!done){done=true;res(q);}};
+      G.seats.forEach((st,q)=>{
+        if(st.type==='cpu')setTimeout(()=>fin(q),700+rnd(2300));
+        else ask(q,{k:'dlg',ico:'📣',title:'UNO SPIN!',html:'Wer zuerst drückt, darf eine Karte seiner Wahl ablegen.',btns:['UNO SPIN!']},()=>null).then(()=>fin(q));
+      });});
+    closeDlg();G.seats.forEach(st=>{if(st.type==='remote')L.sendTo(st.seat,{k:'closedlg'});});pend={};
+    say(winner,`${nm(winner)} war am schnellsten und legt eine Karte ab.`,'Du warst am schnellsten und legst eine Karte ab.');push();await sleep(600);
+    const c=await pickCard(winner,uniqCards(G.hands[winner]),'UNO Spin: Karte ablegen','Welche Karte legst du ab?');
+    await discardSet(winner,[c],'UNO Spin');}}];
+async function spinTurn(p){
   const i=rnd(SPINS.length),text=SPINS[i].t;
-  say(p,`${nm(p)} dreht am Glücksrad …`,'Du drehst am Glücksrad …');push();
+  say(p,`${nm(p)} muss das Rad drehen.`,'Du musst das Rad drehen.');push();
+  await ask(p,{k:'dlg',ico:'🌀',title:'Spin-Karte!',html:'Du bist nach der Spin-Karte dran und musst das Rad drehen. Das ersetzt deinen Zug.',btns:['Rad drehen!']},()=>0);
   showSpin(i,text,nm(p));
   G.seats.forEach(s=>{if(s.type==='remote')L.sendTo(s.seat,{k:'spin',i,t:text,who:nm(p)});});
   await sleep(3300);
-  await SPINS[i].f(p);G.hands=G.hands.map(sortHand);
-  say(-1,`Glücksrad: ${text}.`);push();await sleep(700);
+  say(-1,`Rad: ${text}.`);push();
+  await SPINS[i].f(p);
+  G.hands=G.hands.map(sortHand);push();await sleep(600);
+  const w=G.hands.findIndex(h=>h.length===0);
+  return w>=0?{win:w}:nextOf(p);
 }
 async function sevenZero(p,c){
   if(c.k===0){rotateHands();say(-1,`Die Null: Alle geben ihre Hand weiter.`);push();await sleep(900);return;}
@@ -652,8 +736,12 @@ async function turn(p){
   return winCheck(p,c);
 }
 async function winCheck(p,c){
-  if(G.hands[p].length===0)return {win:p};
-  if(G.opts.spin&&c.col===4)await spinWheel(p);
+  if(G.hands[p].length===0){          // Zieh- und Spin-Karten wirken auch als letzte Karte noch
+    if(c.k===12||c.k===14){await drawCards(nextOf(p),c.k===12?2:4,true);}
+    else if(G.opts.spin&&c.spin){await spinTurn(nextOf(p));}
+    return {win:p};
+  }
+  if(G.opts.spin&&c.spin)G.spinDue=true;
   if(G.opts.sevenzero&&c.col<4&&(c.k===7||c.k===0))await sevenZero(p,c);
   return applyEffect(p,c);
 }
@@ -690,7 +778,7 @@ async function playRound(){
     for(let i=0;i<7;i++)for(let p=0;p<n;p++)G.hands[p].push(d.pop());
     G.hands=G.hands.map(sortHand);
     const fi=d.findIndex(c=>c.k<=9);const first=d.splice(fi,1)[0];
-    G.deck=d;G.disc=[first];G.color=first.col;G.dir=1;G.pen=null;G.extraSkip=false;G.src={};CARDS.forEach(c=>{G.src[c.id]='deck';});
+    G.deck=d;G.disc=[first];G.color=first.col;G.dir=1;G.pen=null;G.extraSkip=false;G.spinDue=false;G.src={};CARDS.forEach(c=>{G.src[c.id]='deck';});
     G.cur=G.dealer%n;
     const st=G.cur,rn=G.round+1;
     G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${rn}: ${st===s?'Du beginnst.':nm(st)+' beginnt.'}`});
@@ -702,7 +790,8 @@ async function runLoop(p){
   try{
     while(true){
       G.cur=p;L.snap(snapG('turn'));
-      const r=await turn(p);
+      let r;
+      if(G.spinDue){G.spinDue=false;r=await spinTurn(p);}else r=await turn(p);
       if(typeof r==='object')return endRound(r.win);
       p=r;
       if(G.extraSkip){G.extraSkip=false;say(p,`${nm(p)} muss wegen des Glücksrads aussetzen.`,'Du musst wegen des Glücksrads aussetzen.');push();await sleep(700);p=nextOf(p);}
@@ -713,12 +802,12 @@ async function runLoop(p){
 function snapG(phase){
   const ids=a=>a.map(c=>c.id);
   return {phase,round:G.round,goal:G.goal,opts:G.opts,scores:G.scores.slice(),dealer:G.dealer,hands:G.hands.map(ids),deck:ids(G.deck),disc:ids(G.disc),color:G.color,dir:G.dir,cur:G.cur,pen:G.pen,
-    seats:G.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),logE:G.logE.filter(e=>!e.per).slice(0,15).map(e=>({p:e.p,a:e.a,b:e.b})),src:G.src};
+    spinDue:!!G.spinDue,seats:G.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),logE:G.logE.filter(e=>!e.per).slice(0,15).map(e=>({p:e.p,a:e.a,b:e.b})),src:G.src};
 }
 function onMigrate(snap,info){
   token++;pend={};closeDlg();inp=null;ROLE='host';prevV=null;V=null;lastCnt={};hintTxt='';unoOn=false;
   const ids=a=>a.map(i=>CARDS[i]);
-  G={round:snap.round,goal:snap.goal,opts:snap.opts,scores:snap.scores,dealer:snap.dealer,hands:snap.hands.map(ids),deck:ids(snap.deck),disc:ids(snap.disc),color:snap.color,dir:snap.dir,cur:snap.cur,pen:snap.pen,extraSkip:false,
+  G={round:snap.round,goal:snap.goal,opts:snap.opts,scores:snap.scores,dealer:snap.dealer,hands:snap.hands.map(ids),deck:ids(snap.deck),disc:ids(snap.disc),color:snap.color,dir:snap.dir,cur:snap.cur,pen:snap.pen,extraSkip:false,spinDue:!!snap.spinDue,
     seats:snap.seats.map(s=>Object.assign({},s)),logE:snap.logE,src:snap.src};
   G.seats.forEach(s=>{
     if(s.seat===info.you)s.type='host';

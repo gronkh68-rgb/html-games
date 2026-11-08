@@ -2,7 +2,7 @@
    FC3D.load() -> Promise   FC3D.init(hostEl, api)   FC3D.update(V, inp, instant)   FC3D.setActive(bool)
    api: { CARDS, COLN, sym(card), cyber(), sfx(name), onCard(id), onDraw() }                               */
 (function () {
-  var CW = 2.4, CH = 3.6, MAXV = 14;
+  var CW = 2.4, CH = 3.6, MAXV = 14, HEXR = 1.1547;
   var F = window.FC3D = { ready: false };
   var host, api, r, scene, camera, controls, world, env = [], cards = {}, labels = {}, tw = [], fx = [], texCache = {}, geo = null, geoStyle = '';
   var shGeo, shTex, ray, mouse, lastV = null, lastInp = null, hoverId = null, down = null, active = false, rain = null, room = null, lastT = 0, lastR = 0, camD = 40;
@@ -26,7 +26,7 @@
   function shapeFor(cy) {
     var s = new THREE.Shape(), w = CW / 2, h = CH / 2;
     if (cy) {
-      var k = .16 * CH;
+      var k = .25 * CH;
       s.moveTo(0, h); s.lineTo(w, h - k); s.lineTo(w, -h + k); s.lineTo(0, -h); s.lineTo(-w, -h + k); s.lineTo(-w, h - k); s.closePath();
     } else {
       var q = .26;
@@ -42,15 +42,15 @@
   }
   function hexPath(x, w, h, k) { x.beginPath(); x.moveTo(w / 2, 0); x.lineTo(w, k); x.lineTo(w, h - k); x.lineTo(w / 2, h); x.lineTo(0, h - k); x.lineTo(0, k); x.closePath(); }
   function drawCard(c, back, cy) {
-    var cv = document.createElement('canvas'); cv.width = 256; cv.height = 384; var x = cv.getContext('2d'), W = 256, H = 384;
+    var W = 256, H = cy ? Math.round(256 * HEXR) : 384, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
     var wild = !back && c.col === 4, col = back ? (cy ? '#00f0ff' : '#15171c') : (wild ? '#222' : (cy ? NEON[c.col] : HEX[c.col]));
     var s = back ? '✦' : api.sym(c), small = s.length > 1;
     function wildFill(a) { var g = x.createLinearGradient(0, 0, W, H); ['#e53935', '#f9a825', '#2e9a4a', '#1e6fd0'].forEach(function (cc, i) { g.addColorStop(i / 3, cc); }); return g; }
     if (cy) {
       x.fillStyle = '#04070d'; x.fillRect(0, 0, W, H);
-      hexPath(x, W, H, .16 * H); x.save(); x.clip();
+      hexPath(x, W, H, .25 * H); x.save(); x.clip();
       var bg = x.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#0b1424'); bg.addColorStop(1, '#04070d'); x.fillStyle = bg; x.fillRect(0, 0, W, H); x.restore();
-      x.lineWidth = 16; x.strokeStyle = wild ? wildFill() : col; x.shadowColor = wild ? '#fff' : col; x.shadowBlur = 14; hexPath(x, W, H, .16 * H); x.stroke(); x.shadowBlur = 0;
+      x.lineWidth = 16; x.strokeStyle = wild ? wildFill() : col; x.shadowColor = wild ? '#fff' : col; x.shadowBlur = 14; hexPath(x, W, H, .25 * H); x.stroke(); x.shadowBlur = 0;
     } else {
       x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
       x.fillStyle = back ? '#15171c' : (wild ? '#222' : col); x.fillRect(14, 14, W - 28, H - 28);
@@ -60,19 +60,21 @@
       x.restore();
     }
     x.textAlign = 'center'; x.textBaseline = 'middle';
-    var big = (small ? 96 : 150) + 'px system-ui,sans-serif', tc = cy ? (wild ? '#fff' : col) : (wild ? '#fff' : (back ? '#fff' : col));
+    var big = (cy ? (small ? 78 : 118) : (small ? 96 : 150)) + 'px system-ui,sans-serif', tc = cy ? (wild ? '#fff' : col) : (wild ? '#fff' : (back ? '#fff' : col));
     x.font = 'bold ' + big;
     if (!cy && wild) { x.lineWidth = 10; x.strokeStyle = '#000'; x.strokeText(s, W / 2, H / 2 + 6); }
     if (cy) { x.shadowColor = wild ? '#00f0ff' : col; x.shadowBlur = 16; }
     x.fillStyle = tc; x.fillText(s, W / 2, H / 2 + 6); x.shadowBlur = 0;
     if (!back) {
       x.font = 'bold 40px system-ui,sans-serif'; x.fillStyle = cy ? (wild ? '#fff' : col) : '#fff';
-      x.fillText(s, 44, small ? 62 : 56); x.save(); x.translate(W, H); x.rotate(Math.PI); x.fillText(s, 44, small ? 62 : 56); x.restore();
+      var cx0 = cy ? 62 : 44, cy0 = cy ? 84 : (small ? 62 : 56);
+      x.font = 'bold ' + (cy ? 32 : 40) + 'px system-ui,sans-serif'; x.fillText(s, cx0, cy0); x.save(); x.translate(W, H); x.rotate(Math.PI); x.fillText(s, cx0, cy0); x.restore();
     }
+    if (!back && c.spin && api.spinMode()) { x.font = (cy ? 44 : 56) + 'px system-ui,sans-serif'; x.fillStyle = '#fff'; x.fillText('🌀', W / 2, H - (cy ? 56 : 70)); }
     var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
   function tex(c, back) {
-    var key = (cyber() ? 'c' : 'k') + (back ? 'b' : c.id);
+    var key = (cyber() ? 'c' : 'k') + (back ? 'b' : c.id) + (!back && c.spin && api.spinMode() ? 's' : '');
     return texCache[key] || (texCache[key] = drawCard(c, back, cyber()));
   }
 
@@ -90,7 +92,7 @@
     world = new THREE.Group(); scene.add(world);
     var sc = document.createElement('canvas'); sc.width = sc.height = 64; var sx = sc.getContext('2d'), g = sx.createRadialGradient(32, 32, 4, 32, 32, 32);
     g.addColorStop(0, 'rgba(0,0,0,.65)'); g.addColorStop(1, 'rgba(0,0,0,0)'); sx.fillStyle = g; sx.fillRect(0, 0, 64, 64);
-    shTex = new THREE.CanvasTexture(sc); shGeo = new THREE.PlaneGeometry(CW * 1.4, CH * 1.25);
+    shTex = new THREE.CanvasTexture(sc); shGeo = new THREE.PlaneGeometry(CW * 1.4, CH * 1.25); CH = cyber() ? CW * HEXR : 3.6;
     ray = new THREE.Raycaster(); mouse = new THREE.Vector2();
     buildEnv(); styleCheck();
     new MutationObserver(function () { buildEnv(); styleCheck(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
@@ -122,7 +124,7 @@
   };
   function styleCheck() {   // Kartenform hängt vom Stil ab: bei Wechsel alle Karten neu aufbauen
     var s = cyber() ? 'c' : 'k';
-    if (s === curStyle) return; curStyle = s; geo = makeGeo(cyber());
+    if (s === curStyle) return; curStyle = s; CH = cyber() ? CW * HEXR : 3.6; shGeo = new THREE.PlaneGeometry(CW * 1.4, CH * 1.25); geo = makeGeo(cyber());
     Object.keys(cards).forEach(drop); backMat = null; lastKeep = null;
     if (lastV && F.ready) F.update(lastV, lastInp, true);
   }
@@ -309,10 +311,15 @@
     lastV.hand.forEach(function (id) { var o = cards['c' + id]; if (o) { list.push(o.front); } });
     var topKey = 'd' + (Math.min(lastV.deckN, MAXV) - 1), tk = cards[topKey];
     if (tk) list.push(tk.front);
-    var hit = ray.intersectObjects(list, false)[0];
+    world.updateMatrixWorld(true);
+    var hits = ray.intersectObjects(list, false), hit = hits[0];
     if (!hit) return null;
+    if (lastInp && lastInp.mode === 'turn') {   // bei überlappenden Karten die spielbare unter dem Zeiger bevorzugen
+      for (var q = 0; q < hits.length; q++) { var gi = hits[q].object.userData.top.userData.id; if (gi != null && lastInp.can.indexOf(gi) >= 0) { hit = hits[q]; break; } }
+    }
     var g = hit.object.userData.top; return g.userData.id != null ? g.userData.id : 'draw';
   }
+  F.pick = function (cx, cy) { return pickAt({ clientX: cx, clientY: cy }); };
   F.screenOf = function (id) {
     var o = cards['c' + id]; if (!o) return null;
     var v = new THREE.Vector3(); o.mesh.getWorldPosition(v); v.project(camera);
