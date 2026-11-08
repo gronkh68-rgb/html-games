@@ -202,7 +202,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
     <div class="row"><label>Dein Name</label><input id="myName" maxlength="14" placeholder="Name"></div>
     <div class="row"><label for="diceMode">Würfel</label>
       <select id="diceMode"><option value="bag">Ausgeglichen: jeder Spieler hat seinen eigenen Würfel</option><option value="rand">Echter Zufall (ein gemeinsamer Würfel)</option></select></div>
-    <p class="hint" id="diceHint" style="margin:-2px 0 8px;font-size:.8rem;color:var(--muted)">Ausgeglichen: Jeder Spieler würfelt aus einem eigenen Beutel mit je zwei Mal 1 bis 6. So bekommt jeder auf Dauer gleich viele Sechsen, Pechsträhnen sind kürzer. Online gilt die Einstellung des Hosts.</p>
+    <p class="hint" id="diceHint" style="margin:-2px 0 8px;font-size:.8rem;color:var(--muted)">Ausgeglichen: Jeder Spieler würfelt aus einem eigenen Beutel mit 1 bis 6 (alle sechs Würfe je einmal). Nach höchstens 5 Würfen ohne 6 kommt sicher eine, und zwei Sechsen direkt hintereinander gibt es nicht. Online gilt die Einstellung des Hosts.</p>
     <div class="row" id="modeTabs">
       <button class="btn" data-m="local">Lokal</button>
       <button class="btn alt" data-m="host">Online: Raum erstellen</button>
@@ -610,11 +610,21 @@ function setPhys(on){
 
 // ---------- Ablauf ----------
 // Würfelzahl: "Ausgeglichen" zieht pro Spieler aus einem eigenen Beutel (zwei Mal 1–6, gemischt), "Echter Zufall" wie bisher
-let bags=[[],[],[],[]];
+let bags=[[],[],[],[]],gap=[0,0,0,0],lastV=[0,0,0,0];
 function rollValue(p){
   if(($('diceMode')||{}).value!=='bag')return 1+Math.floor(Math.random()*6);
-  if(!bags[p].length){const b=[1,2,3,4,5,6,1,2,3,4,5,6];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}bags[p]=b;}
-  return bags[p].pop();
+  const bag=bags[p];let v;
+  if(gap[p]>=5){                                   // nach 5 Würfen ohne 6 kommt sicher eine
+    v=6;const i=bag.indexOf(6);if(i>=0)bag.splice(i,1);
+  }else{
+    if(!bag.length){const b=[1,2,3,4,5,6];for(let i=5;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}bags[p]=b;}
+    const bg=bags[p];let i=bg.length-1;
+    if(bg[i]===6&&lastV[p]===6&&bg.length>1)i=bg.length-2;       // keine zwei Sechsen direkt hintereinander
+    else if(bg[i]===6&&lastV[p]===6){bags[p]=[];return rollValue(p);}
+    v=bg.splice(i,1)[0];
+  }
+  gap[p]=v===6?0:gap[p]+1;lastV[p]=v;
+  return v;
 }
 async function doRoll(p){
   const btn=$('rollBtn');
@@ -786,7 +796,7 @@ function startGame(){
 }
 function launch(){            // startet das Spiel mit den Werten in cfg und names
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
-  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);bags=[[],[],[],[]];
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
   pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
