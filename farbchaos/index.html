@@ -666,7 +666,7 @@ async function vote(specFor){
 }
 async function endRound(w){
   let pt=0;G.hands.forEach((h,i)=>{if(i!==w)h.forEach(c=>{pt+=pts(c);});});
-  G.scores[w]+=pt;G.round++;G.cur=-1;G.dealer=w;G.pen=null;
+  G.scores[w]+=pt;G.round++;G.cur=-1;G.dealer=w;G.pen=null;L.snap(snapG('between'));
   say(w,`${nm(w)} gewinnt die Runde (+${pt} Punkte).`,`Du gewinnst die Runde (+${pt} Punkte).`);push();
   const over=G.goal===0||G.scores[w]>=G.goal;
   if(over)return finishGame();
@@ -695,14 +695,42 @@ async function playRound(){
     const st=G.cur,rn=G.round+1;
     G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${rn}: ${st===s?'Du beginnst.':nm(st)+' beginnt.'}`});
     push();await sleep(1900);
-    let p=G.cur;
+    return runLoop(G.cur);
+  }catch(e){if(e!==CANCEL)throw e;}
+}
+async function runLoop(p){
+  try{
     while(true){
+      G.cur=p;L.snap(snapG('turn'));
       const r=await turn(p);
       if(typeof r==='object')return endRound(r.win);
       p=r;
       if(G.extraSkip){G.extraSkip=false;say(p,`${nm(p)} muss wegen des Glücksrads aussetzen.`,'Du musst wegen des Glücksrads aussetzen.');push();await sleep(700);p=nextOf(p);}
     }
   }catch(e){if(e!==CANCEL)throw e;}
+}
+// Spielstand für den Host-Wechsel (wird an jedem Zugbeginn an den Nachfolger geschickt)
+function snapG(phase){
+  const ids=a=>a.map(c=>c.id);
+  return {phase,round:G.round,goal:G.goal,opts:G.opts,scores:G.scores.slice(),dealer:G.dealer,hands:G.hands.map(ids),deck:ids(G.deck),disc:ids(G.disc),color:G.color,dir:G.dir,cur:G.cur,pen:G.pen,
+    seats:G.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),logE:G.logE.filter(e=>!e.per).slice(0,15).map(e=>({p:e.p,a:e.a,b:e.b})),src:G.src};
+}
+function onMigrate(snap,info){
+  token++;pend={};closeDlg();inp=null;ROLE='host';prevV=null;V=null;lastCnt={};hintTxt='';unoOn=false;
+  const ids=a=>a.map(i=>CARDS[i]);
+  G={round:snap.round,goal:snap.goal,opts:snap.opts,scores:snap.scores,dealer:snap.dealer,hands:snap.hands.map(ids),deck:ids(snap.deck),disc:ids(snap.disc),color:snap.color,dir:snap.dir,cur:snap.cur,pen:snap.pen,extraSkip:false,
+    seats:snap.seats.map(s=>Object.assign({},s)),logE:snap.logE,src:snap.src};
+  G.seats.forEach(s=>{
+    if(s.seat===info.you)s.type='host';
+    else if(s.type==='host'){s.type='cpu';s.name=s.name+' (Computer)';s.away=false;}
+    else if(s.type==='remote'){s.orig=s.name;s.name=s.name+' (Computer)';s.type='cpu';s.away=true;}
+  });
+  ME=G.seats.findIndex(s=>s.type==='host');
+  $('setup').hidden=true;$('game').hidden=false;
+  say(-1,'Der Host hat gewechselt. Das Spiel läuft weiter.');
+  push();
+  if(snap.phase==='between'){const over=G.goal===0||Math.max(...G.scores)>=G.goal;(over?finishGame():playRound());return;}
+  runLoop(G.cur);
 }
 function startGame(seats,goal,opts){
   token++;inp=null;pend={};closeDlg();prevV=null;V=null;lastCnt={};hintTxt='';unoOn=false;unoWarned=false;
@@ -713,8 +741,15 @@ function startGame(seats,goal,opts){
   playRound();
 }
 function backToSetup(){token++;inp=null;pend={};closeDlg();G=null;V=null;prevV=null;$('game').hidden=true;$('setup').hidden=false;document.title='Farbchaos';}
-function exitGame(){
-  if(ROLE==='host'&&L.role==='host'){backToSetup();ROLE='local';L.backToLobby();return;}
+async function exitGame(ask){
+  if(ROLE==='host'&&L.role==='host'){
+    if(ask&&G&&G.seats.some(s=>s.type==='remote')&&L.backup){
+      const i=await dlg({ico:'🚪',title:'Spiel verlassen',html:'Soll das Spiel für alle enden, oder soll ein anderer Spieler Host werden und mit den anderen weiterspielen?',btns:['Verlassen, die anderen spielen weiter','Spiel für alle beenden','Abbrechen']});
+      if(i===2)return;
+      if(i===0){L.handover();await new Promise(r=>setTimeout(r,500));ROLE='local';L.leave();backToSetup();return;}
+    }
+    backToSetup();ROLE='local';L.backToLobby();return;
+  }
   if(ROLE==='client'){try{L.leave();}catch(e){}ROLE='local';}
   backToSetup();
 }
@@ -727,14 +762,14 @@ $('start').onclick=()=>{
 $('online').onclick=()=>L.open();
 $('rejoinBtn').onclick=()=>L.rejoin();
 function updRejoin(){$('rejoinBtn').hidden=!L.hasRejoin();}
-$('again').onclick=exitGame;
+$('again').onclick=()=>exitGame(true);
 
 // ---------- Online ----------
 L=MP.init({
   prefix:'fch-v1-',title:'Farbchaos',
   seats:[{name:'Rot',color:'#e53935'},{name:'Gelb',color:'#f9a825'},{name:'Grün',color:'#2e9a4a'},{name:'Blau',color:'#1e6fd0'}],
-  minPlayers:2,bots:true,rejoin:true,
-  onRejoin:onRejoin,
+  minPlayers:2,bots:true,rejoin:true,migrate:true,
+  onRejoin:onRejoin,onMigrate:onMigrate,
   onStart(info){
     token++;ROLE=info.role;
     if(info.role==='host'){

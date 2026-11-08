@@ -111,6 +111,39 @@
       conn.on('data', function (m) { onHostMsg(conn, m); });
       conn.on('close', function () { dropRemote(conn); });
     }
+    // ---------- Host-Wechsel: ein Mitspieler hält einen zweiten Raum bereit und bekommt laufend den Spielstand ----------
+    function ensureBackup() {
+      if (!cfg.migrate || L.role !== 'host' || !L.playing) return;
+      if (L.backup && L.seats[L.backup.seat] && L.seats[L.backup.seat].type === 'remote') return;
+      L.backup = null; var si = -1;
+      L.seats.forEach(function (s, k) { if (si < 0 && s.type === 'remote' && s.conn && s.conn.open) si = k; });
+      L.pendingSucc = si; if (si < 0) return;
+      var info = L.seats.map(function (s) { return { type: s.type, name: s.name || '', rid: s.rid || null }; });
+      try { L.seats[si].conn.send({ t: 'standby', seats: info, hostSeat: hostSeat() }); } catch (e) {}
+    }
+    function broadcastBackup() {
+      if (!L.backup) return;
+      L.seats.forEach(function (s) { if (s.conn && s.conn.open) try { s.conn.send({ t: 'backup', seat: L.backup.seat, code: L.backup.code }); } catch (e) {} });
+    }
+    L.snap = function (d) {                              // Spiel ruft das an jedem Zugbeginn auf
+      L.lastSnap = d;
+      if (!cfg.migrate || L.role !== 'host' || !L.backup) return;
+      var s = L.seats[L.backup.seat]; if (s && s.conn && s.conn.open) try { s.conn.send({ t: 'snap', d: d }); } catch (e) {}
+    };
+    L.handover = function () {                           // Host geht freiwillig: alle wechseln zum Nachfolger
+      if (L.role !== 'host' || !L.backup || !L.playing) return false;
+      L.handedOver = true;
+      L.seats.forEach(function (s) { if (s.conn && s.conn.open) try { s.conn.send({ t: 'migrate' }); } catch (e) {} });
+      return true;
+    };
+    L.canHandover = function () { return !!(L.role === 'host' && L.playing && L.backup && L.seats.some(function (s, k) { return k !== L.backup.seat && s.type === 'remote'; }) || (L.role === 'host' && L.playing && L.backup)); };
+    setInterval(function () { if (L.role === 'host' && L.playing) ensureBackup(); }, 4000);
+    var toastT = 0;
+    function toast(t) {
+      var e = document.getElementById('mpToast');
+      if (!e) { e = document.createElement('div'); e.id = 'mpToast'; e.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:990;background:#ffd23f;color:#1b1200;font-weight:800;padding:10px 18px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.5)'; document.body.appendChild(e); }
+      e.textContent = t || ''; e.hidden = !t; clearTimeout(toastT); if (t) toastT = setTimeout(function () { e.hidden = true; }, 12000);
+    }
     function hostSeat() { for (var i = 0; i < L.seats.length; i++) if (L.seats[i].type === 'host') return i; return -1; }
     function onHostMsg(conn, m) {
       if (!m || typeof m !== 'object') return;
@@ -125,6 +158,7 @@
           try { conn.send({ t: 'welcome', slot: ri }); } catch (e) {}
           try { conn.send({ t: 'start', you: ri, seats: lobbyInfo() }); } catch (e) {}
           if (cfg.onRejoin) cfg.onRejoin(ri);
+          setTimeout(ensureBackup, 300);
           return;
         }
         var i = -1; L.seats.forEach(function (s, k) { if (i < 0 && s.type === 'open') i = k; });
@@ -134,6 +168,10 @@
         broadcastLobby(); return;
       }
       if (conn.slot === undefined) return;
+      if (m.t === 'standbyReady') {
+        if (cfg.migrate && !L.backup && conn.slot === L.pendingSucc) { L.backup = { seat: conn.slot, code: String(m.code || '') }; broadcastBackup(); if (L.lastSnap) L.snap(L.lastSnap); }
+        return;
+      }
       if (m.t === 'color') {
         var to = +m.slot;
         if (!L.playing && Number.isInteger(to) && L.seats[to] && L.seats[to].type === 'open') moveSlot(conn.slot, to);
@@ -147,6 +185,8 @@
       var old = L.seats[i];
       L.seats[i] = { type: cfg.bots ? 'cpu' : 'left', name: '', rid: cfg.rejoin ? old.rid : undefined, away: !!(cfg.rejoin && old.rid) };
       if (cfg.onSeatDrop) cfg.onSeatDrop(i);
+      if (L.backup && L.backup.seat === i) L.backup = null;
+      setTimeout(ensureBackup, 300);
     }
     function moveSlot(from, to) {
       if (L.playing || !L.seats[from] || !L.seats[to] || L.seats[to].type !== 'open') return;
@@ -196,6 +236,7 @@
       L.seats.forEach(function (s, i) { if (s.conn && s.conn.open) try { s.conn.send({ t: 'start', you: i, seats: info }); } catch (e) {} });
       L.you = hostSeat(); L.close();
       cfg.onStart({ role: 'host', you: L.you, seats: info });
+      L.backup = null; L.lastSnap = null; setTimeout(ensureBackup, 600);
     };
     $('mpCopy').onclick = function () {
       if (!L.room) return;
@@ -237,7 +278,7 @@
     }
     function onClientMsg(m) {
       if (!m || typeof m !== 'object') return;
-      if (m.t === 'welcome') { saveLast(L.joinCode); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
+      if (m.t === 'welcome') { if (L.migrating) { L.migrating = false; toast(''); L.backup = null; } saveLast(L.joinCode); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
       else if (m.t === 'lobby') {
         L.you = m.you; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false;
         if (L.playing || m.back) { L.playing = false; if (cfg.onBackToLobby) cfg.onBackToLobby(); ov.hidden = false; showMode('join'); $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
@@ -247,13 +288,71 @@
           return row(i, '<span class="who">' + who + '</span>');
         }).join('');
       }
+      else if (m.t === 'standby') { becomeStandby(m); }
+      else if (m.t === 'backup') { L.backup = { seat: m.seat, code: m.code }; }
+      else if (m.t === 'snap') { L.snapData = m.d; }
+      else if (m.t === 'migrate') { startMigration(); }
       else if (m.t === 'start') { L.playing = true; L.you = m.you; ov.hidden = true; if (cfg.onStart) cfg.onStart({ role: 'client', you: m.you, seats: m.seats }); }
       else if (m.t === 'g') { if (cfg.onData) cfg.onData(-1, m.d); }
       else if (m.t === 'full') { var w = m.why || 'Der Raum ist voll'; L.leave(); clearLast(); err(w); showMode('join'); }
       else if (m.t === 'kicked') { var why = m.why || 'Verbindung beendet'; if (/Host/.test(why)) clearLast(); L.leave(); ov.hidden = false; showMode('join'); err(why); if (cfg.onLeave) cfg.onLeave(why); }
     }
+    function becomeStandby(m) {
+      L.standbySeats = m;
+      if (L.standby && L.standby.code) { L.send2host({ t: 'standbyReady', code: L.standby.code }); return; }
+      if (L.standbyOpening) return; L.standbyOpening = true;
+      (async function () {
+        var r = null;
+        for (var i = 0; i < 4 && !r; i++) { try { r = await Net.host(cfg.prefix, Net.newCode(), onStandbyConn); } catch (e) { r = null; } }
+        L.standbyOpening = false; if (!r) return;
+        L.standby = { room: r, code: r.code, queue: [] };
+        L.send2host({ t: 'standbyReady', code: r.code });
+      })();
+    }
+    function onStandbyConn(conn) {
+      conn.on('data', function (m) { if (L.role === 'host') onHostMsg(conn, m); else if (L.standby) L.standby.queue.push([conn, m]); });
+      conn.on('close', function () { if (L.role === 'host') dropRemote(conn); });
+    }
+    function startMigration() {
+      if (L.migrating || L.leaving || L.role !== 'client' || !cfg.migrate || !L.backup || !L.backup.code) { if (!L.migrating) { L.leave(); ov.hidden = false; showMode('join'); err('Der Host hat das Spiel verlassen.'); if (cfg.onLeave) cfg.onLeave('Host weg'); } return; }
+      L.migrating = true; toast('Der Host ist weg. Ein neuer Host übernimmt …');
+      try { var hc = L.hostConn; L.hostConn = null; hc && hc.close(); } catch (e) {}
+      if (L.standby && L.you === L.backup.seat) setTimeout(becomeHost, 300);
+      else setTimeout(function () { migJoin(12); }, 1800);
+    }
+    function migJoin(tries) {
+      if (!L.migrating) return;
+      L.joinCode = L.backup.code;
+      L.joiner = Net.join(cfg.prefix, L.backup.code, {
+        attach: function (c) { L.hostConn = c; c.on('data', onClientMsg); c.on('close', onClientClose); },
+        open: function (c) { try { c.send({ t: 'hello', name: myName(), rid: myRid() }); } catch (e) {} },
+        fail: function () { if (tries > 0 && L.migrating) setTimeout(function () { migJoin(tries - 1); }, 1500); else giveUp(); }
+      });
+    }
+    function giveUp() {
+      L.migrating = false; toast(''); L.leave(); ov.hidden = false; showMode('join'); err('Der Host ist weg und es konnte kein neuer Host verbunden werden.');
+      if (cfg.onLeave) cfg.onLeave('Host weg');
+    }
+    function becomeHost() {
+      var sd = L.standbySeats;
+      if (!L.standby || !sd || !L.snapData) { giveUp(); return; }
+      L.room = L.standby.room; L.role = 'host'; L.playing = true; L.migrating = false; L.hostConn = null; L.backup = null; L.lastSnap = L.snapData; toast('');
+      var me = L.you;
+      L.seats = sd.seats.map(function (s, i) {
+        if (i === me) return { type: 'host', name: myName(), rid: myRid() };
+        if (i === sd.hostSeat) return { type: cfg.bots ? 'cpu' : 'left', name: '' };
+        if (s.type === 'remote') return { type: cfg.bots ? 'cpu' : 'left', name: '', rid: s.rid, away: true };
+        return { type: s.type === 'off' ? 'off' : (s.type === 'cpu' ? 'cpu' : 'left'), name: '' };
+      });
+      if (cfg.onMigrate) cfg.onMigrate(L.snapData, { you: me, seats: lobbyInfo() });
+      var q = L.standby.queue.splice(0);
+      q.forEach(function (x) { onHostMsg(x[0], x[1]); });
+      setTimeout(ensureBackup, 4000);
+    }
     function onClientClose() {
-      if (L.role !== 'client') return;
+      if (L.role !== 'client' || L.leaving) return;
+      if (cfg.migrate && L.playing && L.backup && L.backup.code && !L.migrating) { startMigration(); return; }
+      if (L.migrating) return;
       L.leave(); ov.hidden = false; showMode('join'); err('Die Verbindung zum Host ist abgebrochen.'); if (cfg.onLeave) cfg.onLeave('Verbindung zum Host abgebrochen');
     }
     $('mpJoinBtn').onclick = function () { joinRoom(); };
@@ -274,16 +373,19 @@
       broadcastLobby(true); ov.hidden = false; showMode('host'); renderHost();
     };
     L.leave = function () {
+      L.leaving = true;
       if (L.role === 'host') {
-        L.seats.forEach(function (s) { if (s.conn) try { s.conn.send({ t: 'kicked', why: 'Der Host hat den Raum geschlossen' }); s.conn.close(); } catch (e) {} });
+        L.seats.forEach(function (s) { if (s.conn) try { if (!L.handedOver) s.conn.send({ t: 'kicked', why: 'Der Host hat den Raum geschlossen' }); s.conn.close(); } catch (e) {} });
         try { L.room && L.room.close(); } catch (e) {}
       }
       if (L.role === 'client') { try { L.hostConn && (L.hostConn.send({ t: 'bye' }), L.hostConn.close()); } catch (e) {} if (L.joiner) L.joiner.cancel(); }
       stopAnnounce(); stopWatch();
       L.room = null; L.seats = []; L.hostConn = null; L.joiner = null; L.role = 'local'; L.playing = false; L.you = -1; L.opening = false;
+      L.backup = null; L.migrating = false; L.handedOver = false; L.snapData = null; L.lastSnap = null;
+      try { if (L.standby && L.standby.room) L.standby.room.close(); } catch (e) {} L.standby = null; L.standbySeats = null; L.leaving = false;
       $('mpJoinForm').hidden = false; $('mpLobby').hidden = true; $('mpJoinBtn').disabled = false;
     };
-    addEventListener('beforeunload', function () { try { if (L.role === 'client' && L.hostConn) L.hostConn.send({ t: 'bye' }); } catch (e) {} });
+    addEventListener('beforeunload', function () { try { if (L.role === 'host') L.handover(); } catch (e) {} try { if (L.role === 'client' && L.hostConn) L.hostConn.send({ t: 'bye' }); } catch (e) {} });
 
     // Raumlink (?room=CODE): Beitritts-Fenster direkt öffnen
     var q = new URLSearchParams(location.search).get('room');

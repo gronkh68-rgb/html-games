@@ -577,7 +577,7 @@ async function endRound(w){
     if(G.koi[1-w]){pts*=2;note.push('Gegner hatte Koi-Koi gerufen: ×2');}
     G.scores[w]+=pts;G.parent=w;
   }
-  G.round++;G.turn=-1;
+  G.round++;G.turn=-1;L.snap(snapG('between'));
   say(-1,w<0?'Die Runde endet unentschieden.':`${nm(w)} gewinnt die Runde (+${pts}).`,w<0?'Die Runde endet unentschieden.':`Du gewinnst die Runde (+${pts}).`);
   push();
   const last=G.round>=G.rounds;
@@ -616,14 +616,42 @@ async function playRound(){
     G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${G.round+1}/${G.rounds}: ${MONTHS[G.round%12].n}. ${G.parent===s?'Du beginnst.':nm(G.parent)+' beginnt.'}`});
     push();
     await sleep(1800);
-    let p=G.parent;
+    return runLoop(G.parent);
+  }catch(e){if(e!==CANCEL)throw e;}
+}
+async function runLoop(p){
+  try{
     while(true){
+      G.turn=p;L.snap(snapG('turn'));
       const r=await playTurn(p);
       if(r==='shobu')return endRound(p);
       p=1-p;
       if(!G.hands[0].length&&!G.hands[1].length)return endRound(-1);
     }
   }catch(e){if(e!==CANCEL)throw e;}
+}
+// Spielstand für den Host-Wechsel
+function snapG(phase){
+  const ids=a=>a.map(c=>c.id);
+  return {phase,round:G.round,rounds:G.rounds,scores:G.scores.slice(),parent:G.parent,hands:G.hands.map(ids),caps:G.caps.map(ids),table:ids(G.table),deck:ids(G.deck),
+    announced:G.announced.slice(),koi:G.koi.slice(),turn:G.turn,seats:G.seats.map(s=>({type:s.type,name:s.name,orig:s.orig,away:s.away})),
+    logE:G.logE.filter(e=>!e.per).slice(0,15).map(e=>({p:e.p,a:e.a,b:e.b})),src:G.src};
+}
+function onMigrate(snap,info){
+  token++;pend={};closeDlg();inp=null;ROLE='host';ME=info.you;prevV=null;V=null;lastOppN=0;hintTxt='';
+  const ids=a=>a.map(i=>CARDS[i]);
+  G={round:snap.round,rounds:snap.rounds,scores:snap.scores,parent:snap.parent,hands:snap.hands.map(ids),caps:snap.caps.map(ids),table:ids(snap.table),deck:ids(snap.deck),flip:null,pair:null,
+    announced:snap.announced,koi:snap.koi,turn:snap.turn,seats:snap.seats.map(s=>Object.assign({},s)),logE:snap.logE,src:snap.src,last:null};
+  G.seats.forEach((s,i)=>{
+    if(i===info.you)s.type='host';
+    else if(s.type==='host'){s.type='cpu';s.name='Computer';s.away=false;}
+    else if(s.type==='remote'){s.orig=s.name;s.name='Computer';s.type='cpu';s.away=true;}
+  });
+  showGameScreen();
+  say(-1,'Der Host hat gewechselt. Das Spiel läuft weiter.');
+  push();
+  if(snap.phase==='between'){(G.round>=G.rounds?finishGame():playRound());return;}
+  runLoop(G.turn);
 }
 function startGame(seats){
   token++;inp=null;pend={};closeDlg();prevV=null;V=null;lastOppN=0;hintTxt='';
@@ -634,8 +662,15 @@ function startGame(seats){
 }
 function showGameScreen(){$('setup').hidden=true;$('game').hidden=false;if(want3d&&!use3d){want3d=false;set3d(true);}}
 function backToSetup(){token++;inp=null;pend={};closeDlg();G=null;V=null;prevV=null;$('game').hidden=true;$('setup').hidden=false;}
-function exitGame(){
-  if(ROLE==='host'&&L.role==='host'){backToSetup();ROLE='local';L.backToLobby();return;}   // Host: zurück in die Lobby (Raum bleibt offen)
+async function exitGame(ask){
+  if(ROLE==='host'&&L.role==='host'){
+    if(ask&&G&&G.seats.some(s=>s.type==='remote')&&L.backup){
+      const i=await dlg({ico:'🚪',title:'Spiel verlassen',html:'Soll das Spiel für alle enden, oder soll ein anderer Spieler Host werden und mit den anderen weiterspielen?',btns:['Verlassen, die anderen spielen weiter','Spiel für alle beenden','Abbrechen']});
+      if(i===2)return;
+      if(i===0){L.handover();await new Promise(r=>setTimeout(r,500));ROLE='local';L.leave();backToSetup();return;}
+    }
+    backToSetup();ROLE='local';L.backToLobby();return;
+  }
   if(ROLE==='client'){try{L.leave();}catch(e){}ROLE='local';}
   backToSetup();
 }
@@ -643,14 +678,14 @@ $('start').onclick=()=>{ROLE='local';ME=0;startGame([{type:'host',name:'Du'},{ty
 $('online').onclick=()=>L.open();
 $('rejoinBtn').onclick=()=>L.rejoin();
 function updRejoin(){$('rejoinBtn').hidden=!L.hasRejoin();}
-$('again').onclick=exitGame;
+$('again').onclick=()=>exitGame(true);
 
 // ---------- Online ----------
 L=MP.init({
   prefix:'hnf-v1-',title:'Hanafuda',
   seats:[{name:'Spieler 1',color:'#ff2a55'},{name:'Spieler 2',color:'#00f0ff'}],
-  minPlayers:2,bots:true,rejoin:true,
-  onRejoin:onRejoin,
+  minPlayers:2,bots:true,rejoin:true,migrate:true,
+  onRejoin:onRejoin,onMigrate:onMigrate,
   onStart(info){
     token++;ROLE=info.role;ME=info.you;
     if(info.role==='host')startGame(info.seats.map(s=>({type:s.type==='host'||s.type==='remote'||s.type==='cpu'?s.type:'cpu',name:s.name})));
