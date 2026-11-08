@@ -10,6 +10,14 @@
   window.rollLabel = function () {
     return document.documentElement.getAttribute('data-style') === 'cyber' ? 'Hack starten' : 'Würfeln';
   };
+  // Text je nach Stil: erster Wert im Cyber-Stil, zweiter sonst
+  window.cyTx = function (c, s) { return document.documentElement.getAttribute('data-style') === 'cyber' ? c : s; };
+  // Beim Umschalten des Stils Beschriftungen nachziehen
+  new MutationObserver(function () {
+    var b = document.getElementById('rollBtn'), cy = document.documentElement.getAttribute('data-style') === 'cyber';
+    if (b) b.textContent = b.textContent.replace(/^(Hack starten|Würfeln)/, cy ? 'Hack starten' : 'Würfeln').replace(/^(Hacken|Würfeln) \(/, (cy ? 'Hacken' : 'Würfeln') + ' (');
+    var e = document.getElementById('eventLbl'); if (e) e.textContent = cy ? 'Hack-Terminal' : 'Würfel-Feld';
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
   window.rollFrames = FRAMES;
 
   // Ruhezustand oder Ergebnis (state: '' | 'ok')
