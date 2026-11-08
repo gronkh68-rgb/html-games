@@ -11,15 +11,15 @@
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
 @media (max-width:900px){.layout{grid-template-columns:1fr}}
 .table{--cw:clamp(34px,calc((100vw - 60px)/8.8),66px);background:radial-gradient(ellipse at 50% 40%,#1f5a3a,#123a26);border:2px solid #0b2418;border-radius:18px;padding:12px 10px;display:flex;flex-direction:column;gap:10px;min-width:0}
-.zone{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*1.58)}
+.zone{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*1.765)}
 .zone.hand{justify-content:center;flex-wrap:nowrap;gap:calc(var(--cw)*.07)}
 .zone.center{justify-content:center;align-items:flex-start;gap:12px;flex-wrap:nowrap}
 .tbl{display:flex;flex-wrap:wrap;gap:calc(var(--cw)*.1);flex:1;justify-content:center;min-height:calc(var(--cw)*3.3)}
 .pile{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;color:#d7f0dc;font-size:.75rem}
-.flip{min-height:calc(var(--cw)*1.58)}
+.flip{min-height:calc(var(--cw)*1.765)}
 .pname{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#d7f0dc;font-weight:700;font-size:.9rem}
 .pname .sc{background:rgba(0,0,0,.35);padding:2px 10px;border-radius:999px}
-.caps{display:flex;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*.73 + 18px)}
+.caps{display:flex;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*.88 + 18px)}
 .grp{display:flex;align-items:center;flex-direction:column;gap:2px;background:rgba(0,0,0,.22);border-radius:8px;padding:4px 6px;min-width:calc(var(--cw)*.9)}
 .grp .gl{font-size:.62rem;color:#b9dcc4;letter-spacing:.05em;text-transform:uppercase}
 .grp .row{display:flex}
@@ -28,7 +28,7 @@
 #status{background:rgba(0,0,0,.4);color:#fff;border-radius:10px;padding:8px 12px;text-align:center;min-height:2.6em;display:flex;align-items:center;justify-content:center;font-weight:600}
 
 /* Karten */
-.hc{--w:var(--cw,64px);width:var(--w);height:calc(var(--w)*1.58);border-radius:calc(var(--w)*.1);position:relative;background:#f6efdc;border:2px solid #3a2a1a;
+.hc{--w:var(--cw,64px);width:var(--w);height:calc(var(--w)*1.765);border-radius:calc(var(--w)*.07);position:relative;background:#f6efdc;border:1px solid #3a2a1a;
   box-shadow:0 2px 6px rgba(0,0,0,.4);font-size:calc(var(--w)*.14);color:#222;overflow:hidden;flex:none;transition:transform .15s,box-shadow .15s;user-select:none;box-sizing:border-box}
 .hc .mk{position:absolute;left:5%;top:3%;font-weight:800;font-size:1.25em;color:#8a1c28;line-height:1}
 .hc .pl{position:absolute;right:5%;top:3%;font-size:1.15em;line-height:1}
@@ -42,6 +42,7 @@
 .t-tane{background:#e4f0ff}
 .t-tanzaku{background:#fff1e4}
 .t-kasu{background:#dfe9d2}
+.hc img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
 .hc.back{background:repeating-linear-gradient(45deg,#8c1d2c 0 6px,#6e1421 6px 12px);border-color:#f0d9a0}
 .hc.back>*{display:none}
 .hc.mini .nm,.hc.mini .tg,.hc.mini .mk{display:none}
@@ -120,6 +121,7 @@
         <div class="panel"><div id="log"></div></div>
         <details class="panel rules"><summary>Kombinationen (Yaku)</summary><table class="ytab" id="ytab"></table></details>
         <button class="btn alt" id="again">Neues Spiel</button>
+        <p style="font-size:.72rem;opacity:.6;margin:6px 0 0">Kartenbilder: Sheldon Chen, <a href="https://fudawiki.org/en/hanafuda" target="_blank" rel="noopener" style="color:inherit">Fuda Wiki</a>, CC BY 4.0</p>
       </div>
     </div>
   </div>
@@ -162,9 +164,8 @@ const val=c=>VAL[c.t];
 const cname=c=>`${MONTHS[c.m].n} ${c.t==='kasu'?'(Kasu)':c.t==='tanzaku'?'(Band)':'– '+c.n}`;
 function cardHtml(c,cls=''){
   if(cls.includes('back'))return `<div class="hc ${cls}"></div>`;
-  const mid=c.t==='tanzaku'?'<i class="rib"></i>':`<span class="em">${c.e}</span>`;
-  return `<div class="hc t-${c.t}${c.sub?' s-'+c.sub:''} ${cls}" data-id="${c.id}" title="${esc(MONTHS[c.m].n+': '+c.n)}">`+
-    `<span class="mk">${MONTHS[c.m].k}</span>${c.t==='kasu'?'':`<span class="pl">${MONTHS[c.m].e}</span>`}${mid}<span class="nm">${c.t==='tanzaku'?MONTHS[c.m].n:c.n}</span><span class="tg">${val(c)}</span></div>`;
+  const f=(c.m+1)+''+(c.id%4);
+  return `<div class="hc ${cls}" data-id="${c.id}" title="${esc(MONTHS[c.m].n+': '+c.n)}"><img src="cards/${f}.svg" alt="${esc(MONTHS[c.m].n+' '+c.n)}" draggable="false"></div>`;
 }
 
 // ---------- Kombinationen (Yaku) ----------
@@ -208,7 +209,7 @@ function capsHtml(p){
   const newIds=(G.last||[]).map(c=>c.id);
   return ORDER.map(t=>{
     const cs=G.caps[p].filter(c=>c.t===t||(t==='kasu'&&false));
-    if(!cs.length)return `<div class="grp"><span class="gl">${GL[t]}</span><div class="row" style="min-height:calc(var(--cw)*.79)"></div></div>`;
+    if(!cs.length)return `<div class="grp"><span class="gl">${GL[t]}</span><div class="row" style="min-height:calc(var(--cw)*.89)"></div></div>`;
     return `<div class="grp"><span class="gl">${GL[t]} ${cs.length}</span><div class="row">${cs.map(c=>cardHtml(c,'mini'+(newIds.includes(c.id)&&G.lastP===p?' new':''))).join('')}</div></div>`;
   }).join('');
 }

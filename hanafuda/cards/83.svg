@@ -1,0 +1,21 @@
+<svg id="svg142" version="1.1" viewBox="0 0 510 900" height="900" width="510" xmlns="http://www.w3.org/2000/svg">
+  <metadata id="metadata146">
+    
+      
+        image/svg+xml
+        
+      
+    
+  </metadata>
+  
+  <defs id="defs122">
+    <style id="style120">.a,.c{fill:#272D22;}.a,.b{stroke:#1a1a1a;}.a{stroke-miterlimit:10;stroke-width:8px;}.b{fill:#EFEEE6;stroke-width:15px;}.b,.c{stroke-miterlimit:2;}.c{stroke:#272D22;stroke-width:12px;}</style>
+  </defs>
+  <title id="title124">83</title>
+  <path id="path126" d="M0,594.44c68-43.8,157.28-70.36,255-70.36s187,26.56,255,70.36V900H0Z" class="a"></path>
+  <path id="path128" d="M419.4,591.85a523.44,523.44,0,0,1,90.6,7.82V900H34.52A211.15,211.15,0,0,1,33,874.76C33,718.51,206,591.85,419.4,591.85Z" class="a"></path>
+  <path id="path130" d="M0,617.16c2.9,0,5.8-.08,8.72-.08,213.4,0,386.39,126.67,386.39,282.92H0Z" class="a"></path>
+  <path id="path132" d="M510,680V900H243.85C269.51,795.45,373.64,710.84,510,680Z" class="a"></path>
+  <path id="path134" d="M0,900V709.89C91.15,751.35,157,819.81,176.68,900Z" class="a"></path>
+  <path id="path136" d="M0,900V814.33a513,513,0,0,1,135.94-18c120.5,0,228.11,40.39,299,103.68Z" class="a"></path>
+</svg>
