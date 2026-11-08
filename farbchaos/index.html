@@ -339,7 +339,7 @@ function answerTurn(a){
 }
 function clickHand(id){
   if(!inp||inp.mode!=='turn')return;
-  if(!inp.can.includes(id)){hint('Diese Karte passt nicht: Du brauchst die Farbe '+COLN[V.color]+' oder dasselbe Symbol.');return;}
+  if(!inp.can.includes(id)){hint(V.pen?'Du kannst nur mit einer passenden Plus-Karte kontern oder musst '+V.pen.n+' Karten ziehen (Stapel antippen).':'Diese Karte passt nicht: Du brauchst die Farbe '+COLN[V.color]+' oder dasselbe Symbol.');return;}
   if(V.opts&&V.opts.unoManual&&V.hand.length===2&&!unoOn&&!confirmUno()){return;}
   answerTurn({c:id});
 }
@@ -672,6 +672,7 @@ async function pickCard(p,list,title,html){
 }
 // Mehrere Karten ablegen: der Spieler bestimmt, welche oben liegt (sie legt Farbe und Zahl für den Weiterspielenden fest)
 async function discardSet(p,cards,what){
+  cards=cards.filter(Boolean);
   if(!cards.length)return;
   const top=await pickCard(p,uniqCards(cards),'Welche Karte soll oben liegen?','Sie bestimmt Farbe und Zahl für den nächsten Spieler.');
   G.hands[p]=G.hands[p].filter(c=>!cards.includes(c));
@@ -720,8 +721,11 @@ const SPINS=[
     await dlgAll(q=>({ico:'⚔️',title:'Stechen',html:txt+`<br><br><b>${best.q===q?'Du legst':esc(nm(best.q))+' legt'} die höchste Karte ab.</b>`,btns:['Weiter']}),0);
     await discardSet(best.q,[best.c],'Stechen');}},
   {i:'📣',t:'UNO Spin: wer zuerst ruft, legt eine Karte seiner Wahl ab',f:async s=>{
-    const winner=await new Promise(res=>{let done=false;const fin=q=>{if(!done){done=true;res(q);}};
+    if(!G.hands.some(h=>h.length)){return;}
+    const tk0=token;
+    const winner=await new Promise((res,rej)=>{let done=false;const fin=q=>{if(!done){done=true;if(tk0!==token)rej(CANCEL);else res(q);}};
       G.seats.forEach((st,q)=>{
+        if(!G.hands[q].length)return;          // wer schon keine Karten mehr hat, kann nichts ablegen
         if(st.type==='cpu')setTimeout(()=>fin(q),700+rnd(2300));
         else ask(q,{k:'dlg',ico:'📣',title:'UNO SPIN!',html:'Wer zuerst drückt, darf eine Karte seiner Wahl ablegen.',btns:['UNO SPIN!']},()=>null).then(()=>fin(q));
       });});
@@ -775,7 +779,7 @@ async function applyEffect(p,c){
     if(c.k===14&&G.opts.challenge){
       const i=await ask(x,{k:'dlg',ico:'🤔',title:'Farbwahl +4: anzweifeln?',html:`${esc(nm(p))} hat +4 gelegt und wählt <b>${COLN[G.color]}</b>.<br>Anzweifeln? Hatte die Person die bisherige Farbe <b>${COLN[G.prevColor]}</b> auf der Hand, muss sie selbst 4 Karten ziehen. Hatte sie keine, ziehst du 6 statt 4.`,btns:['Hinnehmen','Anzweifeln']},()=>Math.random()<.3?1:0);
       if(i===1){
-        if(G.preHad){say(p,`${nm(x)} zweifelt an: Zu Recht! ${nm(p)} zieht 4 Karten.`,`${nm(x)} zweifelt an: Zu Recht! Du ziehst 4 Karten.`);push();await sleep(700);await drawCards(p,4,true);return x;}
+        if(G.preHad){const old=G.pen?G.pen.n:0;G.pen=null;say(p,`${nm(x)} zweifelt an: Zu Recht! ${nm(p)} zieht ${4+old} Karten.`,`${nm(x)} zweifelt an: Zu Recht! Du ziehst ${4+old} Karten.`);push();await sleep(700);await drawCards(p,4+old,true);return x;}
         say(x,`${nm(x)} zweifelt an: Zu Unrecht! Er/Sie zieht 6 Karten.`,'Du zweifelst an: Zu Unrecht! Du ziehst 6 Karten.');n=6;push();await sleep(700);
       }
     }
@@ -844,11 +848,11 @@ async function endRound(w){
   G.scores[w]+=pt;G.round++;G.cur=-1;G.dealer=w;G.pen=null;L.snap(snapG('between'));
   say(w,`${nm(w)} gewinnt die Runde (+${pt} Punkte).`,`Du gewinnst die Runde (+${pt} Punkte).`);push();
   const over=G.goal===0||G.scores[w]>=G.goal;
-  if(over)return finishGame();
+  if(over)return await finishGame();
   const more=await vote(q=>({ico:w===q?'🏆':'🃏',title:w===q?'Du gewinnst die Runde!':`${esc(nm(w))} gewinnt die Runde`,
     html:`<b>${pt} Punkte</b> für ${w===q?'dich':esc(nm(w))}.<br><br>`+G.seats.map((s,i)=>`${i===q?'Du':esc(s.name)}: <b>${G.scores[i]}</b>`).join('<br>')+'<br><br><b>Abstimmung:</b> Weiterspielen?',btns:['Weiterspielen','Beenden']}));
-  if(more)return playRound();
-  return finishGame(true);
+  if(more)return await playRound();
+  return await finishGame(true);
 }
 async function finishGame(stopped){
   const best=Math.max(...G.scores),top=G.scores.indexOf(best);
@@ -870,7 +874,7 @@ async function playRound(){
     const st=G.cur,rn=G.round+1;
     G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${rn}: ${st===s?'Du beginnst.':nm(st)+' beginnt.'}`});
     push();await sleep(1900);
-    return runLoop(G.cur);
+    return await runLoop(G.cur);
   }catch(e){if(e!==CANCEL)throw e;}
 }
 async function runLoop(p){
@@ -879,7 +883,7 @@ async function runLoop(p){
       G.cur=p;L.snap(snapG('turn'));
       let r;
       if(G.spinDue){G.spinDue=false;r=await spinTurn(p);}else r=await turn(p);
-      if(typeof r==='object')return endRound(r.win);
+      if(typeof r==='object')return await endRound(r.win);
       p=r;
       if(G.extraSkip){G.extraSkip=false;say(p,`${nm(p)} muss wegen des Glücksrads aussetzen.`,'Du musst wegen des Glücksrads aussetzen.');push();await sleep(700);p=nextOf(p);}
     }
