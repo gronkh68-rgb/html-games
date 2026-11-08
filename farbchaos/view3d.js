@@ -293,7 +293,8 @@
         if (k[0] === 'd' && !nr) o.tg = { x: t.x, y: t.y, z: t.z, rx: t.rx, ry: t.ry, s: t.s };
       }
       o.glowOn = !!t.glow; o.dim = !!t.dim;
-      move(o, t, o.delay || 0, instant && !nr);
+      var dl = o.delay || 0; o.delay = 0;   // Startverzögerung gilt nur für den ersten Flug nach dem Austeilen
+      move(o, t, dl, instant && !nr);
     });
     // Farbe und Richtung
     var col = cyber() ? NEON[V.color] : HEX[V.color];
@@ -320,6 +321,7 @@
     }
     var g = hit.object.userData.top; return g.userData.id != null ? g.userData.id : 'draw';
   }
+  F.dump = function (id) { var o = cards['c' + id]; if (!o) return null; var m = o.mesh; return { x: +m.position.x.toFixed(2), y: +m.position.y.toFixed(2), z: +m.position.z.toFixed(2), rx: +m.rotation.x.toFixed(2), ry: +m.rotation.y.toFixed(2), rz: +m.rotation.z.toFixed(2), s: +m.scale.x.toFixed(2), tg: o.tg && { x: o.tg.x, y: o.tg.y, z: o.tg.z, rx: +o.tg.rx.toFixed(2) } }; };
   F.pick = function (cx, cy) { return pickAt({ clientX: cx, clientY: cy }); };
   F.screenOf = function (id) {
     var o = cards['c' + id]; if (!o) return null;

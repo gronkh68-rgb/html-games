@@ -244,7 +244,8 @@
         if (k[0] === 'd' && !nr) o.tg = { x: t.x, y: t.y, z: t.z, rx: t.rx, s: t.s };
       }
       o.glowC = t.glow || 0;
-      move(o, t, o.delay || 0, instant && !nr);
+      var dl = o.delay || 0; o.delay = 0;   // Startverzögerung gilt nur für den ersten Flug nach dem Austeilen
+      move(o, t, dl, instant && !nr);
     });
     // Namensschilder
     label('me', V.names[0], V.scores[0] + ' Punkte', V.turn === 0, HX, 15.1);
