@@ -268,7 +268,7 @@ const sortHand=h=>h.slice().sort((a,b)=>a.col-b.col||a.k-b.k);
 
 function buildView(s){
   const ids=a=>a.map(c=>c.id);
-  return {me:s,n:N(),names:G.seats.map((x,i)=>i===s?'Du':x.name),round:G.round,goal:G.goal,scores:G.scores.slice(),
+  return {me:s,n:N(),names:G.seats.map((x,i)=>i===s?'Du':x.name),round:G.round,deal:G.deal||0,goal:G.goal,scores:G.scores.slice(),
     hand:ids(G.hands[s]),counts:G.hands.map(h=>h.length),deckN:G.deck.length,top:ids(G.disc.slice(-4)),color:G.color,dir:G.dir,cur:G.cur,opts:G.opts,pen:G.pen,
     src:G.src,status:G.logE.length?fmt(G.logE[0],s):'',log:G.logE.slice(1).map(e=>fmt(e,s))};
 }
@@ -513,7 +513,7 @@ function fly(e,from,delay,turn){
   };
 }
 function runFlip(b){
-  const newRound=!prevV||prevV.round!==V.round;let k=0;
+  const newRound=!prevV||prevV.deal!==V.deal;let k=0;
   const rectOf=(z,r1)=>({left:z.left+z.width/2-r1.width/2,top:z.top+z.height/2-r1.height/2,width:r1.width,height:r1.height});
   document.querySelectorAll('#board .uc[data-id]').forEach(e=>{
     const id=e.dataset.id,p=newRound?null:b.r[id];
@@ -870,7 +870,7 @@ async function playRound(){
     G.hands=G.hands.map(sortHand);
     const fi=d.findIndex(c=>c.k<=9);const first=d.splice(fi,1)[0];
     G.deck=d;G.disc=[first];G.color=first.col;G.dir=1;G.pen=null;G.extraSkip=false;G.spinDue=false;G.src={};CARDS.forEach(c=>{G.src[c.id]='deck';});
-    G.cur=G.dealer%n;
+    G.deal=(G.deal||0)+1;G.cur=G.dealer%n;
     const st=G.cur,rn=G.round+1;
     G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${rn}: ${st===s?'Du beginnst.':nm(st)+' beginnt.'}`});
     push();await sleep(1900);
@@ -892,13 +892,13 @@ async function runLoop(p){
 // Spielstand für den Host-Wechsel (wird an jedem Zugbeginn an den Nachfolger geschickt)
 function snapG(phase){
   const ids=a=>a.map(c=>c.id);
-  return {phase,round:G.round,goal:G.goal,opts:G.opts,scores:G.scores.slice(),dealer:G.dealer,hands:G.hands.map(ids),deck:ids(G.deck),disc:ids(G.disc),color:G.color,dir:G.dir,cur:G.cur,pen:G.pen,
+  return {phase,round:G.round,deal:G.deal||0,goal:G.goal,opts:G.opts,scores:G.scores.slice(),dealer:G.dealer,hands:G.hands.map(ids),deck:ids(G.deck),disc:ids(G.disc),color:G.color,dir:G.dir,cur:G.cur,pen:G.pen,
     spinDue:!!G.spinDue,seats:G.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),logE:G.logE.filter(e=>!e.per).slice(0,15).map(e=>({p:e.p,a:e.a,b:e.b})),src:G.src};
 }
 function onMigrate(snap,info){
   token++;pend={};closeDlg();inp=null;ROLE='host';prevV=null;V=null;lastCnt={};hintTxt='';unoOn=false;
   const ids=a=>a.map(i=>CARDS[i]);
-  G={round:snap.round,goal:snap.goal,opts:snap.opts,scores:snap.scores,dealer:snap.dealer,hands:snap.hands.map(ids),deck:ids(snap.deck),disc:ids(snap.disc),color:snap.color,dir:snap.dir,cur:snap.cur,pen:snap.pen,extraSkip:false,spinDue:!!snap.spinDue,
+  G={round:snap.round,deal:snap.deal||0,goal:snap.goal,opts:snap.opts,scores:snap.scores,dealer:snap.dealer,hands:snap.hands.map(ids),deck:ids(snap.deck),disc:ids(snap.disc),color:snap.color,dir:snap.dir,cur:snap.cur,pen:snap.pen,extraSkip:false,spinDue:!!snap.spinDue,
     seats:snap.seats.map(s=>Object.assign({},s)),logE:snap.logE,src:snap.src};
   G.seats.forEach(s=>{
     if(s.seat===info.you)s.type='host';
@@ -914,7 +914,7 @@ function onMigrate(snap,info){
 }
 function startGame(seats,goal,opts){
   token++;inp=null;pend={};closeDlg();prevV=null;V=null;lastCnt={};hintTxt='';unoOn=false;unoWarned=false;
-  G={round:0,goal:goal,opts:opts,scores:seats.map(()=>0),dealer:0,hands:[],deck:[],disc:[],color:0,dir:1,cur:0,pen:null,
+  G={round:0,deal:0,goal:goal,opts:opts,scores:seats.map(()=>0),dealer:0,hands:[],deck:[],disc:[],color:0,dir:1,cur:0,pen:null,
     seats:seats.map(s=>({type:s.type,name:s.name,seat:s.seat})),logE:[],src:{}};
   $('setup').hidden=true;$('game').hidden=false;
   if(want3d&&!use3d){want3d=false;set3d(true);}

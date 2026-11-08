@@ -238,7 +238,7 @@
 
   F.update = function (V, inp, instant) {
     if (!F.ready || !V) return;
-    var C = api.CARDS, nr = !lastV || lastV.round !== V.round || lastV.me !== V.me;
+    var C = api.CARDS, nr = !lastV || lastV.deal !== V.deal || lastV.me !== V.me;
     if (nr) clearAll();
     lastV = V; lastInp = inp;
     var want = {}, order = [], i, j;
