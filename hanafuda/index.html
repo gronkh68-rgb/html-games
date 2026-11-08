@@ -81,6 +81,23 @@
 .slotrow{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
 .main{display:flex;flex-direction:column;gap:10px;min-width:0}
 .table[hidden],#stage3d[hidden]{display:none!important}
+#stage3d.full{position:fixed;inset:0;z-index:80;height:auto;min-height:0;border:0;border-radius:0}
+body.full3d{overflow:hidden}
+#modal{z-index:200}
+#hudTop{position:absolute;left:50%;top:10px;transform:translateX(-50%);width:min(760px,72vw);display:none;flex-direction:column;gap:6px;pointer-events:none;z-index:3}
+#stage3d.full #hudTop{display:flex}
+#hudTop #status,#hudTop #turnBanner{background:rgba(8,12,24,.72);backdrop-filter:blur(4px)}
+#hudBtns{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:none;gap:8px;flex-wrap:wrap;justify-content:center;z-index:3}
+#stage3d.full #hudBtns{display:flex}
+#hudBtns .btn{padding:8px 14px;font-size:.85rem;background:rgba(8,12,24,.78);color:#fff;border:1px solid rgba(255,255,255,.3)}
+#hudScores{position:absolute;right:10px;top:10px;background:rgba(8,12,24,.72);backdrop-filter:blur(4px);border-radius:12px;padding:8px 12px;font-size:.85rem;color:#e8f2ff;z-index:3;pointer-events:none;display:none;min-width:150px}
+#stage3d.full #hudScores{display:block}
+#hudScores div{display:flex;justify-content:space-between;gap:14px;padding:1px 0}
+#hudScores .t{color:#ffd23f;font-weight:800}
+#stage3d.full #hint3d{left:auto;right:12px;bottom:14px;text-align:right;max-width:30vw}
+#stage3d.full.myturn{animation:turnGlowIn 1s ease-in-out infinite alternate}
+@keyframes turnGlowIn{from{box-shadow:inset 0 0 20px 0 rgba(255,210,63,0)}to{box-shadow:inset 0 0 70px 10px rgba(255,210,63,.5)}}
+
 #stage3d{position:relative;height:min(78vh,760px);min-height:380px;border-radius:18px;overflow:hidden;border:2px solid #0b2418;background:#0b0f14}
 #stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
 #hint3d{position:absolute;left:10px;bottom:8px;font-size:.72rem;color:#d7f0dc;opacity:.8;pointer-events:none;text-shadow:0 1px 2px #000}
@@ -126,7 +143,7 @@
           <div class="zone hand" id="hand"></div>
           <div class="pname"><span id="myName">Du</span><span class="sc" id="mySc">0 Punkte</span></div>
         </div>
-        <div id="stage3d" hidden><div id="hint3d">Ziehen: Ansicht drehen · Mausrad/Pinch: Zoom · Karte antippen: auswählen</div></div>
+        <div id="stage3d" hidden><div id="hudTop"></div><div id="hudScores"></div><div id="hudBtns"><button class="btn alt" id="fsBtn">⛶ Vollbild</button></div><div id="hint3d">Ziehen: Ansicht drehen · Mausrad/Pinch: Zoom · Karte antippen: auswählen</div></div>
       </div>
       <div class="side">
         <div class="panel">
@@ -364,6 +381,7 @@ function capsHtml(side){
   }).join('');
 }
 function renderSide(){
+  $('hudScores').innerHTML=`<div class="${V.turn===0?'t':''}"><span>${esc(V.names[0])}</span><b>${V.scores[0]} P</b></div><div class="${V.turn===1?'t':''}"><span>${esc(V.names[1])}</span><b>${V.scores[1]} P</b></div>`;
   $('status').textContent=hintTxt||V.status;
   $('log').innerHTML=V.log.map(l=>`<div>${esc(l)}</div>`).join('');
   $('oppName').textContent=V.names[1];$('myName').textContent=V.names[0];$('nmDu').textContent=V.names[0];$('nmPc').textContent=V.names[1];
@@ -454,25 +472,45 @@ function refresh(){
 }
 
 // ---------- 3D-Ansicht ----------
-async function set3d(on){
+
+// ---------- Vollbild: die 3D-Ansicht füllt das ganze Fenster, Bedienelemente liegen darüber ----------
+function fullOn(){
+  const st=$('stage3d');st.classList.add('full');document.body.classList.add('full3d');
+  $('hudTop').append($('status'));
+  $('hudBtns').append($('v3d'),$('fsBtn'),$('snd'),$('again'));
+}
+function fullOff(){
+  const st=$('stage3d');st.classList.remove('full');document.body.classList.remove('full3d');
+  const main=document.querySelector('.main'),tr=document.querySelector('.toolrow'),side=document.querySelector('.side');
+  main.insertBefore($('status'),main.firstChild);
+  tr.append($('v3d'),$('snd'));side.insertBefore($('again'),tr.nextSibling);
+  try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
+}
+function toggleFs(){
+  try{if(document.fullscreenElement)document.exitFullscreen();else($('stage3d').requestFullscreen||document.documentElement.requestFullscreen).call($('stage3d'));}catch(e){}
+}
+document.addEventListener('fullscreenchange',()=>{const f=!!document.fullscreenElement;$('fsBtn').textContent=f?'⛶ Vollbild beenden':'⛶ Vollbild';if(window.H3D&&H3D.ready)H3D.resize();if(window.FC3D&&FC3D.ready)FC3D.resize();});
+$('fsBtn').onclick=toggleFs;
+async function set3d(on,gesture){
   if(on){
     $('v3d').disabled=true;$('v3d').textContent='Lade 3D …';
     try{
       await H3D.load();
-      $('tableBox').hidden=true;$('stage3d').hidden=false;
+      $('tableBox').hidden=true;$('stage3d').hidden=false;fullOn();
       H3D.init($('stage3d'),{CARDS,cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard});
-      H3D.setActive(true);use3d=true;
+      H3D.setActive(true);use3d=true;H3D.resize();
+      if(gesture){try{($('stage3d').requestFullscreen||function(){}).call($('stage3d'));}catch(e){}}
       if(V)H3D.update(V,inp,true);
-    }catch(e){$('tableBox').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
+    }catch(e){fullOff();$('tableBox').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
     $('v3d').disabled=false;
   }else{
     use3d=false;if(window.H3D&&H3D.ready)H3D.setActive(false);
-    $('tableBox').hidden=false;$('stage3d').hidden=true;prevV=null;if(V)render(false);
+    fullOff();$('tableBox').hidden=false;$('stage3d').hidden=true;prevV=null;if(V)render(false);
   }
   $('v3d').textContent=use3d?'2D-Ansicht':'3D-Ansicht';
   try{localStorage.setItem('hnf-3d',use3d?'1':'0');}catch(e){}
 }
-$('v3d').onclick=()=>set3d(!use3d);
+$('v3d').onclick=()=>set3d(!use3d,true);
 $('snd').onclick=()=>{snd=!snd;$('snd').textContent=snd?'Ton: an':'Ton: aus';try{localStorage.setItem('hnf-snd',snd?'1':'0');}catch(e){}};
 $('snd').textContent=snd?'Ton: an':'Ton: aus';
 

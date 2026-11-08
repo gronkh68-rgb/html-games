@@ -29,6 +29,24 @@
 #stage3d.myturn{border-color:#ffd23f;animation:turnGlow 1s ease-in-out infinite alternate}
 #stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
 .board[hidden],#stage3d[hidden]{display:none!important}
+#stage3d.full{position:fixed;inset:0;z-index:80;height:auto;min-height:0;border:0;border-radius:0}
+body.full3d{overflow:hidden}
+#modal{z-index:200}
+#hudTop{position:absolute;left:50%;top:10px;transform:translateX(-50%);width:min(760px,72vw);display:none;flex-direction:column;gap:6px;pointer-events:none;z-index:3}
+#stage3d.full #hudTop{display:flex}
+#hudTop #status,#hudTop #turnBanner{background:rgba(8,12,24,.72);backdrop-filter:blur(4px)}
+#hudTop #turnBanner.me{background:linear-gradient(90deg,#ffb300,#ffd23f,#ffb300)}
+#hudBtns{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:none;gap:8px;flex-wrap:wrap;justify-content:center;z-index:3}
+#stage3d.full #hudBtns{display:flex}
+#hudBtns .btn{padding:8px 14px;font-size:.85rem;background:rgba(8,12,24,.78);color:#fff;border:1px solid rgba(255,255,255,.3)}
+#hudScores{position:absolute;right:10px;top:10px;background:rgba(8,12,24,.72);backdrop-filter:blur(4px);border-radius:12px;padding:8px 12px;font-size:.85rem;color:#e8f2ff;z-index:3;pointer-events:none;display:none;min-width:150px}
+#stage3d.full #hudScores{display:block}
+#hudScores div{display:flex;justify-content:space-between;gap:14px;padding:1px 0}
+#hudScores .t{color:#ffd23f;font-weight:800}
+#stage3d.full #hint3d{left:auto;right:12px;bottom:14px;text-align:right;max-width:30vw}
+#stage3d.full.myturn{animation:turnGlowIn 1s ease-in-out infinite alternate}
+@keyframes turnGlowIn{from{box-shadow:inset 0 0 20px 0 rgba(255,210,63,0)}to{box-shadow:inset 0 0 70px 10px rgba(255,210,63,.5)}}
+
 #hint3d{position:absolute;left:10px;bottom:8px;font-size:.72rem;color:#d7e8ff;opacity:.8;pointer-events:none;text-shadow:0 1px 2px #000}
 #status{background:rgba(0,0,0,.4);color:#fff;border-radius:10px;padding:8px 12px;text-align:center;min-height:2.6em;display:flex;align-items:center;justify-content:center;font-weight:600}
 .opps{display:flex;justify-content:space-around;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*1.5*.62 + 44px)}
@@ -187,7 +205,7 @@ html[data-style="cyber"] #turnBanner.me{background:linear-gradient(90deg,#c9bd00
             <div class="actions"><button id="unoBtn">UNO!</button></div>
           </div>
         </div>
-        <div id="stage3d" hidden><div id="hint3d">Ziehen: Ansicht drehen · Mausrad/Pinch: Zoom · Karte antippen: legen · Stapel antippen: ziehen</div></div>
+        <div id="stage3d" hidden><div id="hudTop"></div><div id="hudScores"></div><div id="hudBtns"><button class="btn alt" id="fsBtn">⛶ Vollbild</button></div><div id="hint3d">Ziehen: Ansicht drehen · Mausrad/Pinch: Zoom · Karte antippen: legen · Stapel antippen: ziehen</div></div>
       </div>
       <div class="side">
         <div class="panel"><div class="scoreline"><span>Runde</span><b id="rnd">1</b></div><div id="scores"></div></div>
@@ -449,6 +467,7 @@ function ruleText(o){
   return '<ul style="margin:0;padding-left:18px">'+l.map(x=>`<li>${x}</li>`).join('')+'</ul>';
 }
 function renderSide(){
+  $('hudScores').innerHTML=V.names.map((n,i)=>`<div class="${V.cur===i?'t':''}"><span>${esc(n)}</span><b>${V.scores[i]} P · ${V.counts[i]}</b></div>`).join('');
   document.body.classList.toggle('spinmode',!!(V.opts&&V.opts.spin));updateBanner();$('ruleList').innerHTML=ruleText(V.opts||{});$('penTxt').textContent=V.pen?`Strafe: +${V.pen.n}`:'';
   $('status').textContent=hintTxt||V.status;
   $('log').innerHTML=V.log.map(l=>`<div>${esc(l)}</div>`).join('');
@@ -548,25 +567,45 @@ function showSpin(i,text,who){
   setTimeout(()=>{$('spinTxt').textContent=SPINS[i].i+' '+text;sfx('take');},2400);
   spinTimer=setTimeout(()=>{$('spin').hidden=true;},3400);
 }
-async function set3d(on){
+
+// ---------- Vollbild: die 3D-Ansicht füllt das ganze Fenster, Bedienelemente liegen darüber ----------
+function fullOn(){
+  const st=$('stage3d');st.classList.add('full');document.body.classList.add('full3d');
+  $('hudTop').append($('turnBanner'),$('status'));
+  $('hudBtns').append($('v3d'),$('fsBtn'),$('snd'),$('again'));
+}
+function fullOff(){
+  const st=$('stage3d');st.classList.remove('full');document.body.classList.remove('full3d');
+  const main=document.querySelector('.main'),tr=document.querySelector('.toolrow'),side=document.querySelector('.side');
+  main.insertBefore($('status'),main.firstChild);if($('turnBanner'))main.insertBefore($('turnBanner'),main.firstChild);
+  tr.append($('v3d'),$('snd'));side.insertBefore($('again'),tr.nextSibling);
+  try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
+}
+function toggleFs(){
+  try{if(document.fullscreenElement)document.exitFullscreen();else($('stage3d').requestFullscreen||document.documentElement.requestFullscreen).call($('stage3d'));}catch(e){}
+}
+document.addEventListener('fullscreenchange',()=>{const f=!!document.fullscreenElement;$('fsBtn').textContent=f?'⛶ Vollbild beenden':'⛶ Vollbild';if(window.H3D&&H3D.ready)H3D.resize();if(window.FC3D&&FC3D.ready)FC3D.resize();});
+$('fsBtn').onclick=toggleFs;
+async function set3d(on,gesture){
   if(on){
     $('v3d').disabled=true;$('v3d').textContent='Lade 3D …';
     try{
       await FC3D.load();
-      $('board').hidden=true;$('stage3d').hidden=false;
+      $('board').hidden=true;$('stage3d').hidden=false;fullOn();
       FC3D.init($('stage3d'),{CARDS,COLN,sym,spinMode:()=>!!(V&&V.opts&&V.opts.spin),cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard:id=>clickHand(id),onDraw:()=>{if(inp&&inp.mode==='turn')answerTurn({c:null});}});
-      FC3D.setActive(true);use3d=true;
+      FC3D.setActive(true);use3d=true;FC3D.resize();
+      if(gesture){try{($('stage3d').requestFullscreen||function(){}).call($('stage3d'));}catch(e){}}
       if(V)FC3D.update(V,inp,true);
-    }catch(e){$('board').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
+    }catch(e){fullOff();$('board').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
     $('v3d').disabled=false;
   }else{
     use3d=false;if(window.FC3D&&FC3D.ready)FC3D.setActive(false);
-    $('board').hidden=false;$('stage3d').hidden=true;prevV=null;if(V)render(false);
+    fullOff();$('board').hidden=false;$('stage3d').hidden=true;prevV=null;if(V)render(false);
   }
   $('v3d').textContent=use3d?'2D-Ansicht':'3D-Ansicht';
   try{localStorage.setItem('fc-3d',use3d?'1':'0');}catch(e){}
 }
-$('v3d').onclick=()=>set3d(!use3d);
+$('v3d').onclick=()=>set3d(!use3d,true);
 try{want3d=localStorage.getItem('fc-3d')==='1';}catch(e){}
 // Zusatzregeln merken
 const OPT_IDS={oStack:'stack',oChal:'challenge',oSeven:'sevenzero',oSpin:'spin',oUno:'unoManual'};

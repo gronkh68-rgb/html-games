@@ -83,6 +83,7 @@
       if (hv !== hoverId) { hoverId = hv; if (lastV) H.update(lastV, lastInp); }
     });
     addEventListener('resize', function () { if (active) H.resize(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { if (active) H.resize(); }).observe(host);
     requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (active) tick(now); });
     setInterval(function () { var n = performance.now(); if (active && n - lastR > 400) tick(n); else runTw(n); }, 100);   // läuft auch weiter, wenn der Tab im Hintergrund ist
     H.ready = true; H.resize();
@@ -197,7 +198,7 @@
     var hn = V.hand.length, hsp = Math.min(2.4, 17.5 / Math.max(1, hn));
     V.hand.forEach(function (id, i) {
       var s = sel === id, hv = hoverId === id && inp && inp.mode === 'hand';
-      W('c' + id, { id: id, x: HX + (i - (hn - 1) / 2) * hsp, y: .9 + i * .012 + (s ? 1.3 : hv ? .6 : 0), z: HAND_Z - (s ? 1 : hv ? .4 : 0), rx: -Math.PI / 2 + .72 - (s ? .15 : 0), s: 1.15, glow: s ? 0xffd23f : 0 });
+      W('c' + id, { id: id, x: HX + (i - (hn - 1) / 2) * hsp, y: CH * 1.15 / 2 * Math.sin(.72) + .45 + i * .012 + (s ? 1.3 : hv ? .6 : 0), z: HAND_Z - (s ? 1 : hv ? .4 : 0), rx: -Math.PI / 2 + .72 - (s ? .15 : 0), s: 1.15, glow: s ? 0xffd23f : 0 });
     });
     var pair = V.pair || [], pc = pair.length ? pair[0] : null;
     Object.keys(slotMap).forEach(function (id) { if (V.table.indexOf(+id) < 0 || +id === pc) delete slotMap[id]; });

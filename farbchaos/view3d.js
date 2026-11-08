@@ -109,6 +109,7 @@
       if (hv !== hoverId) { hoverId = hv; if (lastV) F.update(lastV, lastInp); }
     });
     addEventListener('resize', function () { if (active) F.resize(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { if (active) F.resize(); }).observe(host);
     requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (active) tick(now); });
     setInterval(function () { var n = performance.now(); if (active && n - lastR > 400) tick(n); else runTw(n); }, 100);
     F.ready = true; F.resize();
@@ -117,7 +118,7 @@
   F.resize = function () {
     var w = host.clientWidth || 600, h = host.clientHeight || 400;
     r.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-    var t = Math.tan(20 * Math.PI / 180), dh = 20.5 / (t * camera.aspect), dv = 19 / t;
+    var t = Math.tan(20 * Math.PI / 180), dh = 20.5 / (t * camera.aspect), dv = 17.5 / t;
     camD = Math.max(dh, dv) * 1.04; var el = 62 * Math.PI / 180;
     camera.position.set(0, camD * Math.sin(el), 1.2 + camD * Math.cos(el)); controls.target.set(0, 0, 1.2);
     controls.minDistance = camD * .5; controls.maxDistance = camD * 1.3; controls.update();
@@ -265,7 +266,7 @@
     var hn = V.hand.length, hsp = Math.min(2.5, 21 / Math.max(1, hn));
     V.hand.forEach(function (id, k) {
       var ok = !mine || inp.can.indexOf(id) >= 0, hv = hoverId === id && mine && ok, off = (k - (hn - 1) / 2) * hsp;
-      W('c' + id, { id: id, x: off, y: 1 + k * .012 + (mine && ok ? .5 : 0) + (hv ? 1.1 : 0), z: 10.4 + off * off * .004 - (hv ? .8 : 0), rx: -Math.PI / 2 + .78 - (hv ? .12 : 0), ry: 0, s: 1.18, snd: null, dim: mine && !ok, glow: mine && ok ? 1 : 0, hand: 1 });
+      W('c' + id, { id: id, x: off, y: CH * 1.18 / 2 * Math.sin(.78) + .45 + k * .012 + (mine && ok ? .5 : 0) + (hv ? 1.1 : 0), z: 10.4 + off * off * .004 - (hv ? .8 : 0), rx: -Math.PI / 2 + .78 - (hv ? .12 : 0), ry: 0, s: 1.18, snd: null, dim: mine && !ok, glow: mine && ok ? 1 : 0, hand: 1 });
     });
     glowFor('gme', 0, 10.4, 0, V.cur === V.me);
     label('lme', V.names[V.me], V.scores[V.me] + ' P · ' + V.counts[V.me] + ' Karten', V.cur === V.me, 0, 14.6);
