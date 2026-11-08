@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Puzzle</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+html,body{overscroll-behavior:none}
+.wrap{max-width:1300px}
+body{-webkit-tap-highlight-color:transparent}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.gal button{padding:0;border:3px solid transparent;border-radius:12px;overflow:hidden;background:var(--bg);cursor:pointer;position:relative;aspect-ratio:3/2;color:#fff;font:600 .75rem system-ui}
+.gal button canvas,.gal button img{width:100%;height:100%;display:block;object-fit:cover}
+.gal button span{position:absolute;left:0;right:0;bottom:0;padding:3px 6px;background:rgba(0,0,0,.55);text-align:left}
+.gal button.sel{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(39,211,195,.35)}
+.gal .up{display:grid;place-items:center;background:var(--card-hover);color:var(--text);font-size:1.6rem;gap:2px}
+.gal .up small{font-size:.72rem;color:var(--muted)}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.opt{font:inherit;font-weight:600;color:var(--text);background:var(--bg);border:2px solid var(--border);border-radius:12px;padding:8px 14px;cursor:pointer;transition:transform .12s,border-color .12s}
+.opt:hover{transform:translateY(-2px)}
+.opt.sel{border-color:var(--accent2);background:var(--card-hover)}
+.opt.shape{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 8px;font-size:.78rem}
+.opt.shape canvas{width:80px;height:60px;border-radius:6px;background:#2a2f4f}
+.opt small{display:block;font-weight:400;color:var(--muted);font-size:.7rem}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.bar .grow{flex:1}
+.bar .btn{padding:7px 12px;font-size:.85rem}
+.pill{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-weight:700;font-variant-numeric:tabular-nums}
+.prog{flex:1;min-width:90px;height:10px;border-radius:6px;background:var(--card);border:1px solid var(--border);overflow:hidden}
+.prog b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s}
+#stage{position:relative;width:100%;height:calc(100vh - 150px);min-height:380px;border-radius:16px;overflow:hidden;border:2px solid var(--border);background:#14172a;touch-action:none;user-select:none;-webkit-user-select:none}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#fx{pointer-events:none}
+#hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:rgba(255,255,255,.7);font-size:.8rem;pointer-events:none;text-shadow:0 1px 4px #000;padding:0 10px}
+#loading{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,12,24,.7);color:#fff;font-weight:700}
+@media (max-width:700px){#stage{height:calc(100vh - 190px)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Puzzle</h1></div>
+
+  <div id="setup">
+    <div class="panel"><h2>1 · Bild wählen</h2><div class="gal" id="gal"></div><input type="file" id="file" accept="image/*" hidden></div>
+    <div class="panel"><h2>2 · Anzahl der Teile</h2><div class="opts" id="cntOpts"></div></div>
+    <div class="panel"><h2>3 · Form der Teile</h2><div class="opts" id="shapeOpts"></div></div>
+    <div class="panel"><h2>4 · Ansicht</h2>
+      <div class="opts" id="modeOpts"><button class="opt" data-m="2d">🖼️ 2D<small>flach, schnell</small></button><button class="opt" data-m="3d">🧊 3D<small>Tisch mit Schatten, Kamera drehbar</small></button></div>
+    </div>
+    <button class="btn" id="start" style="font-size:1.1rem;padding:14px 28px">Puzzle starten</button>
+  </div>
+
+  <div id="game" hidden>
+    <div class="bar">
+      <button class="btn alt" id="bBack">← Auswahl</button>
+      <span class="pill" id="time">00:00</span>
+      <span class="pill" id="cnt">0 / 0</span>
+      <div class="prog"><b id="prog"></b></div>
+      <button class="btn alt" id="bView">2D / 3D</button>
+      <button class="btn alt" id="bPrev">👁 Vorschau</button>
+      <button class="btn alt" id="bScatter">🔀 Neu verteilen</button>
+      <button class="btn alt" id="bFit">⤢ Ansicht</button>
+      <button class="btn alt" id="bSnd">🔊</button>
+    </div>
+    <div id="stage">
+      <canvas id="c2"></canvas>
+      <canvas id="c3" hidden></canvas>
+      <canvas id="fx"></canvas>
+      <div id="hint"></div>
+      <div id="loading" hidden>Puzzle wird gebaut …</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden><div class="box"><h2>🎉 Geschafft!</h2><p id="winTxt"></p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn" id="again">Nochmal</button><button class="btn alt" id="newp">Neues Puzzle</button></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+(function () {
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+function mkRng(seed) { var s = seed >>> 0; return function () { s = (s + 0x6D2B79F5) >>> 0; var t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function fmt(t) { t = Math.floor(t); return pad2(Math.floor(t / 60)) + ':' + pad2(t % 60); }
+var ease = { outCubic: function (t) { return 1 - Math.pow(1 - t, 3); }, outBack: function (t) { var c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); } };
+
+/* ===================== Bilder (selbst gezeichnet) ===================== */
+function ridge(g, w, baseY, amp, col, r, freq) {
+  var ph = [r() * 6, r() * 6, r() * 6]; g.fillStyle = col; g.beginPath(); g.moveTo(0, g.canvas.height);
+  for (var x = 0; x <= w; x += 8) { var u = x / w * freq; var y = baseY - amp * (Math.sin(u * 3 + ph[0]) * .5 + Math.sin(u * 7.3 + ph[1]) * .3 + Math.sin(u * 15 + ph[2]) * .2); g.lineTo(x, y); }
+  g.lineTo(w, g.canvas.height); g.closePath(); g.fill();
+}
+function lin(g, x0, y0, x1, y1, stops) { var l = g.createLinearGradient(x0, y0, x1, y1); stops.forEach(function (s) { l.addColorStop(s[0], s[1]); }); return l; }
+function rad(g, x, y, r0, r1, stops) { var l = g.createRadialGradient(x, y, r0, x, y, r1); stops.forEach(function (s) { l.addColorStop(s[0], s[1]); }); return l; }
+var PICS = [
+  { name: 'Abendrot', seed: 11, draw: function (g, w, h, r) {
+    g.fillStyle = lin(g, 0, 0, 0, h * .75, [[0, '#2b1b5a'], [.45, '#b0407a'], [.8, '#ff9a52'], [1, '#ffd98a']]); g.fillRect(0, 0, w, h);
+    g.fillStyle = '#fff'; for (var i = 0; i < 70; i++) { g.globalAlpha = r() * .6; g.fillRect(r() * w, r() * h * .35, 2, 2); } g.globalAlpha = 1;
+    g.fillStyle = rad(g, w * .62, h * .55, 0, h * .5, [[0, 'rgba(255,230,160,.9)'], [.3, 'rgba(255,170,90,.4)'], [1, 'rgba(255,120,80,0)']]); g.fillRect(0, 0, w, h);
+    g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(w * .62, h * .55, h * .075, 0, 6.3); g.fill();
+    ridge(g, w, h * .6, h * .16, '#7a3f84', r, 3); ridge(g, w, h * .68, h * .13, '#4d2a6a', r, 4); ridge(g, w, h * .76, h * .1, '#2a1b4a', r, 5);
+    g.fillStyle = lin(g, 0, h * .78, 0, h, [[0, '#3a2a5a'], [1, '#0f0a20']]); g.fillRect(0, h * .8, w, h * .2);
+    for (var k = 0; k < 14; k++) { g.fillStyle = 'rgba(255,200,120,' + (.5 - k * .03) + ')'; var ww = (40 - k * 2) * (w / 1200); g.fillRect(w * .62 - ww / 2 + (r() - .5) * 20, h * .8 + k * h * .012, ww, 3); }
+  } },
+  { name: 'Kristall-Stadt', seed: 22, draw: function (g, w, h, r) {
+    g.fillStyle = lin(g, 0, 0, 0, h, [[0, '#050818'], [.6, '#1a1f55'], [1, '#6a3a9a']]); g.fillRect(0, 0, w, h);
+    g.fillStyle = '#fff'; for (var i = 0; i < 90; i++) { g.globalAlpha = r() * .8; g.fillRect(r() * w, r() * h * .5, 2, 2); } g.globalAlpha = 1;
+    g.fillStyle = rad(g, w * .8, h * .2, 0, h * .3, [[0, 'rgba(200,220,255,.5)'], [1, 'rgba(200,220,255,0)']]); g.fillRect(0, 0, w, h);
+    g.fillStyle = '#e8eeff'; g.beginPath(); g.arc(w * .8, h * .2, h * .06, 0, 6.3); g.fill();
+    [['#161a40', .55, .22], ['#0e1130', .68, .3], ['#080a20', .8, .4]].forEach(function (L, li) {
+      var x = -10; while (x < w) { var bw = (40 + r() * 70) * (w / 1200), bh = h * (.12 + r() * L[2]), by = h * L[1] + h * .3 - bh; g.fillStyle = L[0]; g.fillRect(x, by, bw, h - by);
+        var cols = ['#ffd27a', '#7ae6ff', '#ff7ad9', '#fff']; for (var wy = by + 10; wy < h * .95; wy += 16 * (h / 800)) for (var wx = x + 6; wx < x + bw - 6; wx += 14 * (w / 1200)) if (r() < .28 - li * .04) { g.fillStyle = cols[(r() * 4) | 0]; g.globalAlpha = .55 + r() * .4; g.fillRect(wx, wy, 6, 8); } g.globalAlpha = 1; x += bw + 3; }
+    });
+  } },
+  { name: 'Blumenwiese', seed: 33, draw: function (g, w, h, r) {
+    g.fillStyle = lin(g, 0, 0, 0, h * .6, [[0, '#4aa8ff'], [1, '#d6f0ff']]); g.fillRect(0, 0, w, h);
+    g.fillStyle = '#fff'; for (var c = 0; c < 6; c++) { var cx = r() * w, cy = h * (.08 + r() * .2); g.globalAlpha = .85; for (var q = 0; q < 6; q++) { g.beginPath(); g.ellipse(cx + q * 26 - 60, cy + (r() - .5) * 16, 50, 22, 0, 0, 6.3); g.fill(); } } g.globalAlpha = 1;
+    g.fillStyle = rad(g, w * .2, h * .12, 0, h * .12, [[0, '#fff7c0'], [1, 'rgba(255,240,150,0)']]); g.fillRect(0, 0, w, h);
+    ridge(g, w, h * .55, h * .08, '#6cc16a', r, 2); ridge(g, w, h * .65, h * .06, '#4aa84c', r, 3); ridge(g, w, h * .76, h * .04, '#3a8e3c', r, 3);
+    var cols = ['#ff4d6d', '#ffd23f', '#ff8fe0', '#ffffff', '#b085ff', '#ff9a3d'];
+    for (var i = 0; i < 170; i++) { var x = r() * w, y = h * (.66 + r() * .34), s = .5 + (y / h - .66) * 3; g.strokeStyle = '#2f7d32'; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(x, y + 40 * s); g.lineTo(x, y); g.stroke(); var col = cols[(r() * cols.length) | 0]; g.fillStyle = col; for (var p = 0; p < 6; p++) { var a = p / 6 * 6.28; g.beginPath(); g.ellipse(x + Math.cos(a) * 9 * s, y + Math.sin(a) * 9 * s, 8 * s, 5 * s, a, 0, 6.3); g.fill(); } g.fillStyle = '#ffb300'; g.beginPath(); g.arc(x, y, 4.5 * s, 0, 6.3); g.fill(); }
+  } },
+  { name: 'Ozean', seed: 44, draw: function (g, w, h, r) {
+    g.fillStyle = lin(g, 0, 0, 0, h * .55, [[0, '#ff7a6b'], [.5, '#ffc785'], [1, '#fff0c8']]); g.fillRect(0, 0, w, h);
+    g.fillStyle = '#fffbe0'; g.beginPath(); g.arc(w * .3, h * .42, h * .07, 0, 6.3); g.fill();
+    var cols = ['#4fb6c9', '#2f95b3', '#1f78a0', '#175f8a', '#0f4770', '#0a3556'];
+    cols.forEach(function (c, i) { ridge(g, w, h * (.5 + i * .09), h * (.015 + i * .012), c, r, 14 - i); });
+    g.fillStyle = 'rgba(255,240,200,.5)'; for (var k = 0; k < 10; k++) g.fillRect(w * .3 - 70 + k * 3 + r() * 40, h * .52 + k * h * .018, 80 - k * 4, 3);
+    g.fillStyle = '#6a3a1e'; g.beginPath(); g.moveTo(w * .62, h * .62); g.lineTo(w * .75, h * .62); g.lineTo(w * .72, h * .66); g.lineTo(w * .65, h * .66); g.closePath(); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.moveTo(w * .685, h * .35); g.lineTo(w * .685, h * .61); g.lineTo(w * .74, h * .61); g.closePath(); g.fill();
+    g.fillStyle = '#ffd3a0'; g.beginPath(); g.moveTo(w * .675, h * .4); g.lineTo(w * .675, h * .61); g.lineTo(w * .635, h * .61); g.closePath(); g.fill();
+  } },
+  { name: 'Mandala', seed: 55, draw: function (g, w, h, r) {
+    g.fillStyle = rad(g, w / 2, h / 2, 0, w * .7, [[0, '#2a1060'], [1, '#05030f']]); g.fillRect(0, 0, w, h);
+    g.save(); g.translate(w / 2, h / 2); var R = h * .46;
+    for (var k = 8; k >= 1; k--) { var n = 6 + k * 3, rr = R * k / 8; for (var i = 0; i < n; i++) { g.save(); g.rotate(i / n * 6.2832 + k * .2); g.fillStyle = 'hsla(' + ((k * 38 + 200) % 360) + ',85%,' + (45 + k * 3) + '%,.82)'; g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, -rr * .8, rr * .09 + 4, rr * .24, 0, 0, 6.3); g.fill(); g.stroke(); g.restore(); } }
+    g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(0, 0, R * .07, 0, 6.3); g.fill(); g.restore();
+    g.fillStyle = '#fff'; for (var s = 0; s < 80; s++) { g.globalAlpha = r() * .7; g.fillRect(r() * w, r() * h, 2, 2); } g.globalAlpha = 1;
+  } },
+  { name: 'Herbstwald', seed: 66, draw: function (g, w, h, r) {
+    g.fillStyle = lin(g, 0, 0, 0, h, [[0, '#9ec9e8'], [.55, '#f6dfb0'], [1, '#c9733a']]); g.fillRect(0, 0, w, h);
+    ridge(g, w, h * .5, h * .08, '#c98a52', r, 3); ridge(g, w, h * .58, h * .06, '#a8643a', r, 4);
+    var cols = ['#e8622a', '#f0a030', '#c0392b', '#f4d03f', '#d35400', '#a93226'];
+    for (var row = 0; row < 4; row++) { var n = 7 + row * 3; for (var i = 0; i < n; i++) { var x = (i + r() * .6) / n * w, y = h * (.56 + row * .12), s = .55 + row * .3; g.fillStyle = '#4a2c18'; g.fillRect(x - 6 * s, y - 100 * s, 12 * s, 110 * s);
+      for (var b = 0; b < 6; b++) { g.fillStyle = cols[(r() * cols.length) | 0]; g.globalAlpha = .92; g.beginPath(); g.arc(x + (r() - .5) * 90 * s, y - (100 + r() * 70) * s, (38 + r() * 26) * s, 0, 6.3); g.fill(); } g.globalAlpha = 1; } }
+    for (var l = 0; l < 220; l++) { g.fillStyle = cols[(r() * cols.length) | 0]; g.beginPath(); g.ellipse(r() * w, h * (.84 + r() * .16), 7, 3.5, r() * 3, 0, 6.3); g.fill(); }
+  } }
+];
+
+/* ===================== Teile-Formen ===================== */
+var SHAPES = [
+  { id: 'classic', name: 'Klassisch' }, { id: 'knob', name: 'Knöpfe' }, { id: 'wave', name: 'Wellen' },
+  { id: 'zigzag', name: 'Zacken' }, { id: 'chaos', name: 'Chaos' }, { id: 'square', name: 'Eckig' }
+];
+function edgeNorm(kind, r) {
+  if (kind === 'chaos') kind = ['classic', 'knob', 'wave', 'zigzag'][(r() * 4) | 0];
+  if (kind === 'square') return [[0, 0], [1, 0]];
+  var pts = [], i;
+  if (kind === 'wave') { var k = 1 + ((r() * 2) | 0), amp = .06 + r() * .05; for (i = 0; i <= 30; i++) { var t = i / 30; pts.push([t, Math.sin(t * Math.PI * 2 * k) * amp * Math.pow(Math.sin(Math.PI * t), .5)]); } return pts; }
+  if (kind === 'zigzag') { var n = 4, am = .07 + r() * .04; pts.push([0, 0], [.14, 0]); for (i = 0; i < n; i++) pts.push([.24 + .52 * i / (n - 1), (i % 2 ? -1 : 1) * am]); pts.push([.86, 0], [1, 0]); return pts; }
+  var knob = kind === 'knob', a = .5 + (r() - .5) * .16, rr = (knob ? .15 : .115) * (1 + (r() - .5) * .2), w = knob ? .045 : .08, nh = .07, th0 = Math.PI * (knob ? 1.2 : 1.12), cy = nh + Math.sin(-(th0 - Math.PI)) * rr * 0 + rr * Math.abs(Math.sin(th0));
+  var p0 = [a - w, 0], c = [a - w * .9, nh * 1.1], p1 = [a + Math.cos(th0) * rr, cy + Math.sin(th0) * rr];
+  pts.push([0, 0], p0);
+  for (i = 1; i <= 8; i++) { var u = i / 8, q = (1 - u) * (1 - u), m = 2 * (1 - u) * u, z = u * u; pts.push([q * p0[0] + m * c[0] + z * p1[0], q * p0[1] + m * c[1] + z * p1[1]]); }
+  var th1 = Math.PI - th0; for (i = 1; i <= 22; i++) { var ang = th0 + (th1 - th0) * i / 22; pts.push([a + Math.cos(ang) * rr, cy + Math.sin(ang) * rr]); }
+  var p2 = pts[pts.length - 1], c2 = [a + w * .9, nh * 1.1], p3 = [a + w, 0];
+  for (i = 1; i <= 8; i++) { var u2 = i / 8, q2 = (1 - u2) * (1 - u2), m2 = 2 * (1 - u2) * u2, z2 = u2 * u2; pts.push([q2 * p2[0] + m2 * c2[0] + z2 * p3[0], q2 * p2[1] + m2 * c2[1] + z2 * p3[1]]); }
+  pts.push([1, 0]); return pts;
+}
+function buildPuzzle(cols, rows, shape, Bw, Bh, seed) {
+  var cw = Bw / cols, ch = Bh / rows, r = mkRng(seed), H = [], V = [], i, j;
+  function mkEdge(horiz, x0, y0) {
+    var L = horiz ? cw : ch, s = r() < .5 ? -1 : 1, n = edgeNorm(shape, r);
+    return n.map(function (p) { var o = p[1] * s * L; return horiz ? [x0 + p[0] * cw, y0 + o] : [x0 + o, y0 + p[0] * ch]; });
+  }
+  for (i = 0; i <= rows; i++) { H[i] = []; for (j = 0; j < cols; j++) H[i][j] = (i === 0 || i === rows) ? null : mkEdge(true, j * cw, i * ch); }
+  for (i = 0; i < rows; i++) { V[i] = []; for (j = 0; j <= cols; j++) V[i][j] = (j === 0 || j === cols) ? null : mkEdge(false, j * cw, i * ch); }
+  var pieces = [];
+  for (i = 0; i < rows; i++) for (j = 0; j < cols; j++) {
+    var ox = j * cw, oy = i * ch, pts = [];
+    function add(arr) { for (var k = pts.length ? 1 : 0; k < arr.length; k++) pts.push([arr[k][0] - ox, arr[k][1] - oy]); }
+    add(H[i][j] || [[ox, oy], [ox + cw, oy]]);
+    add(V[i][j + 1] || [[ox + cw, oy], [ox + cw, oy + ch]]);
+    add(H[i + 1][j] ? H[i + 1][j].slice().reverse() : [[ox + cw, oy + ch], [ox, oy + ch]]);
+    add(V[i][j] ? V[i][j].slice().reverse() : [[ox, oy + ch], [ox, oy]]);
+    pts.pop();
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; pts.forEach(function (p) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); });
+    pieces.push({ i: pieces.length, c: j, r: i, pts: pts, bb: { x0: x0, y0: y0, x1: x1, y1: y1 }, x: ox, y: oy, g: null, locked: false, tw: null, lift: 0, liftT: 0, pulse: 0, bmp: null, mesh: null });
+  }
+  return { cols: cols, rows: rows, cw: cw, ch: ch, Bw: Bw, Bh: Bh, pieces: pieces };
+}
+
+/* ===================== Zustand ===================== */
+var S = { pic: 0, custom: null, cnt: 24, shape: 'classic', mode: '2d', sound: true };
+var G = null, IMG = null, groups = [], order = [], view = { s: 1, ox: 0, oy: 0 }, dirty = true, timer = { t: 0, on: false, last: 0 }, won = false, showPrev = false, fxP = [], fxOn = false, winFade = 0, seedBase = 1;
+var cv2 = $('c2'), cv3 = $('c3'), fx = $('fx'), stage = $('stage'), g2 = cv2.getContext('2d'), gfx = fx.getContext('2d'), DPR = Math.min(2, window.devicePixelRatio || 1);
+var hasThree = typeof THREE !== 'undefined';
+
+/* ===================== Setup-Bildschirm ===================== */
+(function setup() {
+  var gal = $('gal');
+  PICS.forEach(function (p, i) {
+    var b = document.createElement('button'), c = document.createElement('canvas'); c.width = 240; c.height = 160;
+    p.draw(c.getContext('2d'), 240, 160, mkRng(p.seed)); b.appendChild(c); var sp = document.createElement('span'); sp.textContent = p.name; b.appendChild(sp);
+    b.onclick = function () { S.pic = i; S.custom = null; sel(); }; gal.appendChild(b);
+  });
+  var up = document.createElement('button'); up.className = 'up'; up.innerHTML = '📷<small>Eigenes Bild</small>'; up.onclick = function () { $('file').click(); }; gal.appendChild(up);
+  $('file').onchange = function (e) {
+    var f = e.target.files[0]; if (!f) return; var url = URL.createObjectURL(f), im = new Image();
+    im.onload = function () { S.custom = im; S.pic = -1; sel(); var t = up.querySelector('img'); if (t) t.remove(); var ti = document.createElement('img'); ti.src = url; up.insertBefore(ti, up.firstChild); up.querySelector('small').textContent = 'Dein Bild'; };
+    im.src = url;
+  };
+  [6, 12, 24, 48, 96, 150].forEach(function (n) { var b = document.createElement('button'); b.className = 'opt'; b.dataset.n = n; b.textContent = n + ' Teile'; b.onclick = function () { S.cnt = n; sel(); }; $('cntOpts').appendChild(b); });
+  SHAPES.forEach(function (s) {
+    var b = document.createElement('button'); b.className = 'opt shape'; b.dataset.s = s.id; var c = document.createElement('canvas'); c.width = 160; c.height = 120; b.appendChild(c); b.appendChild(document.createTextNode(s.name));
+    var pz = buildPuzzle(2, 2, s.id, 140, 100, 7), x = c.getContext('2d'); x.translate(10, 10); x.strokeStyle = '#7ae6d8'; x.lineWidth = 2.2; x.lineJoin = 'round';
+    pz.pieces.forEach(function (p) { x.beginPath(); p.pts.forEach(function (q, k) { var X = q[0] + p.c * pz.cw, Y = q[1] + p.r * pz.ch; if (k) x.lineTo(X, Y); else x.moveTo(X, Y); }); x.closePath(); x.stroke(); });
+    b.onclick = function () { S.shape = s.id; sel(); }; $('shapeOpts').appendChild(b);
+  });
+  [].forEach.call($('modeOpts').children, function (b) { b.onclick = function () { if (b.dataset.m === '3d' && !hasThree) { alert('3D konnte nicht geladen werden (keine Verbindung zur Bibliothek).'); return; } S.mode = b.dataset.m; sel(); }; });
+  function sel() {
+    [].forEach.call(gal.children, function (b, i) { b.classList.toggle('sel', (S.custom ? i === gal.children.length - 1 : i === S.pic)); });
+    [].forEach.call($('cntOpts').children, function (b) { b.classList.toggle('sel', +b.dataset.n === S.cnt); });
+    [].forEach.call($('shapeOpts').children, function (b) { b.classList.toggle('sel', b.dataset.s === S.shape); });
+    [].forEach.call($('modeOpts').children, function (b) { b.classList.toggle('sel', b.dataset.m === S.mode); });
+  }
+  sel(); window._sel = sel;
+})();
+
+/* ===================== Spiel starten ===================== */
+function makeImage() {
+  var c = document.createElement('canvas');
+  if (S.custom) {
+    var im = S.custom, w = im.naturalWidth, h = im.naturalHeight, ar = w / h, sx = 0, sy = 0, sw = w, sh = h;
+    if (ar > 1.8) { sw = h * 1.8; sx = (w - sw) / 2; } else if (ar < .6) { sh = w / .6; sy = (h - sh) / 2; }
+    var k = Math.min(1, 1600 / Math.max(sw, sh)); c.width = Math.round(sw * k); c.height = Math.round(sh * k); c.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  } else { c.width = 1200; c.height = 800; var p = PICS[S.pic]; p.draw(c.getContext('2d'), 1200, 800, mkRng(p.seed)); }
+  return c;
+}
+function startGame(sameSeed) {
+  $('loading').hidden = false;
+  setTimeout(function () {
+    IMG = makeImage(); var ar = IMG.width / IMG.height, Bw, Bh;
+    if (ar >= 1) { Bw = 900; Bh = Math.round(900 / ar); } else { Bh = 800; Bw = Math.round(800 * ar); }
+    var cols = Math.max(2, Math.round(Math.sqrt(S.cnt * ar))), rows = Math.max(2, Math.round(S.cnt / cols));
+    if (!sameSeed) seedBase = (Math.random() * 1e9) | 0;
+    G = buildPuzzle(cols, rows, S.shape, Bw, Bh, seedBase);
+    disposeThree(); groups = []; order = [];
+    G.pieces.forEach(function (p) { p.g = groups.length; groups.push({ id: p.g, m: [p.i], locked: false }); order.push(p.i); });
+    won = false; winFade = 0; fxOn = false; fxP = []; timer = { t: 0, on: false, last: 0 };
+    $('setup').hidden = true; $('game').hidden = false; $('win').hidden = true;
+    setMode(S.mode, true); resizeAll(); fitView(); scatter(true); updHud();
+    $('hint').textContent = 'Teile ziehen und passend zusammenschieben · Mausrad/Pinch: Zoom · Hintergrund ziehen: verschieben' + (S.mode === '3d' ? ' · Rechtsklick ziehen: Kamera neigen' : '');
+    $('loading').hidden = true; dirty = true;
+  }, 30);
+}
+$('start').onclick = function () { startGame(false); };
+$('again').onclick = function () { $('win').hidden = true; startGame(true); };
+$('newp').onclick = function () { $('win').hidden = true; toSetup(); };
+$('bBack').onclick = toSetup;
+function toSetup() { $('game').hidden = true; $('setup').hidden = false; timer.on = false; }
+
+/* ===================== Verteilen ===================== */
+function scatterTarget(p, rnd) {
+  var m = G.cw * .15, bx0 = -m, by0 = -m, bx1 = G.Bw + m, by1 = G.Bh + m, X, Y, k;
+  var tr = tableRect(), fx0 = tr.x0, fx1 = tr.x1 - G.cw, fy0 = tr.y0, fy1 = tr.y1 - G.ch;
+  for (k = 0; k < 40; k++) {
+    X = fx0 + rnd() * (fx1 - fx0); Y = fy0 + rnd() * (fy1 - fy0);
+    if (X + G.cw < bx0 || X > bx1 || Y + G.ch < by0 || Y > by1) break;
+  }
+  return [X, Y];
+}
+function tween(p, x, y, dur, ez, delay) { p.tw = { x0: p.x, y0: p.y, x1: x, y1: y, t: -(delay || 0), d: dur, e: ez || 'outCubic' }; dirty = true; }
+function scatter(initial) {
+  var r = mkRng((Math.random() * 1e9) | 0), cx = G.Bw / 2 - G.cw / 2, cy = G.Bh / 2 - G.ch / 2, n = 0;
+  groups.forEach(function (gr) {
+    if (gr.locked) return;
+    var lead = G.pieces[gr.m[0]], t = scatterTarget(lead, r), dx = t[0] - lead.x, dy = t[1] - lead.y;
+    if (initial) { gr.m.forEach(function (i) { var p = G.pieces[i]; p.x = cx + (p.c - lead.c) * G.cw; p.y = cy + (p.r - lead.r) * G.ch; }); lead = G.pieces[gr.m[0]]; dx = t[0] - lead.x; dy = t[1] - lead.y; }
+    gr.m.forEach(function (i) { var p = G.pieces[i]; tween(p, p.x + dx, p.y + dy, .75 + r() * .3, 'outCubic', initial ? (n % 60) * .012 : 0); }); n++;
+  });
+  order = G.pieces.map(function (p) { return p.i; }).sort(function () { return r() - .5; });
+}
+$('bScatter').onclick = function () { if (G && !won) scatter(false); };
+
+/* ===================== Ansicht / Eingabe ===================== */
+function resizeAll() {
+  var w = stage.clientWidth, h = stage.clientHeight;
+  [cv2, fx].forEach(function (c) { c.width = Math.round(w * DPR); c.height = Math.round(h * DPR); });
+  if (R3.r) { R3.r.setPixelRatio(DPR); R3.r.setSize(w, h, false); R3.cam.aspect = w / h; R3.cam.updateProjectionMatrix(); }
+  dirty = true;
+}
+window.addEventListener('resize', function () { if (G && !$('game').hidden) { resizeAll(); } });
+// Spielfläche um das Brett: passt sich dem Seitenverhältnis des Fensters an (Handy hochkant: Teile oben und unten)
+function tableRect() {
+  var w = stage.clientWidth || 1, h = stage.clientHeight || 1, th = G.Bh * 2, tw = th * w / h, mx = (tw / G.Bw - 1) / 2, my = .5;
+  if (mx < .12) { mx = .12; tw = G.Bw * (1 + 2 * mx); th = tw * h / w; my = Math.max(.5, (th / G.Bh - 1) / 2); }
+  else if (mx > 1.2) { mx = 1.2; }
+  return { x0: -G.Bw * mx, x1: G.Bw * (1 + mx), y0: -G.Bh * my, y1: G.Bh * (1 + my) };
+}
+function fitView() {
+  if (!G) return; var w = stage.clientWidth, h = stage.clientHeight, tr = tableRect(), tw = tr.x1 - tr.x0, th = tr.y1 - tr.y0;
+  view.s = Math.min(w / tw, h / th); view.ox = w / 2 - (G.Bw / 2) * view.s; view.oy = h / 2 - (G.Bh / 2) * view.s;
+  if (R3.r) { R3.tx = G.Bw / 2; R3.tz = G.Bh / 2; R3.pitch = 62 * Math.PI / 180; var asp = w / h, half = Math.max(th / 2 / 1, tw / 2 / asp); R3.dist = half / Math.tan(R3.cam.fov * Math.PI / 360) * 1.02; }
+  dirty = true;
+}
+$('bFit').onclick = fitView;
+function toWorld(cx, cy) {
+  var rc = stage.getBoundingClientRect(), px = cx - rc.left, py = cy - rc.top;
+  if (S.mode === '3d' && R3.r) {
+    var nd = new THREE.Vector2(px / rc.width * 2 - 1, -(py / rc.height) * 2 + 1); R3.ray.setFromCamera(nd, R3.cam);
+    var o = R3.ray.ray.origin, d = R3.ray.ray.direction, y0 = 3, t = (y0 - o.y) / d.y; if (!isFinite(t) || t < 0) return null; return { x: o.x + d.x * t, y: o.z + d.z * t };
+  }
+  return { x: (px - view.ox) / view.s, y: (py - view.oy) / view.s };
+}
+function inPoly(pts, x, y) { var c = false; for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) { var a = pts[i], b = pts[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
+function pick(w) {
+  for (var k = order.length - 1; k >= 0; k--) { var p = G.pieces[order[k]]; if (p.locked) continue; var lx = w.x - p.x, ly = w.y - p.y; if (lx < p.bb.x0 || lx > p.bb.x1 || ly < p.bb.y0 || ly > p.bb.y1) continue; if (inPoly(p.pts, lx, ly)) return p; }
+  return null;
+}
+var ptrs = {}, drag = null, pan = null, orbit = null, pinch = null, vel = { x: 0, y: 0 };
+stage.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+stage.addEventListener('pointerdown', function (e) {
+  if (!G || won) return; ensureAudio(); try { stage.setPointerCapture(e.pointerId); } catch (x) { }
+  ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+  var ids = Object.keys(ptrs);
+  if (ids.length === 2) { cancelDrag(); pan = null; var a = ptrs[ids[0]], b = ptrs[ids[1]]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s: view.s, dist: R3.dist }; return; }
+  if (e.button === 2 || e.button === 1) { if (S.mode === '3d') orbit = { x: e.clientX, y: e.clientY }; else pan = { x: e.clientX, y: e.clientY }; return; }
+  var w = toWorld(e.clientX, e.clientY); if (!w) return; var p = pick(w);
+  if (p) startDrag(p, w); else pan = { x: e.clientX, y: e.clientY };
+});
+stage.addEventListener('pointermove', function (e) {
+  if (!ptrs[e.pointerId]) return; var prev = ptrs[e.pointerId]; ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+  var ids = Object.keys(ptrs);
+  if (pinch && ids.length === 2) { var a = ptrs[ids[0]], b = ptrs[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y), f = d / pinch.d; if (S.mode === '3d') { R3.dist = Math.max(150, Math.min(4000, pinch.dist / f)); } else zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, pinch.s * f / view.s); dirty = true; return; }
+  if (drag) { var w = toWorld(e.clientX, e.clientY); if (!w) return; var nx = w.x - drag.ox, ny = w.y - drag.oy, lead = G.pieces[drag.lead], dx = nx - lead.x, dy = ny - lead.y; vel.x = vel.x * .6 + dx * .4; vel.y = vel.y * .6 + dy * .4; groups[drag.g].m.forEach(function (i) { var p = G.pieces[i]; p.x += dx; p.y += dy; p.tw = null; }); dirty = true; return; }
+  if (orbit) { R3.pitch = Math.max(.35, Math.min(1.5, R3.pitch + (e.clientY - orbit.y) * .006)); R3.yaw = Math.max(-.9, Math.min(.9, (R3.yaw || 0) - (e.clientX - orbit.x) * .005)); orbit = { x: e.clientX, y: e.clientY }; dirty = true; return; }
+  if (pan) {
+    if (S.mode === '3d') { var w0 = toWorld(prev.x, prev.y), w1 = toWorld(e.clientX, e.clientY); if (w0 && w1) { R3.tx += w0.x - w1.x; R3.tz += w0.y - w1.y; } }
+    else { view.ox += e.clientX - prev.x; view.oy += e.clientY - prev.y; }
+    dirty = true;
+  }
+});
+function endPtr(e) {
+  delete ptrs[e.pointerId]; if (Object.keys(ptrs).length < 2) pinch = null;
+  if (drag && Object.keys(ptrs).length === 0) endDrag(); pan = null; orbit = null;
+}
+stage.addEventListener('pointerup', endPtr); stage.addEventListener('pointercancel', endPtr);
+stage.addEventListener('wheel', function (e) {
+  if (!G) return; e.preventDefault(); var f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  if (S.mode === '3d') R3.dist = Math.max(150, Math.min(4000, R3.dist / f)); else zoomAt(e.clientX, e.clientY, f); dirty = true;
+}, { passive: false });
+function zoomAt(cx, cy, f) {
+  var rc = stage.getBoundingClientRect(), px = cx - rc.left, py = cy - rc.top, ns = Math.max(.12, Math.min(6, view.s * f)); f = ns / view.s;
+  view.ox = px - (px - view.ox) * f; view.oy = py - (py - view.oy) * f; view.s = ns;
+}
+function startDrag(p, w) {
+  var gr = groups[p.g]; drag = { g: p.g, lead: p.i, ox: w.x - p.x, oy: w.y - p.y }; vel = { x: 0, y: 0 };
+  // Gruppe nach vorn
+  var set = {}; gr.m.forEach(function (i) { set[i] = 1; }); order = order.filter(function (i) { return !set[i]; }).concat(gr.m.slice().sort(function (a, b) { return a === p.i ? 1 : b === p.i ? -1 : 0; }));
+  gr.m.forEach(function (i) { var q = G.pieces[i]; q.liftT = 1; q.tw = null; });
+  if (!timer.on) { timer.on = true; timer.last = performance.now(); }
+  click(520, .03); dirty = true;
+}
+function cancelDrag() { if (drag) { groups[drag.g].m.forEach(function (i) { G.pieces[i].liftT = 0; }); drag = null; } }
+function endDrag() {
+  var gi = drag.g; groups[gi].m.forEach(function (i) { G.pieces[i].liftT = 0; }); drag = null; settle(gi); dirty = true;
+}
+
+/* ===================== Einrasten ===================== */
+function settle(gi) {
+  var tol = Math.min(G.cw, G.ch) * .24, changed = true, merged = false, safety = 0;
+  function shiftGroup(g, dx, dy, dur) { g.m.forEach(function (i) { var p = G.pieces[i]; tween(p, p.x + dx, p.y + dy, dur || .22, 'outBack'); p.x = p.tw.x1; p.y = p.tw.y1; p.tw.x0 = p.tw.x0; }); }
+  // Zielposition sofort setzen, Animation läuft von alter Position
+  function snapGroup(g, dx, dy) { g.m.forEach(function (i) { var p = G.pieces[i], ox = p.x, oy = p.y; p.x += dx; p.y += dy; p.tw = { x0: ox, y0: oy, x1: p.x, y1: p.y, t: 0, d: .24, e: 'outBack' }; }); }
+  function merge(a, b) { // b in a
+    var A = groups[a], B = groups[b]; B.m.forEach(function (i) { G.pieces[i].g = a; A.m.push(i); }); A.locked = A.locked || B.locked; B.m = []; B.dead = true;
+    if (A.locked) A.m.forEach(function (i) { G.pieces[i].locked = true; });
+  }
+  while (changed && safety++ < 30) {
+    changed = false; var g = groups[gi], i, k;
+    // 1) Brett (alle Teile haben dort ihre Lösungsposition)
+    if (!g.locked) for (k = 0; k < g.m.length; k++) {
+      var p = G.pieces[g.m[k]], ex = p.c * G.cw - p.x, ey = p.r * G.ch - p.y;
+      if (Math.hypot(ex, ey) < tol) { snapGroup(g, ex, ey); g.locked = true; g.m.forEach(function (i2) { G.pieces[i2].locked = true; }); merged = true; changed = true; break; }
+    }
+    if (changed) { // alle fest verbundenen Nachbarn auf dem Brett sind schon Teil der "locked"-Gruppe: zusammenführen
+      var tgt = null; groups.forEach(function (o) { if (!o.dead && o.locked && o.id !== gi && o.m.length) tgt = tgt === null ? o.id : tgt; });
+      if (tgt !== null) { merge(tgt, gi); gi = tgt; }
+      continue;
+    }
+    // 2) Nachbarn
+    outer: for (k = 0; k < g.m.length; k++) {
+      var q = G.pieces[g.m[k]], nb = [[q.c - 1, q.r], [q.c + 1, q.r], [q.c, q.r - 1], [q.c, q.r + 1]];
+      for (var n = 0; n < 4; n++) {
+        var nc = nb[n][0], nr = nb[n][1]; if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
+        var o = G.pieces[nr * G.cols + nc]; if (o.g === gi) continue;
+        var ex2 = o.x - ((nc - q.c) * G.cw + q.x), ey2 = o.y - ((nr - q.r) * G.ch + q.y);
+        if (Math.hypot(ex2, ey2) < tol) {
+          var og = groups[o.g];
+          if (og.locked) { snapGroup(g, ex2, ey2); g.locked = true; g.m.forEach(function (i3) { G.pieces[i3].locked = true; }); }
+          else if (g.locked) { snapGroup(og, -ex2, -ey2); }
+          else { snapGroup(g, ex2, ey2); }
+          var keep = og.locked ? o.g : gi, drop = keep === gi ? o.g : gi; merge(keep, drop); gi = keep; merged = true; changed = true; break outer;
+        }
+      }
+    }
+  }
+  if (merged) {
+    var gr = groups[gi]; gr.m.forEach(function (i) { G.pieces[i].pulse = 1; });
+    click(gr.locked ? 880 : 700, .06); if (gr.locked) setTimeout(function () { click(1180, .05); }, 70);
+    // gesperrte Teile unter die losen
+    var lk = order.filter(function (i) { return G.pieces[i].locked; }), lo = order.filter(function (i) { return !G.pieces[i].locked; }); order = lk.concat(lo);
+  } else click(360, .03);
+  updHud(); checkWin();
+}
+function lockedCount() { var n = 0; G.pieces.forEach(function (p) { if (p.locked) n++; }); return n; }
+function updHud() { var n = lockedCount(), t = G.pieces.length; $('cnt').textContent = n + ' / ' + t; $('prog').style.width = (n / t * 100) + '%'; }
+function checkWin() {
+  if (won || lockedCount() < G.pieces.length) return; won = true; timer.on = false;
+  var best = 0, key = 'puzzle-best-' + G.pieces.length;
+  try { best = +localStorage.getItem(key) || 0; if (!best || timer.t < best) { localStorage.setItem(key, Math.round(timer.t)); } } catch (e) { }
+  G.pieces.forEach(function (p) { p.pulse = 1.6 + (p.c + p.r) * .06; });
+  winFade = .001; startConfetti(); [0, 120, 240, 360].forEach(function (d, i) { setTimeout(function () { click(660 + i * 220, .08); }, d); });
+  $('winTxt').textContent = G.pieces.length + ' Teile in ' + fmt(timer.t) + (best && timer.t >= best ? ' (Bestzeit: ' + fmt(best) + ')' : ' – neue Bestzeit!');
+  setTimeout(function () { $('win').hidden = false; }, 1800);
+}
+
+/* ===================== Ton ===================== */
+var AC = null;
+function ensureAudio() { if (!AC && S.sound) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } } if (AC && AC.state === 'suspended') AC.resume(); }
+function click(f, v) {
+  if (!S.sound || !AC) return; try { var o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime; o.type = 'triangle'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.5, t + .08); g.gain.setValueAtTime(v || .05, t); g.gain.exponentialRampToValueAtTime(.0001, t + .16); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + .18); } catch (e) { }
+}
+$('bSnd').onclick = function () { S.sound = !S.sound; this.textContent = S.sound ? '🔊' : '🔇'; ensureAudio(); };
+(function () { var b = $('bPrev'); function on() { showPrev = true; dirty = true; } function off() { showPrev = false; dirty = true; } b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off); })();
+$('bView').onclick = function () { if (!hasThree && S.mode === '2d') { alert('3D konnte nicht geladen werden.'); return; } setMode(S.mode === '2d' ? '3d' : '2d'); fitView(); };
+
+/* ===================== 2D-Renderer ===================== */
+var QS = Math.max(1.25, DPR);
+function bmpOf(p) {
+  if (p.bmp) return p.bmp; var pad = 6, bb = p.bb, w = Math.ceil((bb.x1 - bb.x0 + pad * 2) * QS), h = Math.ceil((bb.y1 - bb.y0 + pad * 2) * QS), c = document.createElement('canvas'); c.width = w; c.height = h;
+  var x = c.getContext('2d'); x.scale(QS, QS); x.translate(pad - bb.x0, pad - bb.y0);
+  function path() { x.beginPath(); p.pts.forEach(function (q, k) { if (k) x.lineTo(q[0], q[1]); else x.moveTo(q[0], q[1]); }); x.closePath(); }
+  x.save(); path(); x.clip(); x.drawImage(IMG, -p.c * G.cw, -p.r * G.ch, G.Bw, G.Bh);
+  x.lineJoin = 'round'; x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,.45)'; x.save(); x.translate(1.2, 1.2); path(); x.stroke(); x.restore();
+  x.strokeStyle = 'rgba(0,0,0,.4)'; x.save(); x.translate(-1.2, -1.2); path(); x.stroke(); x.restore(); x.restore();
+  x.lineWidth = 1; x.strokeStyle = 'rgba(0,0,0,.55)'; path(); x.stroke();
+  p.bmp = c; p.bmpPad = pad; return c;
+}
+function draw2D() {
+  var W = cv2.width, H = cv2.height, g = g2; g.setTransform(1, 0, 0, 1, 0, 0);
+  var bg = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * .75); bg.addColorStop(0, '#2a3158'); bg.addColorStop(1, '#0d1024'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.setTransform(DPR * view.s, 0, 0, DPR * view.s, DPR * view.ox, DPR * view.oy);
+  // Brett
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(-8, -8, G.Bw + 16, G.Bh + 16);
+  g.globalAlpha = showPrev ? .8 : .14; g.drawImage(IMG, 0, 0, G.Bw, G.Bh); g.globalAlpha = 1;
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2 / view.s; g.setLineDash([10 / view.s, 7 / view.s]); g.strokeRect(0, 0, G.Bw, G.Bh); g.setLineDash([]);
+  // Teile
+  for (var pass = 0; pass < 2; pass++) for (var k = 0; k < order.length; k++) {
+    var p = G.pieces[order[k]]; if ((pass === 0) !== p.locked) continue;
+    var bm = bmpOf(p), pad = p.bmpPad, bb = p.bb, wx = p.x + bb.x0 - pad, wy = p.y + bb.y0 - pad, bw = bm.width / QS, bh = bm.height / QS;
+    g.save();
+    if (!p.locked) { g.shadowColor = 'rgba(0,0,0,' + (.35 + .2 * p.lift) + ')'; g.shadowBlur = (5 + 18 * p.lift) * DPR; g.shadowOffsetX = (1 + 4 * p.lift) * DPR; g.shadowOffsetY = (2 + 9 * p.lift) * DPR; }
+    var sc = 1 + .07 * p.lift + (p.pulse > 0 && p.pulse <= 1 ? Math.sin(p.pulse * Math.PI) * .05 : 0), cx = p.x + G.cw / 2, cy = p.y + G.ch / 2;
+    if (sc !== 1) { g.translate(cx, cy); g.scale(sc, sc); g.translate(-cx, -cy); }
+    g.drawImage(bm, wx, wy, bw, bh);
+    if (p.pulse > 0 && p.pulse <= 1) { g.shadowColor = 'transparent'; g.globalAlpha = p.pulse * .55; g.lineWidth = 3.5; g.strokeStyle = '#fff'; g.lineJoin = 'round'; g.translate(p.x, p.y); g.beginPath(); p.pts.forEach(function (q, i) { if (i) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); g.closePath(); g.stroke(); }
+    g.restore();
+  }
+  if (winFade > 0) { g.globalAlpha = Math.min(1, winFade); g.drawImage(IMG, 0, 0, G.Bw, G.Bh); g.globalAlpha = 1; g.strokeStyle = 'rgba(255,255,255,' + Math.min(1, winFade) * .8 + ')'; g.lineWidth = 3 / view.s; g.strokeRect(0, 0, G.Bw, G.Bh); }
+}
+
+/* ===================== 3D-Renderer ===================== */
+var R3 = { r: null, scene: null, cam: null, ray: null, grp: null, tx: 0, tz: 0, pitch: 1.08, yaw: 0, dist: 1200, tex: null, ghost: null };
+var DEP = 6;
+function initThree() {
+  if (R3.r) return true; if (!hasThree) return false;
+  try { R3.r = new THREE.WebGLRenderer({ canvas: cv3, antialias: true, alpha: false }); } catch (e) { return false; }
+  var r = R3.r; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.outputEncoding = THREE.sRGBEncoding; r.setClearColor(0x0d1024);
+  R3.scene = new THREE.Scene(); R3.cam = new THREE.PerspectiveCamera(40, 1, 20, 9000); R3.ray = new THREE.Raycaster();
+  var hemi = new THREE.HemisphereLight(0xdfe8ff, 0x302418, .75); R3.scene.add(hemi);
+  var dl = new THREE.DirectionalLight(0xfff2dd, .85); dl.castShadow = true; dl.shadow.mapSize.set(2048, 2048); dl.shadow.bias = -.0004; dl.shadow.radius = 3; R3.dl = dl; R3.scene.add(dl); R3.scene.add(dl.target);
+  // Tisch (Holz, selbst gezeichnet)
+  var tc = document.createElement('canvas'); tc.width = tc.height = 512; var x = tc.getContext('2d'), rr = mkRng(5); x.fillStyle = '#6b4a2e'; x.fillRect(0, 0, 512, 512);
+  for (var i = 0; i < 260; i++) { x.strokeStyle = 'rgba(' + (rr() < .5 ? '40,24,10' : '150,110,70') + ',' + (.06 + rr() * .12) + ')'; x.lineWidth = .6 + rr() * 2; x.beginPath(); var y0 = rr() * 512; x.moveTo(0, y0); x.bezierCurveTo(170, y0 + (rr() - .5) * 18, 340, y0 + (rr() - .5) * 18, 512, y0 + (rr() - .5) * 10); x.stroke(); }
+  var tt = new THREE.CanvasTexture(tc); tt.wrapS = tt.wrapT = THREE.RepeatWrapping; tt.repeat.set(10, 10); tt.encoding = THREE.sRGBEncoding; tt.anisotropy = 8;
+  var table = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ map: tt, roughness: .85 })); table.rotation.x = -Math.PI / 2; table.position.y = -.5; table.receiveShadow = true; R3.scene.add(table);
+  R3.grp = new THREE.Group(); R3.scene.add(R3.grp); return true;
+}
+function disposeThree() {
+  if (!R3.grp) return; while (R3.grp.children.length) { var o = R3.grp.children.pop(); if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) { if (m !== R3.sideMat) m.dispose(); }); } }
+  if (R3.tex) { R3.tex.dispose(); R3.tex = null; } if (G) G.pieces.forEach(function (p) { p.mesh = null; });
+}
+function build3D() {
+  if (!R3.r || !G) return; disposeThree();
+  var tc = document.createElement('canvas'); tc.width = tc.height = 2048; tc.getContext('2d').drawImage(IMG, 0, 0, 2048, 2048);
+  var tex = new THREE.CanvasTexture(tc); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8; R3.tex = tex;
+  R3.sideMat = R3.sideMat || new THREE.MeshStandardMaterial({ color: 0x3a3126, roughness: .8 });
+  var cx = G.cw / 2, cy = G.ch / 2;
+  G.pieces.forEach(function (p) {
+    var sh = new THREE.Shape(p.pts.map(function (q) { return new THREE.Vector2(q[0] - cx, -(q[1] - cy)); }));
+    var geo = new THREE.ExtrudeGeometry(sh, { depth: DEP, bevelEnabled: true, bevelThickness: 1, bevelSize: .9, bevelOffset: -.9, bevelSegments: 1, curveSegments: 1 }); geo.rotateX(-Math.PI / 2);
+    var pos = geo.attributes.position, uv = geo.attributes.uv;
+    for (var i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + cx + p.c * G.cw) / G.Bw, 1 - (pos.getZ(i) + cy + p.r * G.ch) / G.Bh);
+    var m = new THREE.Mesh(geo, [new THREE.MeshStandardMaterial({ map: tex, roughness: .5, emissive: 0x000000 }), R3.sideMat]); m.castShadow = true; m.receiveShadow = true; p.mesh = m; R3.grp.add(m);
+  });
+  var tray = new THREE.Mesh(new THREE.BoxGeometry(G.Bw + 18, 1, G.Bh + 18), new THREE.MeshStandardMaterial({ color: 0x2a1e12, roughness: .9 })); tray.position.set(G.Bw / 2, -.2, G.Bh / 2); tray.receiveShadow = true; R3.grp.add(tray);
+  var gm = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: .16 }); R3.ghost = new THREE.Mesh(new THREE.PlaneGeometry(G.Bw, G.Bh), gm); R3.ghost.rotation.x = -Math.PI / 2; R3.ghost.position.set(G.Bw / 2, .45, G.Bh / 2); R3.grp.add(R3.ghost);
+  var m2 = Math.max(G.Bw, G.Bh) * 1.7; var sc = R3.dl.shadow.camera; sc.left = -m2; sc.right = m2; sc.top = m2; sc.bottom = -m2; sc.near = 50; sc.far = 3000; sc.updateProjectionMatrix();
+  R3.dl.position.set(G.Bw / 2 - 300, 1100, G.Bh / 2 + 450); R3.dl.target.position.set(G.Bw / 2, 0, G.Bh / 2);
+}
+function sync3D(dt) {
+  var cx = G.cw / 2, cy = G.ch / 2, rank = {}; order.forEach(function (i, k) { rank[i] = k; });
+  G.pieces.forEach(function (p) {
+    var m = p.mesh; if (!m) return; var bounce = p.pulse > 0 && p.pulse <= 1 ? Math.sin(p.pulse * Math.PI) * 7 : 0;
+    var base = p.locked ? 1 : 1 + DEP * .5 + (rank[p.i] || 0) * .25;
+    m.position.set(p.x + cx, base + p.lift * 22 + bounce, p.y + cy);
+    var tl = p.lift > .02 ? 1 : 0; m.rotation.z += ((-vel.x * .035 * tl) - m.rotation.z) * Math.min(1, dt * 12); m.rotation.x += ((vel.y * .035 * tl) - m.rotation.x) * Math.min(1, dt * 12);
+    var e = p.pulse > 0 && p.pulse <= 1 ? p.pulse * .45 : 0; m.material[0].emissive.setRGB(e, e, e);
+  });
+  R3.ghost.material.opacity = showPrev ? .85 : .16; if (winFade > 0) R3.ghost.material.opacity = Math.max(R3.ghost.material.opacity, Math.min(1, winFade));
+  var cp = R3.pitch, yw = R3.yaw || 0, d = R3.dist; R3.cam.position.set(R3.tx + Math.sin(yw) * Math.cos(cp) * d, Math.sin(cp) * d, R3.tz + Math.cos(yw) * Math.cos(cp) * d); R3.cam.up.set(0, 1, 0); R3.cam.lookAt(R3.tx, 0, R3.tz);
+  R3.r.render(R3.scene, R3.cam);
+}
+function setMode(m, silent) {
+  if (m === '3d') { if (!initThree()) { alert('3D wird von diesem Gerät nicht unterstützt.'); m = '2d'; } }
+  S.mode = m; if (window._sel) window._sel();
+  cv2.hidden = m === '3d'; cv3.hidden = m !== '3d';
+  if (m === '3d') { resizeAll(); if (G && !G.pieces[0].mesh) build3D(); }
+  var h = $('hint'); if (h && G) h.textContent = 'Teile ziehen und passend zusammenschieben · Mausrad/Pinch: Zoom · Hintergrund ziehen: verschieben' + (m === '3d' ? ' · Rechtsklick ziehen: Kamera neigen' : '');
+  dirty = true;
+}
+
+/* ===================== Konfetti ===================== */
+function startConfetti() {
+  fxOn = true; fxP = []; var w = fx.width, cols = ['#ff4d6d', '#ffd23f', '#27d3c3', '#7c5cff', '#ff9a3d', '#ffffff'];
+  for (var i = 0; i < 180; i++) fxP.push({ x: Math.random() * w, y: -Math.random() * fx.height * .6, vx: (Math.random() - .5) * 120 * DPR, vy: (120 + Math.random() * 260) * DPR, r: Math.random() * 6, vr: (Math.random() - .5) * 10, w: (6 + Math.random() * 8) * DPR, h: (4 + Math.random() * 6) * DPR, c: cols[(Math.random() * cols.length) | 0] });
+}
+function drawFx(dt) {
+  gfx.clearRect(0, 0, fx.width, fx.height); if (!fxOn) return; var alive = 0;
+  fxP.forEach(function (p) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 90 * DPR * dt; p.r += p.vr * dt; if (p.y < fx.height + 20) alive++; gfx.save(); gfx.translate(p.x, p.y); gfx.rotate(p.r); gfx.fillStyle = p.c; gfx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); gfx.restore(); });
+  if (!alive) { fxOn = false; gfx.clearRect(0, 0, fx.width, fx.height); }
+}
+
+/* ===================== Hauptschleife ===================== */
+var lastT = performance.now();
+function tick(now) {
+  var dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+  if (G && !$('game').hidden) {
+    var anim = false;
+    G.pieces.forEach(function (p) {
+      if (p.tw) { p.tw.t += dt; if (p.tw.t >= 0) { var u = Math.min(1, p.tw.t / p.tw.d), e = ease[p.tw.e](u); p.x = p.tw.x0 + (p.tw.x1 - p.tw.x0) * e; p.y = p.tw.y0 + (p.tw.y1 - p.tw.y0) * e; if (u >= 1) { p.x = p.tw.x1; p.y = p.tw.y1; p.tw = null; } } anim = true; }
+      var dl = p.liftT - p.lift; if (Math.abs(dl) > .002) { p.lift += dl * Math.min(1, dt * 14); anim = true; } else p.lift = p.liftT;
+      if (p.pulse > 0) { p.pulse -= dt * 1.7; anim = true; if (p.pulse < 0) p.pulse = 0; }
+    });
+    if (winFade > 0 && winFade < 1) { winFade += dt * .8; anim = true; }
+    vel.x *= Math.pow(.02, dt); vel.y *= Math.pow(.02, dt); if (Math.abs(vel.x) + Math.abs(vel.y) > .05) anim = true;
+    if (timer.on) { timer.t += (now - timer.last) / 1000; timer.last = now; $('time').textContent = fmt(timer.t); }
+    if (anim || dirty || S.mode === '3d' && (drag || Math.abs(vel.x) > .01)) { if (S.mode === '3d' && R3.r) { if (!G.pieces[0].mesh) build3D(); sync3D(dt); } else draw2D(); dirty = anim; }
+    drawFx(dt);
+  }
+}
+function frame(now) { tick(now); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+setInterval(function () { var n = performance.now(); if (n - lastT > 300 && G && !$('game').hidden) tick(n); }, 250);
+window.PZ = { tick: function () { dirty = true; tick(performance.now()); }, get: function () { return { G: G, groups: groups, order: order, S: S, won: won, timer: timer, view: view }; }, startGame: startGame, settle: settle, setMode: setMode, lockedCount: function () { return lockedCount(); }, R3: R3, toWorld: toWorld, S: S };
+})();
+</script>
+</body>
+</html>
