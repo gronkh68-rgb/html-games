@@ -194,7 +194,7 @@ function buildPuzzle(cols, rows, shape, Bw, Bh, seed) {
 
 /* ===================== Zustand ===================== */
 var S = { pic: 0, custom: null, cnt: 24, shape: 'classic', mode: '2d', sound: true };
-var G = null, IMG = null, groups = [], order = [], view = { s: 1, ox: 0, oy: 0 }, dirty = true, timer = { t: 0, on: false, last: 0 }, won = false, showPrev = false, fxP = [], fxOn = false, winFade = 0, seedBase = 1;
+var AN = null, G = null, IMG = null, groups = [], order = [], view = { s: 1, ox: 0, oy: 0 }, dirty = true, timer = { t: 0, on: false, last: 0 }, won = false, showPrev = false, fxP = [], fxOn = false, winFade = 0, seedBase = 1;
 var cv2 = $('c2'), cv3 = $('c3'), fx = $('fx'), stage = $('stage'), g2 = cv2.getContext('2d'), gfx = fx.getContext('2d'), DPR = Math.min(2, window.devicePixelRatio || 1);
 var hasThree = typeof THREE !== 'undefined';
 
@@ -204,12 +204,12 @@ var hasThree = typeof THREE !== 'undefined';
   PICS.forEach(function (p, i) {
     var b = document.createElement('button'), c = document.createElement('canvas'); c.width = 240; c.height = 160;
     p.draw(c.getContext('2d'), 240, 160, mkRng(p.seed)); b.appendChild(c); var sp = document.createElement('span'); sp.textContent = p.name; b.appendChild(sp);
-    b.onclick = function () { S.pic = i; S.custom = null; sel(); }; gal.appendChild(b);
+    b.onclick = function () { S.pic = i; S.custom = null; S.gif = false; sel(); }; gal.appendChild(b);
   });
   var up = document.createElement('button'); up.className = 'up'; up.innerHTML = '📷<small>Eigenes Bild</small>'; up.onclick = function () { $('file').click(); }; gal.appendChild(up);
   $('file').onchange = function (e) {
     var f = e.target.files[0]; if (!f) return; var url = URL.createObjectURL(f), im = new Image();
-    im.onload = function () { S.custom = im; S.pic = -1; sel(); var t = up.querySelector('img'); if (t) t.remove(); var ti = document.createElement('img'); ti.src = url; up.insertBefore(ti, up.firstChild); up.querySelector('small').textContent = 'Dein Bild'; };
+    im.onload = function () { S.custom = im; S.gif = /gif/i.test(f.type || '') || /\.gif$/i.test(f.name || ''); S.pic = -1; sel(); var t = up.querySelector('img'); if (t) t.remove(); var ti = document.createElement('img'); ti.src = url; up.insertBefore(ti, up.firstChild); up.querySelector('small').textContent = 'Dein Bild'; };
     im.src = url;
   };
   [6, 12, 24, 48, 96, 150].forEach(function (n) { var b = document.createElement('button'); b.className = 'opt'; b.dataset.n = n; b.textContent = n + ' Teile'; b.onclick = function () { S.cnt = n; sel(); }; $('cntOpts').appendChild(b); });
@@ -231,11 +231,14 @@ var hasThree = typeof THREE !== 'undefined';
 
 /* ===================== Spiel starten ===================== */
 function makeImage() {
-  var c = document.createElement('canvas');
+  var c = document.createElement('canvas'); AN = null;
   if (S.custom) {
     var im = S.custom, w = im.naturalWidth, h = im.naturalHeight, ar = w / h, sx = 0, sy = 0, sw = w, sh = h;
     if (ar > 1.8) { sw = h * 1.8; sx = (w - sw) / 2; } else if (ar < .6) { sh = w / .6; sy = (h - sh) / 2; }
-    var k = Math.min(1, 1600 / Math.max(sw, sh)); c.width = Math.round(sw * k); c.height = Math.round(sh * k); c.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    var k = Math.min(1, (S.gif ? 700 : 1600) / Math.max(sw, sh)); c.width = Math.round(sw * k); c.height = Math.round(sh * k); c.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    if (S.gif) { // animiertes GIF: das Bild bleibt im Dokument, damit der Browser es weiter abspielt
+      im.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none'; if (!im.parentNode) document.body.appendChild(im); AN = { im: im, sx: sx, sy: sy, sw: sw, sh: sh };
+    }
   } else { c.width = 1200; c.height = 800; var p = PICS[S.pic]; p.draw(c.getContext('2d'), 1200, 800, mkRng(p.seed)); }
   return c;
 }
@@ -444,7 +447,7 @@ function bmpOf(p) {
   if (p.bmp) return p.bmp; var pad = 6, bb = p.bb, w = Math.ceil((bb.x1 - bb.x0 + pad * 2) * QS), h = Math.ceil((bb.y1 - bb.y0 + pad * 2) * QS), c = document.createElement('canvas'); c.width = w; c.height = h;
   var x = c.getContext('2d'); x.scale(QS, QS); x.translate(pad - bb.x0, pad - bb.y0);
   function path() { x.beginPath(); p.pts.forEach(function (q, k) { if (k) x.lineTo(q[0], q[1]); else x.moveTo(q[0], q[1]); }); x.closePath(); }
-  x.save(); path(); x.clip(); x.drawImage(IMG, -p.c * G.cw, -p.r * G.ch, G.Bw, G.Bh);
+  x.save(); path(); x.clip(); if (!AN) x.drawImage(IMG, -p.c * G.cw, -p.r * G.ch, G.Bw, G.Bh);
   x.lineJoin = 'round'; x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,.45)'; x.save(); x.translate(1.2, 1.2); path(); x.stroke(); x.restore();
   x.strokeStyle = 'rgba(0,0,0,.4)'; x.save(); x.translate(-1.2, -1.2); path(); x.stroke(); x.restore(); x.restore();
   x.lineWidth = 1; x.strokeStyle = 'rgba(0,0,0,.55)'; path(); x.stroke();
@@ -466,6 +469,10 @@ function draw2D() {
     if (!p.locked) { g.shadowColor = 'rgba(0,0,0,' + (.35 + .2 * p.lift) + ')'; g.shadowBlur = (5 + 18 * p.lift) * DPR; g.shadowOffsetX = (1 + 4 * p.lift) * DPR; g.shadowOffsetY = (2 + 9 * p.lift) * DPR; }
     var sc = 1 + .07 * p.lift + (p.pulse > 0 && p.pulse <= 1 ? Math.sin(p.pulse * Math.PI) * .05 : 0), cx = p.x + G.cw / 2, cy = p.y + G.ch / 2;
     if (sc !== 1) { g.translate(cx, cy); g.scale(sc, sc); g.translate(-cx, -cy); }
+    if (AN) {
+      var pa = p.path2d; if (!pa) { pa = p.path2d = new Path2D(); p.pts.forEach(function (q, i) { if (i) pa.lineTo(q[0], q[1]); else pa.moveTo(q[0], q[1]); }); pa.closePath(); }
+      g.save(); g.translate(p.x, p.y); if (!p.locked) { g.fillStyle = '#000'; g.fill(pa); } g.shadowColor = 'transparent'; g.clip(pa); g.drawImage(IMG, -p.c * G.cw, -p.r * G.ch, G.Bw, G.Bh); g.restore();
+    }
     g.drawImage(bm, wx, wy, bw, bh);
     if (p.pulse > 0 && p.pulse <= 1) { g.shadowColor = 'transparent'; g.globalAlpha = p.pulse * .55; g.lineWidth = 3.5; g.strokeStyle = '#fff'; g.lineJoin = 'round'; g.translate(p.x, p.y); g.beginPath(); p.pts.forEach(function (q, i) { if (i) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); g.closePath(); g.stroke(); }
     g.restore();
@@ -496,8 +503,8 @@ function disposeThree() {
 }
 function build3D() {
   if (!R3.r || !G) return; disposeThree();
-  var tc = document.createElement('canvas'); tc.width = tc.height = 2048; tc.getContext('2d').drawImage(IMG, 0, 0, 2048, 2048);
-  var tex = new THREE.CanvasTexture(tc); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8; R3.tex = tex;
+  var tc = document.createElement('canvas'); tc.width = tc.height = AN ? 1024 : 2048; tc.getContext('2d').drawImage(IMG, 0, 0, tc.width, tc.height); R3.texCanvas = tc;
+  var tex = new THREE.CanvasTexture(tc); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8; if (AN) { tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; } R3.tex = tex;
   R3.sideMat = R3.sideMat || new THREE.MeshStandardMaterial({ color: 0x3a3126, roughness: .8 });
   var cx = G.cw / 2, cy = G.ch / 2;
   G.pieces.forEach(function (p) {
@@ -513,6 +520,7 @@ function build3D() {
   R3.dl.position.set(G.Bw / 2 - 300, 1100, G.Bh / 2 + 450); R3.dl.target.position.set(G.Bw / 2, 0, G.Bh / 2);
 }
 function sync3D(dt) {
+  if (AN && R3.texCanvas && R3.tex) { R3.texCanvas.getContext('2d').drawImage(IMG, 0, 0, R3.texCanvas.width, R3.texCanvas.height); R3.tex.needsUpdate = true; }
   var cx = G.cw / 2, cy = G.ch / 2, rank = {}; order.forEach(function (i, k) { rank[i] = k; });
   G.pieces.forEach(function (p) {
     var m = p.mesh; if (!m) return; var bounce = p.pulse > 0 && p.pulse <= 1 ? Math.sin(p.pulse * Math.PI) * 7 : 0;
@@ -559,7 +567,8 @@ function tick(now) {
     if (winFade > 0 && winFade < 1) { winFade += dt * .8; anim = true; }
     vel.x *= Math.pow(.02, dt); vel.y *= Math.pow(.02, dt); if (Math.abs(vel.x) + Math.abs(vel.y) > .05) anim = true;
     if (timer.on) { timer.t += (now - timer.last) / 1000; timer.last = now; $('time').textContent = fmt(timer.t); }
-    if (anim || dirty || S.mode === '3d' && (drag || Math.abs(vel.x) > .01)) { if (S.mode === '3d' && R3.r) { if (!G.pieces[0].mesh) build3D(); sync3D(dt); } else draw2D(); dirty = anim; }
+    if (AN) { IMG.getContext('2d').drawImage(AN.im, AN.sx, AN.sy, AN.sw, AN.sh, 0, 0, IMG.width, IMG.height); dirty = true; }
+    if (anim || dirty || S.mode === '3d' && (drag || Math.abs(vel.x) > .01)) { if (S.mode === '3d' && R3.r) { if (!G.pieces[0].mesh) build3D(); sync3D(dt); } else draw2D(); dirty = anim || !!AN; }
     drawFx(dt);
   }
 }
