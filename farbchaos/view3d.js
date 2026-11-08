@@ -177,7 +177,7 @@
     glow.position.z = -.05; g.add(glow);
     var sh = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({ map: shTex, transparent: true, opacity: .5, depthWrite: false }));
     sh.rotation.x = -Math.PI / 2; world.add(sh);
-    return cards[key] = { mesh: g, front: front, glow: glow, sh: sh, tg: null, key: key };
+    return cards[key] = { mesh: g, front: front, back: back, glow: glow, sh: sh, tg: null, key: key };
   }
   function drop(key) { var o = cards[key]; if (!o) return; world.remove(o.mesh); world.remove(o.sh); tw = tw.filter(function (w) { return w.o !== o; }); delete cards[key]; }
   function clearAll() { Object.keys(cards).forEach(drop); tw = []; }
@@ -263,7 +263,7 @@
       var ol=Math.hypot(sl.x,sl.z)||1; label('l' + seat, V.names[seat], V.scores[seat] + ' P · ' + V.counts[seat] + ' Karten', V.cur === seat, sl.x + sl.x/ol*3.8, sl.z + sl.z/ol*3.8);
     });
     // eigene Hand
-    var hn = V.hand.length, hsp = Math.min(2.5, 21 / Math.max(1, hn));
+    var hn = V.hand.length, hsp = Math.min(2.5, 27 / Math.max(1, hn));
     V.hand.forEach(function (id, k) {
       var ok = !mine || inp.can.indexOf(id) >= 0, hv = hoverId === id && mine && ok, off = (k - (hn - 1) / 2) * hsp;
       W('c' + id, { id: id, x: off, y: CH * 1.18 / 2 * Math.sin(.78) + .45 + k * .012 + (mine && ok ? .5 : 0) + (hv ? 1.1 : 0), z: 10.4 + off * off * .004 - (hv ? .8 : 0), rx: -Math.PI / 2 + .78 - (hv ? .12 : 0), ry: 0, s: 1.18, snd: null, dim: mine && !ok, glow: mine && ok ? 1 : 0, hand: 1 });
@@ -313,12 +313,16 @@
     var list = [];
     lastV.hand.forEach(function (id) { var o = cards['c' + id]; if (o) { list.push(o.front); } });
     var topKey = 'd' + (Math.min(lastV.deckN, MAXV) - 1), tk = cards[topKey];
-    if (tk) list.push(tk.front);
+    if (tk) { list.push(tk.front); list.push(tk.back); }   // verdeckte Karte liegt mit der Rückseite nach oben
     world.updateMatrixWorld(true);
     var hits = ray.intersectObjects(list, false), hit = hits[0];
     if (!hit) return null;
     if (lastInp && lastInp.mode === 'turn') {   // bei überlappenden Karten die spielbare unter dem Zeiger bevorzugen
-      for (var q = 0; q < hits.length; q++) { var gi = hits[q].object.userData.top.userData.id; if (gi != null && lastInp.can.indexOf(gi) >= 0) { hit = hits[q]; break; } }
+      var bd = 1e9;   // unter den spielbaren Karten am Zeiger die mit dem nächsten Mittelpunkt nehmen
+      for (var q = 0; q < hits.length; q++) {
+        var g = hits[q].object.userData.top, gi = g.userData.id;
+        if (gi != null && lastInp.can.indexOf(gi) >= 0) { var dd = Math.abs(hits[q].point.x - g.position.x); if (dd < bd) { bd = dd; hit = hits[q]; } }
+      }
     }
     var g = hit.object.userData.top; return g.userData.id != null ? g.userData.id : 'draw';
   }

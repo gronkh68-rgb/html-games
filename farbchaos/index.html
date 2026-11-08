@@ -358,7 +358,8 @@ $('hand').addEventListener('click',e=>{
   let el=e.target.closest('.uc');
   if(inp&&inp.mode==='turn'){   // bei überlappenden Karten die spielbare unter dem Zeiger nehmen
     const stack=document.elementsFromPoint(e.clientX,e.clientY).map(x=>x.closest&&x.closest('#hand .uc')).filter(Boolean);
-    const ok=stack.find(x=>inp.can.includes(+x.dataset.id));if(ok)el=ok;
+    const okc=stack.filter(x=>inp.can.includes(+x.dataset.id));
+    if(okc.length){let bd=1e9;okc.forEach(x=>{const r=x.getBoundingClientRect(),d=Math.abs(e.clientX-(r.left+r.width/2));if(d<bd){bd=d;el=x;}});}
   }
   if(el)clickHand(+el.dataset.id);
 });
@@ -649,11 +650,13 @@ function reshuffleIfNeeded(){
   if(G.deck.length)say(-1,'Der Ablagestapel wird neu gemischt.');
 }
 async function drawCards(p,n,quick){
+  let last=null;
   for(let i=0;i<n;i++){
     reshuffleIfNeeded();if(!G.deck.length)break;
-    const c=G.deck.pop();G.hands[p].push(c);G.hands[p]=sortHand(G.hands[p]);G.src[c.id]='deck';
+    const c=G.deck.pop();last=c;G.hands[p].push(c);G.hands[p]=sortHand(G.hands[p]);G.src[c.id]='deck';
     push();await sleep(quick?170:300);
   }
+  return last;
 }
 // ---------- UNO-Spin-Modus: Spin-Karten (Zahlen 1-5 mit Wirbel) und das Rad ----------
 function rotateHands(){const nh=[];G.hands.forEach((h,i)=>{nh[nextOf(i)]=h;});G.hands=nh.map(sortHand);}
@@ -680,10 +683,9 @@ async function discardSet(p,cards,what){
   push();await sleep(1000);
 }
 async function drawUntil(p,colr){
-  for(let i=0;i<40;i++){
-    await drawCards(p,1,true);const c=G.hands[p][G.hands[p].length-1];
+  for(let i=0;i<108;i++){
+    const c=await drawCards(p,1,true);
     if(!c)return;if(c.col===colr||c.col===4)return;
-    const last=G.src;  // (nur zur Lesbarkeit)
   }
 }
 const SPINS=[
@@ -804,8 +806,7 @@ async function turn(p){
   if(a.c===null){
     if(G.pen)return takePenalty(p);
     say(p,`${nm(p)} zieht eine Karte.`,'Du ziehst eine Karte.');
-    await drawCards(p,1);
-    const c=G.hands[p][G.hands[p].length-1];
+    const c=await drawCards(p,1);
     if(c&&canPlay(c)){
       const keep=await ask(p,{k:'dlg',ico:'🃏',title:'Gezogene Karte passt',html:`<b>${esc(cname(c))}</b> kannst du sofort legen.`,btns:['Legen','Behalten']},()=>0);
       if(keep===0){
