@@ -200,6 +200,9 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
 <div id="lookBox"><div class="box"><h2>Figuren-Look</h2><p style="margin:0 0 10px;color:var(--muted);font-size:.9rem">Wähle für jede Farbe Ohren, Schwanz, Hut und Kleidung. Das siehst du im Japan-Stil (2D und 3D) und es wird gespeichert.</p><div id="lookTabs"></div><div id="lookSels"></div><div class="row" style="margin-top:12px"><button class="btn" id="lookDone">Fertig</button></div></div></div>
   <div id="setup" class="panel">
     <div class="row"><label>Dein Name</label><input id="myName" maxlength="14" placeholder="Name"></div>
+    <div class="row"><label for="diceMode">Würfel</label>
+      <select id="diceMode"><option value="bag">Ausgeglichen: jeder Spieler hat seinen eigenen Würfel</option><option value="rand">Echter Zufall (ein gemeinsamer Würfel)</option></select></div>
+    <p class="hint" id="diceHint" style="margin:-2px 0 8px;font-size:.8rem;color:var(--muted)">Ausgeglichen: Jeder Spieler würfelt aus einem eigenen Beutel mit je zwei Mal 1 bis 6. So bekommt jeder auf Dauer gleich viele Sechsen, Pechsträhnen sind kürzer. Online gilt die Einstellung des Hosts.</p>
     <div class="row" id="modeTabs">
       <button class="btn" data-m="local">Lokal</button>
       <button class="btn alt" data-m="host">Online: Raum erstellen</button>
@@ -263,7 +266,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
         <div class="panel scores" id="scores"></div>
         <details class="panel rules"><summary>Regeln</summary><ul>
           <li>Mit einer 6 kommt eine Figur aus dem Haus. Das ist Pflicht, solange eine im Haus ist.</li>
-          <li>Wer eine 6 würfelt, würfelt nochmal.</li>
+          <li>Wer eine 6 würfelt, würfelt nochmal. Standardmäßig hat jeder Spieler einen eigenen, ausgeglichenen Würfel (einstellbar vor dem Start).</li>
           <li>Solange noch Figuren im Haus sind, muss die Figur auf dem Startfeld zuerst weiterziehen.</li>
           <li>Ohne Figur auf dem Feld darf man dreimal würfeln.</li>
           <li>Wer auf eine fremde Figur zieht, wirft sie raus. Im Ziel darf man nicht überspringen.</li>
@@ -606,6 +609,13 @@ function setPhys(on){
 }
 
 // ---------- Ablauf ----------
+// Würfelzahl: "Ausgeglichen" zieht pro Spieler aus einem eigenen Beutel (zwei Mal 1–6, gemischt), "Echter Zufall" wie bisher
+let bags=[[],[],[],[]];
+function rollValue(p){
+  if(($('diceMode')||{}).value!=='bag')return 1+Math.floor(Math.random()*6);
+  if(!bags[p].length){const b=[1,2,3,4,5,6,1,2,3,4,5,6];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}bags[p]=b;}
+  return bags[p].pop();
+}
 async function doRoll(p){
   const btn=$('rollBtn');
   if(cfg[p]==='remote'){
@@ -627,12 +637,12 @@ async function doRoll(p){
   let v;
   if(PHYS){
     PD.start();await sleep(700,t);
-    v=1+Math.floor(Math.random()*6);
+    v=rollValue(p);
     netPhase={k:'rolling',p,v};netPush();      // Mitspieler lassen ihren Würfel jetzt auf diese Zahl landen
     await PD.land(v);
   }else{
     for(let k=0;k<rollFrames;k++){dieFrame(k);await sleep(45,t);}
-    v=1+Math.floor(Math.random()*6);
+    v=rollValue(p);
   }
   dieDone(v);lastRoll=v;
   netPhase={k:'idle'};netPush();
@@ -776,7 +786,7 @@ function startGame(){
 }
 function launch(){            // startet das Spiel mit den Werten in cfg und names
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
-  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);bags=[[],[],[],[]];
   pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
@@ -794,6 +804,8 @@ const rollClick=()=>{
   else if(rollWait)rollWait();
 };
 $('rollBtn').onclick=rollClick;$('die').onclick=rollClick;
+try{$('diceMode').value=localStorage.getItem('mdn-dice')||'bag';}catch(e){}
+$('diceMode').onchange=()=>{try{localStorage.setItem('mdn-dice',$('diceMode').value);}catch(e){}};
 buildSetup();setDie(0);
 </script>
 <script>
