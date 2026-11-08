@@ -103,6 +103,29 @@ body.full3d{overflow:hidden}
 #hint3d{position:absolute;left:10px;bottom:8px;font-size:.72rem;color:#d7f0dc;opacity:.8;pointer-events:none;text-shadow:0 1px 2px #000}
 .hc .bk{position:absolute;inset:0;background:repeating-linear-gradient(45deg,#8c1d2c 0 6px,#6e1421 6px 12px);border-radius:inherit;pointer-events:none}
 .hc.pairing{box-shadow:0 0 0 3px #ffd23f,0 0 16px #ffd23f}
+.yh .box{max-width:760px;width:calc(100% - 20px);max-height:90vh;overflow:auto;text-align:left;padding:18px 20px}
+.yh h2{margin:0 0 6px}
+.yh h4{margin:14px 0 6px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#yhTabs{display:flex;gap:8px;margin:8px 0}
+#yhTabs .btn{padding:6px 14px;font-size:.85rem}
+#yhLeg{display:flex;gap:12px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);margin:4px 0 6px}
+#yhLeg span::before{content:'';display:inline-block;width:.8em;height:.8em;border-radius:3px;margin-right:5px;vertical-align:-.1em;border:2px solid transparent}
+#yhLeg .l1::before{border-color:#3ee6a0;background:#3ee6a0}#yhLeg .l2::before{border-color:#ffd23f}#yhLeg .l3::before{border-color:#6ab7ff}#yhLeg .l4::before{background:#555;opacity:.5}
+.yrow{padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.1);margin:6px 0;background:rgba(255,255,255,.03)}
+.yrow.done{border-color:#3ee6a0;background:rgba(62,230,160,.1)}
+.yrow.near{border-color:#ffd23f;background:rgba(255,210,63,.08)}
+.yrow.blocked{opacity:.5}
+.yh1{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.yh1 .pp{background:rgba(255,255,255,.12);border-radius:999px;padding:1px 9px;font-size:.78rem}
+.yh1 .bd{margin-left:auto;font-size:.8rem;font-weight:700}
+.yrow.done .bd{color:#3ee6a0}.yrow.near .bd{color:#ffd23f}
+.yd{font-size:.82rem;color:var(--muted);margin:2px 0 6px}
+.ycards{display:flex;gap:5px;flex-wrap:wrap}
+.yc{width:44px;height:calc(44px*1.765);border-radius:4px;border:2px solid transparent;opacity:.4;filter:grayscale(.9);background:#f6efdc;box-sizing:border-box}
+.yc.own{opacity:1;filter:none;border-color:#3ee6a0;box-shadow:0 0 8px rgba(62,230,160,.6)}
+.yc.hand{opacity:1;filter:none;border-color:#6ab7ff}
+.yc.table{opacity:1;filter:none;border-color:#ffd23f}
+.yc.lost{opacity:.18;filter:grayscale(1) brightness(.6)}
 .toolrow{display:flex;gap:8px;flex-wrap:wrap}.toolrow .btn{flex:1;min-width:110px}
 </style>
 </head>
@@ -125,6 +148,7 @@ body.full3d{overflow:hidden}
       <li>Online: Einer erstellt einen Raum, der andere tritt per Code oder aus der Liste bei. Der zweite Platz kann auch der Computer sein.</li>
     </ul>
     <table class="ytab" id="ytabSetup"></table></details>
+    <button class="btn alt" id="yBtnSetup" style="margin-top:10px">🎴 Kombinationen mit Bildern ansehen</button>
   </div>
 
   <div id="game" hidden>
@@ -155,7 +179,7 @@ body.full3d{overflow:hidden}
         <div class="panel yk" id="yk"></div>
         <div class="panel"><div id="log"></div></div>
         <details class="panel rules"><summary>Kombinationen (Yaku)</summary><table class="ytab" id="ytab"></table></details>
-        <div class="toolrow"><button class="btn alt" id="v3d">3D-Ansicht</button><button class="btn alt" id="snd">Ton: an</button></div>
+        <div class="toolrow"><button class="btn alt" id="yBtn">🎴 Kombinationen</button><button class="btn alt" id="v3d">3D-Ansicht</button><button class="btn alt" id="snd">Ton: an</button></div>
         <button class="btn alt" id="again">Zur Auswahl</button>
         <p style="font-size:.72rem;opacity:.6;margin:6px 0 0">Kartenbilder: Sheldon Chen, <a href="https://fudawiki.org/en/hanafuda" target="_blank" rel="noopener" style="color:inherit">Fuda Wiki</a>, CC BY 4.0</p>
       </div>
@@ -163,6 +187,7 @@ body.full3d{overflow:hidden}
   </div>
 </div>
 
+<div class="overlay yh" id="yh" hidden style="z-index:210"><div class="box"><h2>🎴 Kombinationen (Yaku)</h2><p style="margin:0;color:var(--muted);font-size:.85rem">So viele Karten brauchst du. Deine bereits gewonnenen Karten leuchten grün.</p><div id="yhTabs" hidden><button class="btn">Du</button><button class="btn alt">Gegner</button></div><div id="yhLeg" hidden><span class="l1">schon gewonnen</span><span class="l3">in deiner Hand</span><span class="l2">liegt auf dem Tisch</span><span class="l4">noch verdeckt/offen</span></div><div id="yhBody"></div><div class="row" style="margin-top:12px"><button class="btn" id="yhClose">Schließen</button></div></div></div>
 <div class="overlay" id="modal" hidden>
   <div class="box"><div class="ico" id="mIco"></div><h2 id="mTitle"></h2><p id="mText"></p><div class="mbtns" id="mBtns"></div></div>
 </div>
@@ -390,7 +415,8 @@ function renderSide(){
   $('rnd').textContent=`${Math.min(V.round+1,V.rounds)}/${V.rounds}`;$('mon').textContent=`${MONTHS[V.round%12].k} ${MONTHS[V.round%12].n}`;
   const y0=yakuOf(V.caps[0].map(C)),y1=yakuOf(V.caps[1].map(C));
   const yl=(t,y)=>`<b>${esc(t)}</b>${y.list.length?y.list.map(x=>`<div class="y"><span>${esc(x.n)}</span><b>${x.p}</b></div>`).join(''):'<div style="color:var(--muted)">noch keine Kombination</div>'}`;
-  $('yk').innerHTML=yl('Deine Kombinationen',y0)+'<div style="height:8px"></div>'+yl(V.names[1],y1);
+  const ng=nearGoal(0);
+  $('yk').innerHTML=yl('Deine Kombinationen',y0)+'<div style="height:8px"></div>'+yl(V.names[1],y1)+(ng?`<div style="margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(255,210,63,.1);font-size:.8rem">Nächstes Ziel: <b>${esc(ng.d.n)}</b> (${ng.e.have}/${ng.d.need}${ng.e.left<=2?', fast!':''})</div>`:'');
 }
 function measure(){
   const r={};document.querySelectorAll('#tableBox .hc[data-id]').forEach(e=>{r[e.dataset.id]=e.getBoundingClientRect();});
@@ -461,6 +487,7 @@ function applyV(){
   if(!V)return;
   hintTxt=inp?hintTxt:'';
   renderSide();
+  if(!$('yh').hidden)renderYaku();
   if(use3d&&window.H3D&&H3D.ready)H3D.update(V,inp);
   else if(!use3d)render(true);
   prevV=V;
@@ -477,13 +504,13 @@ function refresh(){
 function fullOn(){
   const st=$('stage3d');st.classList.add('full');document.body.classList.add('full3d');
   $('hudTop').append($('status'));
-  $('hudBtns').append($('v3d'),$('fsBtn'),$('snd'),$('again'));
+  $('hudBtns').append($('yBtn'),$('v3d'),$('fsBtn'),$('snd'),$('again'));
 }
 function fullOff(){
   const st=$('stage3d');st.classList.remove('full');document.body.classList.remove('full3d');
   const main=document.querySelector('.main'),tr=document.querySelector('.toolrow'),side=document.querySelector('.side');
   main.insertBefore($('status'),main.firstChild);
-  tr.append($('v3d'),$('snd'));side.insertBefore($('again'),tr.nextSibling);
+  tr.append($('yBtn'),$('v3d'),$('snd'));side.insertBefore($('again'),tr.nextSibling);
   try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
 }
 function toggleFs(){
@@ -510,6 +537,66 @@ async function set3d(on,gesture){
   $('v3d').textContent=use3d?'2D-Ansicht':'3D-Ansicht';
   try{localStorage.setItem('hnf-3d',use3d?'1':'0');}catch(e){}
 }
+// ---------- Visuelle Kombinationshilfe ----------
+const kid=k=>CARDS.find(c=>c.key===k).id;
+const Y_HIK=CARDS.filter(c=>c.t==='hikari').map(c=>c.id),Y_RAIN=kid('rain'),Y_HIK4=Y_HIK.filter(i=>i!==Y_RAIN);
+const Y_TANE=CARDS.filter(c=>c.t==='tane').map(c=>c.id),Y_AK=CARDS.filter(c=>c.sub==='akatan').map(c=>c.id),Y_AO=CARDS.filter(c=>c.sub==='blue').map(c=>c.id);
+const Y_TZ=CARDS.filter(c=>c.t==='tanzaku').map(c=>c.id),Y_KASU=CARDS.filter(c=>c.t==='kasu'||c.key==='sake').map(c=>c.id);
+const YDEF=[
+  {g:'Lichter',n:'Goko',p:'10',d:'Alle 5 Lichter',ids:Y_HIK,need:5},
+  {n:'Shiko',p:'8',d:'4 Lichter, aber ohne den Regenmann',ids:Y_HIK4,need:4},
+  {n:'Ame-Shiko',p:'7',d:'4 Lichter, darunter der Regenmann',ids:Y_HIK,need:4,must:Y_RAIN},
+  {n:'Sanko',p:'5',d:'3 Lichter, aber ohne den Regenmann',ids:Y_HIK4,need:3},
+  {g:'Sake und Tiere',n:'Hanami-zake',p:'5',d:'Vorhang (Kirschblüte) + Sake-Schale',ids:[kid('curtain'),kid('sake')],need:2},
+  {n:'Tsukimi-zake',p:'5',d:'Mond + Sake-Schale',ids:[kid('moon'),kid('sake')],need:2},
+  {n:'Inoshikacho',p:'5',d:'Eber + Hirsch + Schmetterlinge',ids:[kid('boar'),kid('deer'),kid('butterfly')],need:3},
+  {g:'Bänder',n:'Akatan',p:'5',d:'Die 3 roten Gedichtbänder (Jan, Feb, Mär)',ids:Y_AK,need:3},
+  {n:'Aotan',p:'5',d:'Die 3 blauen Bänder (Jun, Sep, Okt)',ids:Y_AO,need:3},
+  {n:'Akatan-Aotan',p:'10',d:'Alle 6 Bänder von Akatan und Aotan',ids:Y_AK.concat(Y_AO),need:6},
+  {g:'Mehrfach (jedes weitere = +1)',n:'Tane',p:'1+',d:'5 beliebige Tiere/Dinge (die Sake-Schale zählt mit)',ids:Y_TANE,need:5},
+  {n:'Tanzaku',p:'1+',d:'5 beliebige Bänder',ids:Y_TZ,need:5},
+  {n:'Kasu',p:'1+',d:'10 einfache Karten (die Sake-Schale zählt mit)',ids:Y_KASU,need:10}];
+let yhSide=0;
+function ycard(id,st){const c=C(id);return `<img class="yc ${st}" src="cards/${(c.m+1)+''+(c.id%4)}.svg" alt="${esc(MONTHS[c.m].n+' '+c.n)}" title="${esc(MONTHS[c.m].n+': '+c.n)}${st==='lost'?' (beim Gegner)':st==='table'?' (liegt auf dem Tisch)':st==='hand'?' (in deiner Hand)':''}">`;}
+// Zustand je Karte aus Sicht der gewählten Seite (0 = du, 1 = Gegner)
+function yStatus(side){
+  const own=new Set(V?V.caps[side]:[]),opp=new Set(V?V.caps[1-side]:[]),table=new Set(V?V.table.concat(V.flip!=null?[V.flip]:[]):[]),hand=new Set(V&&side===0?V.hand:[]);
+  return id=>own.has(id)?'own':opp.has(id)?'lost':hand.has(id)?'hand':table.has(id)?'table':'';
+}
+function yEval(d,stf){
+  const st=d.ids.map(stf),have=st.filter(s=>s==='own').length,avail=st.filter(s=>s!=='lost').length;
+  const mustLost=d.must!=null&&stf(d.must)==='lost';
+  const mustOwn=d.must==null||stf(d.must)==='own';
+  const done=have>=d.need&&mustOwn,blocked=!done&&(avail<d.need||mustLost);
+  return {st,have,done,blocked,left:d.need-have};
+}
+function nearGoal(side){      // nächstes erreichbares Ziel: die Kombination, der am wenigsten fehlt
+  if(!V)return null;
+  const stf=yStatus(side);let best=null;
+  YDEF.forEach(d=>{const e=yEval(d,stf);if(e.done||e.blocked||e.have===0)return;if(!best||e.left<best.e.left)best={d,e};});
+  return best;
+}
+function renderYaku(){
+  const stf=yStatus(yhSide),has=!!V;
+  let html='',lastG='';
+  YDEF.forEach(d=>{
+    const e=has?yEval(d,stf):{st:d.ids.map(()=>''),have:0,done:false,blocked:false,left:d.need};
+    if(d.g&&d.g!==lastG){html+=`<h4>${esc(d.g)}</h4>`;lastG=d.g;}
+    const cls=e.done?'done':e.blocked?'blocked':(has&&e.left<=2&&e.have>0?'near':'');
+    const badge=!has?'':e.done?'✓ erreicht':e.blocked?'nicht mehr möglich':`${e.have}/${d.need}${e.left<=2&&e.have>0?' · fast!':''}`;
+    html+=`<div class="yrow ${cls}"><div class="yh1"><b>${esc(d.n)}</b><span class="pp">${d.p} Punkte</span><span class="bd">${badge}</span></div><div class="yd">${esc(d.d)}${d.need<d.ids.length&&d.need!==d.ids.length?` <i>(${d.need} aus ${d.ids.length})</i>`:''}</div><div class="ycards">${d.ids.map((id,i)=>ycard(id,e.st[i])).join('')}</div></div>`;
+  });
+  $('yhBody').innerHTML=html;
+  $('yhTabs').hidden=!has;
+  $('yhLeg').hidden=!has;
+  [...$('yhTabs').children].forEach((b,i)=>b.classList.toggle('alt',i!==yhSide));
+  $('yhTabs').children[1].textContent=has?V.names[1]:'Gegner';
+}
+function openYaku(){renderYaku();$('yh').hidden=false;}
+$('yBtn').onclick=openYaku;$('yBtnSetup').onclick=openYaku;
+$('yhClose').onclick=()=>{$('yh').hidden=true;};
+$('yh').addEventListener('click',e=>{if(e.target===$('yh'))$('yh').hidden=true;});
+$('yhTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;yhSide=[...$('yhTabs').children].indexOf(b);renderYaku();});
 $('v3d').onclick=()=>set3d(!use3d,true);
 $('snd').onclick=()=>{snd=!snd;$('snd').textContent=snd?'Ton: an':'Ton: aus';try{localStorage.setItem('hnf-snd',snd?'1':'0');}catch(e){}};
 $('snd').textContent=snd?'Ton: an':'Ton: aus';
