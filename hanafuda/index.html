@@ -5,7 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Hanafuda Koi-Koi</title>
 <link rel="stylesheet" href="../common.css">
+<script>window.RAIN_OPTION=1;</script>
 <script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../room3d.js"></script>
+<script src="view3d.js"></script>
 <style>
 .wrap{max-width:1250px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
@@ -52,8 +60,6 @@
 .hc.sel{transform:translateY(-12px);box-shadow:0 0 0 3px #ffd23f,0 6px 14px rgba(0,0,0,.5)}
 .hc.match{box-shadow:0 0 0 3px #3ee6a0,0 0 14px #3ee6a0;animation:mp .7s ease-in-out infinite alternate}
 @keyframes mp{from{transform:translateY(0)}to{transform:translateY(-5px)}}
-.hc.new{animation:pop .5s ease-out}
-@keyframes pop{0%{transform:scale(1.4);opacity:.3}100%{transform:scale(1);opacity:1}}
 
 .side{display:flex;flex-direction:column;gap:12px}
 .side .panel{margin:0}
@@ -73,6 +79,14 @@
 .mbtns{display:flex;flex-direction:column;gap:8px}
 .mbtns .btn{width:100%}
 .slotrow{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
+.main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.table[hidden],#stage3d[hidden]{display:none!important}
+#stage3d{position:relative;height:min(78vh,760px);min-height:380px;border-radius:18px;overflow:hidden;border:2px solid #0b2418;background:#0b0f14}
+#stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
+#hint3d{position:absolute;left:10px;bottom:8px;font-size:.72rem;color:#d7f0dc;opacity:.8;pointer-events:none;text-shadow:0 1px 2px #000}
+.hc .bk{position:absolute;inset:0;background:repeating-linear-gradient(45deg,#8c1d2c 0 6px,#6e1421 6px 12px);border-radius:inherit;pointer-events:none}
+.hc.pairing{box-shadow:0 0 0 3px #ffd23f,0 0 16px #ffd23f}
+.toolrow{display:flex;gap:8px;flex-wrap:wrap}.toolrow .btn{flex:1;min-width:110px}
 </style>
 </head>
 <body>
@@ -80,47 +94,52 @@
   <div class="top"><a class="back" href="../">← Spiele</a><h1>Hanafuda Koi-Koi</h1></div>
 
   <div id="setup" class="panel">
-    <h2>🎴 Hanafuda: Koi-Koi gegen den Computer</h2>
-    <p style="margin:0 0 10px;color:var(--muted)">Das klassische japanische Blumenkarten-Spiel: Sammle Karten mit passendem Monat und bilde Kombinationen (Yaku). Dann entscheidest du: weiterspielen (Koi-Koi) oder Punkte kassieren (Shobu).</p>
+    <h2>🎴 Hanafuda: Koi-Koi</h2>
+    <p style="margin:0 0 10px;color:var(--muted)">Das klassische japanische Blumenkarten-Spiel: Sammle Karten mit passendem Monat und bilde Kombinationen (Yaku). Dann entscheidest du: weiterspielen (Koi-Koi) oder Punkte kassieren (Shobu). Gegen den Computer oder online zu zweit, wahlweise in 3D.</p>
     <div class="slotrow"><label for="rounds">Spiellänge</label>
       <select id="rounds"><option value="3">3 Runden (Frühling)</option><option value="6" selected>6 Runden</option><option value="12">12 Runden (ein ganzes Jahr)</option></select></div>
-    <div class="row"><button class="btn" id="start">Spiel starten</button></div>
+    <div class="row"><button class="btn" id="start">Gegen den Computer</button><button class="btn alt" id="online">🌐 Online spielen</button></div>
     <details class="rules" style="margin-top:14px"><summary><b>Regeln</b></summary><ul>
       <li>Jeder bekommt 8 Karten, 8 liegen offen auf dem Tisch. Pro Zug spielst du eine Handkarte: Gibt es auf dem Tisch eine Karte vom <b>gleichen Monat</b>, nimmst du beide. Sonst legst du die Karte ab.</li>
       <li>Danach wird die oberste Karte vom Stapel aufgedeckt und genauso behandelt.</li>
       <li>Bildest du eine neue Kombination (Yaku), entscheidest du: <b>Koi-Koi</b> (weiterspielen, vielleicht mehr Punkte) oder <b>Shobu</b> (Runde beenden und die Punkte nehmen).</li>
       <li>Hat der Gegner Koi-Koi gerufen und du gewinnst die Runde, zählen deine Punkte doppelt. Ab 7 Punkten ebenfalls doppelt.</li>
       <li>Sind alle Karten gespielt und niemand hat gewonnen, endet die Runde unentschieden.</li>
+      <li>Online: Einer erstellt einen Raum, der andere tritt per Code oder aus der Liste bei. Der zweite Platz kann auch der Computer sein.</li>
     </ul>
     <table class="ytab" id="ytabSetup"></table></details>
   </div>
 
   <div id="game" hidden>
     <div class="layout">
-      <div class="table" id="tableBox">
-        <div class="pname"><span id="oppName">Computer</span><span class="sc" id="oppSc">0 Punkte</span></div>
-        <div class="zone hand" id="oppHand"></div>
-        <div class="caps" id="oppCaps"></div>
+      <div class="main">
         <div id="status"></div>
-        <div class="zone center">
-          <div class="pile"><div id="pile"></div><span id="pileN"></span><div class="flip" id="flip"></div></div>
-          <div class="tbl" id="tbl"></div>
+        <div class="table" id="tableBox">
+          <div class="pname"><span id="oppName">Computer</span><span class="sc" id="oppSc">0 Punkte</span></div>
+          <div class="zone hand" id="oppHand"></div>
+          <div class="caps" id="oppCaps"></div>
+          <div class="zone center">
+            <div class="pile"><div id="pile"></div><span id="pileN"></span><div class="flip" id="flip"></div></div>
+            <div class="tbl" id="tbl"></div>
+          </div>
+          <div class="caps" id="myCaps"></div>
+          <div class="zone hand" id="hand"></div>
+          <div class="pname"><span id="myName">Du</span><span class="sc" id="mySc">0 Punkte</span></div>
         </div>
-        <div class="caps" id="myCaps"></div>
-        <div class="zone hand" id="hand"></div>
-        <div class="pname"><span>Du</span><span class="sc" id="mySc">0 Punkte</span></div>
+        <div id="stage3d" hidden><div id="hint3d">Ziehen: Ansicht drehen · Mausrad/Pinch: Zoom · Karte antippen: auswählen</div></div>
       </div>
       <div class="side">
         <div class="panel">
           <div class="scoreline"><span>Runde</span><b id="rnd">1/6</b></div>
           <div class="scoreline"><span>Monat</span><b id="mon"></b></div>
-          <div class="scoreline"><span>Du</span><b id="sDu">0</b></div>
-          <div class="scoreline"><span>Computer</span><b id="sPc">0</b></div>
+          <div class="scoreline"><span id="nmDu">Du</span><b id="sDu">0</b></div>
+          <div class="scoreline"><span id="nmPc">Computer</span><b id="sPc">0</b></div>
         </div>
         <div class="panel yk" id="yk"></div>
         <div class="panel"><div id="log"></div></div>
         <details class="panel rules"><summary>Kombinationen (Yaku)</summary><table class="ytab" id="ytab"></table></details>
-        <button class="btn alt" id="again">Neues Spiel</button>
+        <div class="toolrow"><button class="btn alt" id="v3d">3D-Ansicht</button><button class="btn alt" id="snd">Ton: an</button></div>
+        <button class="btn alt" id="again">Zur Auswahl</button>
         <p style="font-size:.72rem;opacity:.6;margin:6px 0 0">Kartenbilder: Sheldon Chen, <a href="https://fudawiki.org/en/hanafuda" target="_blank" rel="noopener" style="color:inherit">Fuda Wiki</a>, CC BY 4.0</p>
       </div>
     </div>
@@ -159,6 +178,7 @@ DEF.forEach((arr,m)=>arr.forEach((code,i)=>{
   else{c.t='kasu';c.n='Kasu';c.e=MONTHS[m].e;}
   CARDS.push(c);
 }));
+const C=id=>CARDS[id];
 const VAL={hikari:20,tane:10,tanzaku:5,kasu:1};
 const val=c=>VAL[c.t];
 const cname=c=>`${MONTHS[c.m].n} ${c.t==='kasu'?'(Kasu)':c.t==='tanzaku'?'(Band)':'– '+c.n}`;
@@ -197,90 +217,263 @@ const YTAB=[['Goko: 5 Lichter',10],['Shiko: 4 Lichter ohne Regenmann',8],['Ame-S
 const ytabHtml=YTAB.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
 $('ytab').innerHTML=ytabHtml;$('ytabSetup').innerHTML=ytabHtml;
 
-// ---------- Zustand ----------
-let G=null,inp=null,token=0,logLines=[];
+/* =====================================================================================
+   Aufbau: Der Host (Einzelspiel oder Online-Host) führt das Spiel (G). Jeder Platz bekommt nur seine eigene
+   Sicht V (Hand des Gegners nur als Anzahl). Mitspieler schicken nur Antworten auf Fragen (ask).
+   ===================================================================================== */
+let G=null,V=null,prevV=null,inp=null,token=0,askN=0,pend={},ME=0,ROLE='local',L=null,hintTxt='';
+let use3d=false,snd=true,dlgSeq=0,lastOppN=0,want3d=false;
+try{snd=localStorage.getItem('hnf-snd')!=='0';}catch(e){}
 const sleep=ms=>{const t=token;return new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms));};
-const who=p=>p===0?'Du':'Der Computer';
-function status(t){$('status').textContent=t;logLines.unshift(t);logLines=logLines.slice(0,30);$('log').innerHTML=logLines.slice(1).map(l=>`<div>${esc(l)}</div>`).join('');}
+const nm=p=>G.seats[p].type==='cpu'?'Der Computer':G.seats[p].name;
+const lbl=p=>G.seats[p].type==='cpu'?'Computer':G.seats[p].name;
+// Meldungen: a = Text für alle anderen, b = Text für den handelnden Spieler selbst
+function say(p,a,b){G.logE.unshift({p,a,b:b==null?a:b});G.logE=G.logE.slice(0,30);}
+const fmt=(e,v)=>e.per?e.per(v):(e.p===v?e.b:e.a);
 
-// ---------- Anzeige ----------
-const ORDER=['hikari','tane','tanzaku','kasu'],GL={hikari:'Lichter',tane:'Tiere',tanzaku:'Bänder',kasu:'Kasu'};
-function capsHtml(p){
-  const newIds=(G.last||[]).map(c=>c.id);
-  return ORDER.map(t=>{
-    const cs=G.caps[p].filter(c=>c.t===t||(t==='kasu'&&false));
-    if(!cs.length)return `<div class="grp"><span class="gl">${GL[t]}</span><div class="row" style="min-height:calc(var(--cw)*.89)"></div></div>`;
-    return `<div class="grp"><span class="gl">${GL[t]} ${cs.length}</span><div class="row">${cs.map(c=>cardHtml(c,'mini'+(newIds.includes(c.id)&&G.lastP===p?' new':''))).join('')}</div></div>`;
-  }).join('');
+function buildView(s){
+  const o=1-s,ids=a=>a.map(c=>c.id);
+  return {me:s,names:['Du',lbl(o)],round:G.round,rounds:G.rounds,scores:[G.scores[s],G.scores[o]],
+    hand:ids(G.hands[s]),oppN:G.hands[o].length,table:ids(G.table),deckN:G.deck.length,flip:G.flip?G.flip.id:null,pair:G.pair,
+    caps:[ids(G.caps[s]),ids(G.caps[o])],turn:G.turn===s?0:1,koi:[G.koi[s],G.koi[o]],src:G.src,
+    status:G.logE.length?fmt(G.logE[0],s):'',log:G.logE.slice(1).map(e=>fmt(e,s))};
 }
-function render(){
-  if(!G)return;
-  const sel=inp&&inp.sel,cands=inp&&inp.mode==='target'?inp.cands:null;
-  $('oppHand').innerHTML=G.hands[1].map(()=>cardHtml({},'back')).join('');
-  $('hand').innerHTML=G.hands[0].map(c=>cardHtml(c,(inp&&inp.mode==='hand'?'can':'')+(sel===c?' sel':''))).join('');
-  const matchM=sel?sel.m:(cands&&G.flip?G.flip.m:-1);
-  $('tbl').innerHTML=G.table.map(c=>cardHtml(c,(c.m===matchM?'match can':'')+(cands&&cands.includes(c)?' can':''))).join('');
-  $('pile').innerHTML=G.deck.length?cardHtml({},'back'):'';
-  $('pileN').textContent=`Stapel: ${G.deck.length}`;
-  $('flip').innerHTML=G.flip?cardHtml(G.flip,'new'):'';
-  $('oppCaps').innerHTML=capsHtml(1);$('myCaps').innerHTML=capsHtml(0);
-  $('mySc').textContent=`${G.scores[0]} Punkte`;$('oppSc').textContent=`${G.scores[1]} Punkte`;
-  $('sDu').textContent=G.scores[0];$('sPc').textContent=G.scores[1];
-  $('rnd').textContent=`${Math.min(G.round+1,G.rounds)}/${G.rounds}`;$('mon').textContent=`${MONTHS[G.round%12].k} ${MONTHS[G.round%12].n}`;
-  const y0=yakuOf(G.caps[0]),y1=yakuOf(G.caps[1]);
-  const yl=(t,y)=>`<b>${t}</b>${y.list.length?y.list.map(x=>`<div class="y"><span>${esc(x.n)}</span><b>${x.p}</b></div>`).join(''):'<div style="color:var(--muted)">noch keine Kombination</div>'}`;
-  $('yk').innerHTML=yl('Deine Kombinationen',y0)+'<div style="height:8px"></div>'+yl('Computer',y1);
+function push(){
+  V=buildView(ME);applyV();
+  if(ROLE==='host')G.seats.forEach((s,i)=>{if(s.type==='remote')L.sendTo(i,{k:'v',v:buildView(i)});});
 }
 
-// ---------- Eingabe ----------
-function humanPickHand(){return new Promise(res=>{inp={mode:'hand',res,sel:null};render();});}
-function humanTarget(cands){return new Promise(res=>{inp={mode:'target',res,cands};render();});}
-$('hand').addEventListener('click',e=>{
-  const el=e.target.closest('.hc');if(!el||!inp||inp.mode!=='hand')return;
-  const c=CARDS[+el.dataset.id];
-  if(inp.sel===c){
-    const ms=G.table.filter(x=>x.m===c.m);
-    if(ms.length===2){status('Tippe die Karte auf dem Tisch an, die du nehmen willst (grün markiert).');return;}
-    const r=inp.res;inp=null;r({c,target:null});
-  }else{inp.sel=c;const ms=G.table.filter(x=>x.m===c.m);
-    status(ms.length?`${cname(c)}: Tippe sie noch einmal an oder wähle die passende Tischkarte.`:`${cname(c)}: Passt auf nichts. Tippe noch einmal an, um sie abzulegen.`);render();}
-});
-$('tbl').addEventListener('click',e=>{
-  const el=e.target.closest('.hc');if(!el||!inp)return;
-  const c=CARDS[+el.dataset.id];
-  if(inp.mode==='hand'&&inp.sel&&c.m===inp.sel.m){const s=inp.sel,r=inp.res;inp=null;r({c:s,target:c});}
-  else if(inp.mode==='target'&&inp.cands.includes(c)){const r=inp.res;inp=null;r(c);}
-});
+// ---------- Fragen an Spieler ----------
+function ask(p,spec,ai){
+  const s=G.seats[p];
+  if(s.type==='cpu')return Promise.resolve(ai());
+  if(s.type==='host')return uiAsk(spec);
+  return new Promise(res=>{const id=++askN;pend[p]={id,res,ai,spec};L.sendTo(p,{k:'ask',id,spec});});
+}
+function validAns(spec,a,p){
+  if(spec.k==='hand')return a&&Number.isInteger(a.c)&&G.hands[p].some(x=>x.id===a.c)&&(a.target==null||G.table.some(x=>x.id===a.target&&x.m===C(a.c).m));
+  if(spec.k==='target')return spec.cands.includes(a);
+  if(spec.k==='dlg')return Number.isInteger(a)&&a>=0&&a<spec.btns.length;
+  return false;
+}
+function hostMsg(from,m){
+  if(!G||!m)return;
+  if(m.k==='ans'){
+    const e=pend[from];if(!e||e.id!==m.id)return;
+    if(!validAns(e.spec,m.a,from)){L.sendTo(from,{k:'ask',id:e.id,spec:e.spec});return;}
+    delete pend[from];e.res(m.a);
+  }else if(m.k==='sync'&&G.seats[from]&&G.seats[from].type==='remote'){L.sendTo(from,{k:'v',v:buildView(from)});}
+}
+function clientMsg(m){
+  if(!m)return;
+  if(m.k==='v'){V=m.v;applyV();}
+  else if(m.k==='ask'){uiAsk(m.spec).then(a=>L.send({k:'ans',id:m.id,a}));}
+  else if(m.k==='info'){showInfo(m.spec);}
+  else if(m.k==='closedlg'){closeDlg();}
+}
+function onSeatDrop(seat){
+  if(!G||!G.seats[seat])return;
+  const was=G.seats[seat].name;G.seats[seat]={type:'cpu',name:'Computer'};
+  say(-1,`${was} hat das Spiel verlassen. Der Computer übernimmt.`);
+  const e=pend[seat];if(e){delete pend[seat];e.res(e.ai());}
+  push();
+}
+async function dlgAll(specFor,aiVal){        // gleiches Fenster für alle Menschen, wartet auf alle
+  await Promise.all(G.seats.map((s,q)=>s.type==='cpu'?0:ask(q,Object.assign({k:'dlg'},specFor(q)),()=>aiVal)));
+}
+
+// ---------- Eingabe (an diesem Gerät) ----------
+function uiAsk(spec){
+  return new Promise(res=>{
+    if(spec.k==='hand'){inp={mode:'hand',res,sel:null};hintTxt='';refresh();}
+    else if(spec.k==='target'){inp={mode:'target',res,cands:spec.cands};hintTxt='';refresh();}
+    else dlg(spec).then(res);
+  });
+}
+function hint(t){hintTxt=t;$('status').textContent=t;}
+function clickHand(id){
+  if(!inp||inp.mode!=='hand'||!V.hand.includes(id))return;
+  const c=C(id),ms=V.table.filter(x=>C(x).m===c.m);
+  if(inp.sel===id){
+    if(ms.length===2){hint('Tippe die Karte auf dem Tisch an, die du nehmen willst (grün markiert).');return;}
+    const r=inp.res;inp=null;hintTxt='';refresh();r({c:id,target:null});
+  }else{
+    inp.sel=id;
+    hint(ms.length?`${cname(c)}: Tippe sie noch einmal an oder wähle die passende Tischkarte.`:`${cname(c)}: Passt auf nichts. Tippe noch einmal an, um sie abzulegen.`);
+    refresh();
+  }
+}
+function clickTable(id){
+  if(!inp||!V.table.includes(id))return;
+  const c=C(id);
+  if(inp.mode==='hand'&&inp.sel!=null&&c.m===C(inp.sel).m){const s=inp.sel,r=inp.res;inp=null;hintTxt='';refresh();r({c:s,target:id});}
+  else if(inp.mode==='target'&&inp.cands.includes(id)){const r=inp.res;inp=null;hintTxt='';refresh();r(id);}
+}
+$('hand').addEventListener('click',e=>{const el=e.target.closest('.hc');if(el)clickHand(+el.dataset.id);});
+$('tbl').addEventListener('click',e=>{const el=e.target.closest('.hc');if(el)clickTable(+el.dataset.id);});
+function onCard(id){if(V&&V.hand.includes(id))clickHand(id);else clickTable(id);}
 
 // ---------- Dialog ----------
 function dlg({ico,title,html,btns}){
   return new Promise(res=>{
-    const t=token;let fin=false;
+    const my=++dlgSeq;
     $('mIco').textContent=ico||'';$('mTitle').textContent=title||'';$('mText').innerHTML=html||'';
     const box=$('mBtns');box.innerHTML='';
-    btns.forEach((b,i)=>{const e=document.createElement('button');e.className='btn'+(i?' alt':'');e.textContent=b;e.onclick=()=>{if(fin||t!==token)return;fin=true;$('modal').hidden=true;res(i);};box.appendChild(e);});
+    btns.forEach((b,i)=>{const e=document.createElement('button');e.className='btn'+(i?' alt':'');e.textContent=b;e.onclick=()=>{if(my!==dlgSeq)return;$('modal').hidden=true;res(i);};box.appendChild(e);});
     $('modal').hidden=false;
   });
 }
+function closeDlg(){dlgSeq++;$('modal').hidden=true;}
+function showInfo(spec){dlg(spec).then(()=>exitGame());}
 
-// ---------- Spielzüge ----------
-async function captureStep(p,c,target){
-  const ms=G.table.filter(x=>x.m===c.m);
-  G.last=null;
-  if(!ms.length){G.table.push(c);G.last=[c];G.lastP=-1;status(`${who(p)} legt ${cname(c)} ab.`);render();await sleep(700);return;}
-  let got;
-  if(ms.length===1)got=[ms[0]];
-  else if(ms.length===3)got=ms;
-  else if(target&&ms.includes(target))got=[target];
-  else if(p===0){status('Zwei Karten passen: Tippe die an, die du nehmen willst.');got=[await humanTarget(ms)];}
-  else got=[ms.reduce((a,b)=>val(b)>val(a)?b:a)];
-  G.table=G.table.filter(x=>!got.includes(x));
-  G.caps[p].push(c,...got);G.last=[c,...got];G.lastP=p;
-  status(`${who(p)} nimmt ${cname(c)} mit ${got.map(cname).join(' und ')}.`);
-  render();await sleep(800);
+// ---------- Ton ----------
+let AC=null;
+function noise(dur,f0,f1,gain){
+  const t=AC.currentTime,n=Math.floor(AC.sampleRate*dur),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+  const s=AC.createBufferSource();s.buffer=b;
+  const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+dur);f.Q.value=1.2;
+  const g=AC.createGain();g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  s.connect(f);f.connect(g);g.connect(AC.destination);s.start(t);
 }
-function aiPickHand(){
-  const p=1,mine=G.caps[p],base=yakuOf(mine).total;
+let lastSfx=0;
+function sfx(kind){
+  if(!snd)return;
+  const now=performance.now();if(now-lastSfx<45)return;lastSfx=now;
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();
+    if(kind==='lay')noise(.07,1200,350,.5);
+    else if(kind==='take'){noise(.06,2200,700,.4);setTimeout(()=>{try{noise(.09,1500,500,.4);}catch(e){}},70);}
+    else if(kind==='flip')noise(.16,900,3200,.25);
+  }catch(e){}
+}
+
+// ---------- Anzeige (2D) ----------
+const ORDER=['hikari','tane','tanzaku','kasu'],GL={hikari:'Lichter',tane:'Tiere',tanzaku:'Bänder',kasu:'Kasu'};
+function capsHtml(side){
+  const cs0=V.caps[side].map(C);
+  return ORDER.map(t=>{
+    const cs=cs0.filter(c=>c.t===t);
+    if(!cs.length)return `<div class="grp"><span class="gl">${GL[t]}</span><div class="row" style="min-height:calc(var(--cw)*.89)"></div></div>`;
+    return `<div class="grp"><span class="gl">${GL[t]} ${cs.length}</span><div class="row">${cs.map(c=>cardHtml(c,'mini')).join('')}</div></div>`;
+  }).join('');
+}
+function renderSide(){
+  $('status').textContent=hintTxt||V.status;
+  $('log').innerHTML=V.log.map(l=>`<div>${esc(l)}</div>`).join('');
+  $('oppName').textContent=V.names[1];$('myName').textContent=V.names[0];$('nmDu').textContent=V.names[0];$('nmPc').textContent=V.names[1];
+  $('mySc').textContent=`${V.scores[0]} Punkte`;$('oppSc').textContent=`${V.scores[1]} Punkte`;
+  $('sDu').textContent=V.scores[0];$('sPc').textContent=V.scores[1];
+  $('rnd').textContent=`${Math.min(V.round+1,V.rounds)}/${V.rounds}`;$('mon').textContent=`${MONTHS[V.round%12].k} ${MONTHS[V.round%12].n}`;
+  const y0=yakuOf(V.caps[0].map(C)),y1=yakuOf(V.caps[1].map(C));
+  const yl=(t,y)=>`<b>${esc(t)}</b>${y.list.length?y.list.map(x=>`<div class="y"><span>${esc(x.n)}</span><b>${x.p}</b></div>`).join(''):'<div style="color:var(--muted)">noch keine Kombination</div>'}`;
+  $('yk').innerHTML=yl('Deine Kombinationen',y0)+'<div style="height:8px"></div>'+yl(V.names[1],y1);
+}
+function measure(){
+  const r={};document.querySelectorAll('#tableBox .hc[data-id]').forEach(e=>{r[e.dataset.id]=e.getBoundingClientRect();});
+  const oh=$('oppHand'),last=oh.lastElementChild;
+  return {r,pile:$('pile').getBoundingClientRect(),opp:last?last.getBoundingClientRect():oh.getBoundingClientRect()};
+}
+function render(flip){
+  if(!V)return;
+  const b=flip?measure():null;
+  const sel=inp&&inp.mode==='hand'?inp.sel:null,cands=inp&&inp.mode==='target'?inp.cands:null,pairS=new Set(V.pair||[]);
+  $('oppHand').innerHTML=Array(V.oppN).fill(0).map(()=>cardHtml({},'back')).join('');
+  $('hand').innerHTML=V.hand.map(id=>cardHtml(C(id),(inp&&inp.mode==='hand'?'can':'')+(sel===id?' sel':''))).join('');
+  const matchM=sel!=null?C(sel).m:(cands&&V.flip!=null?C(V.flip).m:-1);
+  $('tbl').innerHTML=V.table.map(id=>cardHtml(C(id),(matchM>=0&&C(id).m===matchM?'match can':'')+(cands&&cands.includes(id)?' can':'')+(pairS.has(id)?' pairing':''))).join('');
+  $('pile').innerHTML=V.deckN?cardHtml({},'back'):'';
+  $('pileN').textContent=`Stapel: ${V.deckN}`;
+  $('flip').innerHTML=V.flip!=null?cardHtml(C(V.flip),''):'';
+  $('oppCaps').innerHTML=capsHtml(1);$('myCaps').innerHTML=capsHtml(0);
+  if(b)runFlip(b);
+  lastOppN=V.oppN;
+}
+
+// Karten fliegen von ihrem alten Platz zum neuen (FLIP), mit Bogen, Drehung, Umdrehen und Aufprall
+function fly(e,from,delay,opts){
+  const r1=e.getBoundingClientRect();
+  const dx=(from.left+from.width/2)-(r1.left+r1.width/2),dy=(from.top+from.height/2)-(r1.top+r1.height/2),s0=from.width/r1.width;
+  const dist=Math.hypot(dx,dy);
+  if(dist<3&&Math.abs(s0-1)<.03)return;
+  const dur=380+Math.min(480,dist*.55),lift=Math.min(90,20+dist*.12),rot=(dx>0?-1:1)*(8+Math.min(10,dist*.02));
+  const sm=Math.max(s0,1)*1.12;
+  e.style.zIndex=60;
+  const tf=(x,y,s,r,sx)=>`translate(${x}px,${y}px) scale(${s}) rotate(${r}deg) scaleX(${sx})`;
+  const turn=opts.turn?.06:1;
+  const a=e.animate([{transform:tf(dx,dy,s0,rot,1),offset:0},{transform:tf(dx*.5,dy*.5-lift,sm,rot/2,turn),offset:.5},{transform:tf(0,0,1,0,1),offset:1}],
+    {duration:dur,delay,easing:'cubic-bezier(.22,.75,.3,1)',fill:'backwards'});
+  if(opts.turn){
+    const bk=document.createElement('i');bk.className='bk';e.appendChild(bk);
+    bk.animate([{opacity:1},{opacity:1,offset:.5},{opacity:0,offset:.51},{opacity:0}],{duration:dur,delay,easing:'linear',fill:'both'});
+    setTimeout(()=>sfx('flip'),delay+dur*.4);
+  }
+  a.onfinish=()=>{
+    e.style.zIndex='';
+    const bk=e.querySelector('.bk');if(bk)bk.remove();
+    const mini=e.classList.contains('mini');
+    e.animate([{transform:'scale(1.09)',filter:mini?'brightness(1.7)':'brightness(1.15)'},{transform:'scale(1)',filter:'none'}],{duration:mini?420:200,easing:'ease-out'});
+    sfx(mini?'take':'lay');
+  };
+}
+function runFlip(b){
+  const newRound=!prevV||prevV.round!==V.round;
+  const els=[...document.querySelectorAll('#tableBox .hc[data-id]')];
+  let k=0;
+  els.forEach(e=>{
+    const id=e.dataset.id,p=newRound?null:b.r[id];
+    if(p){fly(e,p,0,{turn:false});return;}
+    const s=V.src[id]||'deck',opp=s.startsWith('hand')&&+s.slice(4)!==V.me,z=opp?b.opp:b.pile,r1=e.getBoundingClientRect();
+    fly(e,{left:z.left+z.width/2-r1.width/2,top:z.top+z.height/2-r1.height/2,width:r1.width,height:r1.height},newRound?Math.min(1400,k++*65):0,{turn:true});
+  });
+  // Rückseiten der Gegnerhand: neue fliegen vom Stapel ein
+  const backs=[...$('oppHand').children];
+  if(newRound||V.oppN>lastOppN){
+    const z=b.pile;
+    backs.forEach((e,j)=>{if(newRound||j>=lastOppN){const r1=e.getBoundingClientRect();fly(e,{left:z.left+z.width/2-r1.width/2,top:z.top+z.height/2-r1.height/2,width:r1.width,height:r1.height},newRound?Math.min(1400,(k++)*65):(j-lastOppN)*80,{turn:false});}});
+  }
+}
+
+function applyV(){
+  if(!V)return;
+  hintTxt=inp?hintTxt:'';
+  renderSide();
+  if(use3d&&window.H3D&&H3D.ready)H3D.update(V,inp);
+  else if(!use3d)render(true);
+  prevV=V;
+}
+function refresh(){
+  if(!V)return;
+  $('status').textContent=hintTxt||V.status;
+  if(use3d&&window.H3D&&H3D.ready)H3D.update(V,inp);else render(false);
+}
+
+// ---------- 3D-Ansicht ----------
+async function set3d(on){
+  if(on){
+    $('v3d').disabled=true;$('v3d').textContent='Lade 3D …';
+    try{
+      await H3D.load();
+      $('tableBox').hidden=true;$('stage3d').hidden=false;
+      H3D.init($('stage3d'),{CARDS,cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard});
+      H3D.setActive(true);use3d=true;
+      if(V)H3D.update(V,inp,true);
+    }catch(e){$('tableBox').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
+    $('v3d').disabled=false;
+  }else{
+    use3d=false;if(window.H3D&&H3D.ready)H3D.setActive(false);
+    $('tableBox').hidden=false;$('stage3d').hidden=true;prevV=null;if(V)render(false);
+  }
+  $('v3d').textContent=use3d?'2D-Ansicht':'3D-Ansicht';
+  try{localStorage.setItem('hnf-3d',use3d?'1':'0');}catch(e){}
+}
+$('v3d').onclick=()=>set3d(!use3d);
+$('snd').onclick=()=>{snd=!snd;$('snd').textContent=snd?'Ton: an':'Ton: aus';try{localStorage.setItem('hnf-snd',snd?'1':'0');}catch(e){}};
+$('snd').textContent=snd?'Ton: an':'Ton: aus';
+
+// ---------- Computer ----------
+function aiPickHand(p){
+  const mine=G.caps[p],base=yakuOf(mine).total;
   let best=null,bs=-1e9;
   for(const c of G.hands[p]){
     const ms=G.table.filter(x=>x.m===c.m);let s,target=null;
@@ -296,78 +489,128 @@ function aiPickHand(){
   }
   return best;
 }
-function aiKoi(y){
-  const rem=G.hands[1].length;
+function aiKoi(p,y){
+  const rem=G.hands[p].length,o=1-p;
   if(y.total>=7||rem<=1)return 'shobu';
-  if(G.koi[0])return 'shobu';              // Du hast schon Koi-Koi gerufen: sicher kassieren
-  const pl=G.caps[0].length>=(G.caps[1].length+4);   // Du liegst bei den Karten weit vorn: Risiko
-  let p=y.total<=2?.85:(y.total<=4?.6:.35);
-  if(rem>=5)p+=.1;else if(rem<=2)p-=.3;
-  if(pl)p-=.2;
-  return Math.random()<p?'koi':'shobu';
+  if(G.koi[o])return 'shobu';              // Der Gegner hat schon Koi-Koi gerufen: sicher kassieren
+  const behind=G.caps[o].length>=(G.caps[p].length+4);   // Der Gegner liegt bei den Karten weit vorn: Risiko
+  let pr=y.total<=2?.85:(y.total<=4?.6:.35);
+  if(rem>=5)pr+=.1;else if(rem<=2)pr-=.3;
+  if(behind)pr-=.2;
+  return Math.random()<pr?'koi':'shobu';
+}
+
+// ---------- Spielzüge ----------
+async function askHand(p){
+  const a=await ask(p,{k:'hand'},()=>{const r=aiPickHand(p);return {c:r.c.id,target:r.target?r.target.id:null};});
+  return {c:C(a.c),target:a.target!=null?C(a.target):null};
+}
+async function askTarget(p,ms){
+  const a=await ask(p,{k:'target',cands:ms.map(c=>c.id)},()=>ms.reduce((x,y)=>val(y)>val(x)?y:x).id);
+  return C(a);
+}
+async function captureStep(p,c,target,fromFlip){
+  const ms=G.table.filter(x=>x.m===c.m);
+  G.last=null;G.pair=null;
+  if(!ms.length){
+    if(fromFlip)G.flip=null;
+    G.table.push(c);G.last=[c];G.lastP=-1;
+    say(p,`${nm(p)} legt ${cname(c)} ab.`,`Du legst ${cname(c)} ab.`);push();await sleep(800);return;
+  }
+  let got;
+  if(ms.length===1)got=[ms[0]];
+  else if(ms.length===3)got=ms;
+  else if(target&&ms.includes(target))got=[target];
+  else{say(p,`${nm(p)} wählt eine Karte.`,'Zwei Karten passen: Tippe die an, die du nehmen willst.');push();got=[await askTarget(p,ms)];}
+  // 1. Die Karte wird neben die passende gelegt
+  if(fromFlip)G.flip=null;
+  G.table.splice(G.table.indexOf(got[0])+1,0,c);G.pair=[c.id,...got.map(x=>x.id)];
+  say(p,`${nm(p)} legt ${cname(c)} zu ${got.map(cname).join(' und ')}.`,`Du legst ${cname(c)} zu ${got.map(cname).join(' und ')}.`);
+  push();await sleep(750);
+  // 2. Beide wandern zu den gewonnenen Karten
+  G.pair=null;G.table=G.table.filter(x=>x!==c&&!got.includes(x));
+  G.caps[p].push(c,...got);G.last=[c,...got];G.lastP=p;
+  say(p,`${nm(p)} nimmt ${cname(c)} mit ${got.map(cname).join(' und ')}.`,`Du nimmst ${cname(c)} mit ${got.map(cname).join(' und ')}.`);
+  push();await sleep(900);
 }
 async function playTurn(p){
-  G.turn=p;G.flip=null;render();
-  let pick;
-  if(p===0){status('Du bist dran: Wähle eine Karte aus deiner Hand.');pick=await humanPickHand();}
-  else{status('Der Computer überlegt …');await sleep(900);pick=aiPickHand();}
-  G.hands[p]=G.hands[p].filter(x=>x!==pick.c);
-  await captureStep(p,pick.c,pick.target);
-  const d=G.deck.pop();G.flip=d;render();status(`${who(p)} deckt ${cname(d)} auf.`);await sleep(800);
-  await captureStep(p,d,null);
-  G.flip=null;render();
+  G.turn=p;G.flip=null;G.pair=null;
+  const cpu=G.seats[p].type==='cpu';
+  say(p,cpu?'Der Computer überlegt …':`${nm(p)} überlegt …`,'Du bist dran: Wähle eine Karte aus deiner Hand.');
+  push();
+  if(cpu)await sleep(900);
+  const pick=await askHand(p);
+  G.hands[p]=G.hands[p].filter(x=>x!==pick.c);G.src[pick.c.id]='hand'+p;
+  await captureStep(p,pick.c,pick.target,false);
+  const d=G.deck.pop();G.flip=d;G.src[d.id]='deck';
+  say(p,`${nm(p)} deckt ${cname(d)} auf.`,`Du deckst ${cname(d)} auf.`);push();await sleep(1000);
+  await captureStep(p,d,null,true);
+  G.flip=null;push();
   const y=yakuOf(G.caps[p]);
   if(y.total>G.announced[p]){
     let choice;
     if(G.hands[p].length===0)choice='shobu';
-    else if(p===0){
-      const i=await dlg({ico:'🎴',title:'Kombination!',html:y.list.map(x=>`${esc(x.n)}: <b>${x.p}</b>`).join('<br>')+`<br><br>Zusammen <b>${y.total} Punkte</b>.<br>Weiterspielen für mehr Punkte oder jetzt kassieren?`,
-        btns:['Koi-Koi: weiterspielen','Shobu: Runde beenden (+'+y.total+')']});
+    else{
+      say(p,`${nm(p)} hat eine Kombination und überlegt …`,'Kombination! Weiterspielen oder kassieren?');push();
+      const i=await ask(p,{k:'dlg',ico:'🎴',title:'Kombination!',html:y.list.map(x=>`${esc(x.n)}: <b>${x.p}</b>`).join('<br>')+`<br><br>Zusammen <b>${y.total} Punkte</b>.<br>Weiterspielen für mehr Punkte oder jetzt kassieren?`,
+        btns:['Koi-Koi: weiterspielen','Shobu: Runde beenden (+'+y.total+')']},()=>aiKoi(p,y)==='koi'?0:1);
       choice=i===0?'koi':'shobu';
-    }else choice=aiKoi(y);
-    if(choice==='koi'){G.koi[p]=true;G.announced[p]=y.total;status(`${who(p)} ruft Koi-Koi!`);
-      if(p===1)await dlg({ico:'🎴',title:'Koi-Koi!',html:`Der Computer hat <b>${y.total} Punkte</b> und spielt weiter:<br>${y.list.map(x=>esc(x.n)).join('<br>')}`,btns:['Weiter']});
-      await sleep(400);}
-    else return 'shobu';
+    }
+    if(choice==='koi'){
+      G.koi[p]=true;G.announced[p]=y.total;say(p,`${nm(p)} ruft Koi-Koi!`,'Du rufst Koi-Koi!');push();
+      await Promise.all(G.seats.map((s,q)=>(q===p||s.type==='cpu')?0:ask(q,{k:'dlg',ico:'🎴',title:'Koi-Koi!',html:`${esc(nm(p))} hat <b>${y.total} Punkte</b> und spielt weiter:<br>${y.list.map(x=>esc(x.n)).join('<br>')}`,btns:['Weiter']},()=>0)));
+      await sleep(400);
+    }else return 'shobu';
   }
   return 'continue';
 }
 async function endRound(w){
-  let title,html;
-  if(w<0){title='Unentschieden';html='Alle Karten sind gespielt, niemand hat gewonnen. Keine Punkte.';}
-  else{
-    const y=yakuOf(G.caps[w]);let pts=y.total,notes=[];
-    if(pts>=7){pts*=2;notes.push('7 Punkte oder mehr: ×2');}
-    if(G.koi[1-w]){pts*=2;notes.push('Gegner hatte Koi-Koi gerufen: ×2');}
+  const note=[];let y=null,pts=0;
+  if(w>=0){
+    y=yakuOf(G.caps[w]);pts=y.total;
+    if(pts>=7){pts*=2;note.push('7 Punkte oder mehr: ×2');}
+    if(G.koi[1-w]){pts*=2;note.push('Gegner hatte Koi-Koi gerufen: ×2');}
     G.scores[w]+=pts;G.parent=w;
-    title=w===0?'Du gewinnst die Runde!':'Der Computer gewinnt die Runde';
-    html=y.list.map(x=>`${esc(x.n)}: <b>${x.p}</b>`).join('<br>')+(notes.length?'<br>'+notes.join('<br>'):'')+`<br><br><b>${pts} Punkte</b> für ${w===0?'dich':'den Computer'}.`;
   }
-  G.round++;render();
+  G.round++;G.turn=-1;
+  say(-1,w<0?'Die Runde endet unentschieden.':`${nm(w)} gewinnt die Runde (+${pts}).`,w<0?'Die Runde endet unentschieden.':`Du gewinnst die Runde (+${pts}).`);
+  push();
   const last=G.round>=G.rounds;
-  await dlg({ico:w===0?'🏆':w<0?'🤝':'🤖',title,html,btns:[last?'Ergebnis':'Nächste Runde']});
+  await dlgAll(q=>{
+    if(w<0)return {ico:'🤝',title:'Unentschieden',html:'Alle Karten sind gespielt, niemand hat gewonnen. Keine Punkte.',btns:[last?'Ergebnis':'Nächste Runde']};
+    const mine=w===q;
+    return {ico:mine?'🏆':'🤖',title:mine?'Du gewinnst die Runde!':`${nm(w)} gewinnt die Runde`,
+      html:y.list.map(x=>`${esc(x.n)}: <b>${x.p}</b>`).join('<br>')+(note.length?'<br>'+note.join('<br>'):'')+`<br><br><b>${pts} Punkte</b> für ${mine?'dich':esc(lbl(w))}.`,btns:[last?'Ergebnis':'Nächste Runde']};
+  },0);
   if(last)return finishGame();
   return playRound();
 }
 async function finishGame(){
   const [a,b]=G.scores;
-  const i=await dlg({ico:a>b?'🏆':a<b?'🤖':'🤝',title:a>b?'Du hast gewonnen!':a<b?'Der Computer hat gewonnen':'Unentschieden',html:`Endstand: Du <b>${a}</b> : <b>${b}</b> Computer`,btns:['Nochmal spielen','Zur Auswahl']});
-  if(i===0)return startGame();
-  backToSetup();
+  const spec=q=>{const mine=G.scores[q],theirs=G.scores[1-q];
+    return {ico:mine>theirs?'🏆':mine<theirs?'🤖':'🤝',title:mine>theirs?'Du hast gewonnen!':mine<theirs?`${nm(1-q)} hat gewonnen`:'Unentschieden',
+      html:`Endstand: Du <b>${mine}</b> : <b>${theirs}</b> ${esc(lbl(1-q))}`};};
+  const online=ROLE==='host'&&G.seats.some(s=>s.type==='remote');
+  G.seats.forEach((s,q)=>{if(s.type==='remote')L.sendTo(q,{k:'info',spec:Object.assign(spec(q),{btns:['Spiel verlassen']})});});
+  const i=await dlg(Object.assign(spec(ME),{btns:['Nochmal spielen',online?'Zurück zur Lobby':'Zur Auswahl']}));
+  if(i===0){G.seats.forEach((s,q)=>{if(s.type==='remote')L.sendTo(q,{k:'closedlg'});});return startGame(G.seats);}
+  exitGame();
 }
 function newRound(){
   let d,bad;
   do{d=shuffle(CARDS);const t=d.slice(16,24);bad=MONTHS.some((_,m)=>t.filter(c=>c.m===m).length>=4);}while(bad);
   const sort=a=>a.slice().sort((x,y)=>x.id-y.id);
   G.hands=[sort(d.slice(0,8)),sort(d.slice(8,16))];G.table=d.slice(16,24);G.deck=d.slice(24);
-  G.caps=[[],[]];G.announced=[0,0];G.koi=[false,false];G.flip=null;G.last=null;
+  G.caps=[[],[]];G.announced=[0,0];G.koi=[false,false];G.flip=null;G.pair=null;G.last=null;G.src={};
+  CARDS.forEach(c=>{G.src[c.id]='deck';});
 }
 async function playRound(){
-  const t=token;
   try{
-    newRound();render();
-    status(`Runde ${G.round+1}/${G.rounds}: ${MONTHS[G.round%12].n}. ${G.parent===0?'Du beginnst.':'Der Computer beginnt.'}`);
-    await sleep(900);
+    newRound();
+    G.turn=G.parent;
+    G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${G.round+1}/${G.rounds}: ${MONTHS[G.round%12].n}. ${G.parent===s?'Du beginnst.':nm(G.parent)+' beginnt.'}`});
+    push();
+    await sleep(1800);
     let p=G.parent;
     while(true){
       const r=await playTurn(p);
@@ -377,14 +620,42 @@ async function playRound(){
     }
   }catch(e){if(e!==CANCEL)throw e;}
 }
-function startGame(){
-  token++;inp=null;logLines=[];
-  G={round:0,rounds:+$('rounds').value,scores:[0,0],parent:0,hands:[[],[]],caps:[[],[]],table:[],deck:[],flip:null,announced:[0,0],koi:[false,false]};
-  $('setup').hidden=true;$('game').hidden=false;$('modal').hidden=true;
+function startGame(seats){
+  token++;inp=null;pend={};closeDlg();prevV=null;V=null;lastOppN=0;hintTxt='';
+  G={round:0,rounds:+$('rounds').value,scores:[0,0],parent:0,hands:[[],[]],caps:[[],[]],table:[],deck:[],flip:null,pair:null,announced:[0,0],koi:[false,false],
+    seats:seats.map(s=>({type:s.type,name:s.type==='cpu'?'Computer':(s.name||'Spieler')})),logE:[],src:{},turn:-1};
+  showGameScreen();
   playRound();
 }
-function backToSetup(){token++;inp=null;$('game').hidden=true;$('modal').hidden=true;$('setup').hidden=false;}
-$('start').onclick=startGame;$('again').onclick=backToSetup;
+function showGameScreen(){$('setup').hidden=true;$('game').hidden=false;if(want3d&&!use3d){want3d=false;set3d(true);}}
+function backToSetup(){token++;inp=null;pend={};closeDlg();G=null;V=null;prevV=null;$('game').hidden=true;$('setup').hidden=false;}
+function exitGame(){
+  if(ROLE==='host'&&L.role==='host'){backToSetup();ROLE='local';L.backToLobby();return;}   // Host: zurück in die Lobby (Raum bleibt offen)
+  if(ROLE==='client'){try{L.leave();}catch(e){}ROLE='local';}
+  backToSetup();
+}
+$('start').onclick=()=>{ROLE='local';ME=0;startGame([{type:'host',name:'Du'},{type:'cpu'}]);};
+$('online').onclick=()=>L.open();
+$('again').onclick=exitGame;
+
+// ---------- Online ----------
+L=MP.init({
+  prefix:'hnf-v1-',title:'Hanafuda',
+  seats:[{name:'Spieler 1',color:'#ff2a55'},{name:'Spieler 2',color:'#00f0ff'}],
+  minPlayers:2,bots:true,
+  onStart(info){
+    token++;ROLE=info.role;ME=info.you;
+    if(info.role==='host')startGame(info.seats.map(s=>({type:s.type==='host'||s.type==='remote'||s.type==='cpu'?s.type:'cpu',name:s.name})));
+    else{backToSetup();showGameScreen();hint('Warte auf den Host …');L.send({k:'sync'});}
+  },
+  onData(from,m){if(L.role==='client')clientMsg(m);else hostMsg(from,m);},
+  onSeatDrop:onSeatDrop,
+  onBackToLobby(){ROLE='local';backToSetup();},
+  onLeave(){ROLE='local';backToSetup();}
+});
+$('rounds').addEventListener('change',()=>{});
+
+try{want3d=localStorage.getItem('hnf-3d')==='1';}catch(e){}
 </script>
 </body>
 </html>
