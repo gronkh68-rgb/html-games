@@ -98,7 +98,7 @@
     <p style="margin:0 0 10px;color:var(--muted)">Das klassische japanische Blumenkarten-Spiel: Sammle Karten mit passendem Monat und bilde Kombinationen (Yaku). Dann entscheidest du: weiterspielen (Koi-Koi) oder Punkte kassieren (Shobu). Gegen den Computer oder online zu zweit, wahlweise in 3D.</p>
     <div class="slotrow"><label for="rounds">Spiellänge</label>
       <select id="rounds"><option value="3">3 Runden (Frühling)</option><option value="6" selected>6 Runden</option><option value="12">12 Runden (ein ganzes Jahr)</option></select></div>
-    <div class="row"><button class="btn" id="start">Gegen den Computer</button><button class="btn alt" id="online">🌐 Online spielen</button></div>
+    <div class="row"><button class="btn" id="start">Gegen den Computer</button><button class="btn alt" id="online">🌐 Online spielen</button><button class="btn alt" id="rejoinBtn" hidden>↩ Wieder ins laufende Spiel</button></div>
     <details class="rules" style="margin-top:14px"><summary><b>Regeln</b></summary><ul>
       <li>Jeder bekommt 8 Karten, 8 liegen offen auf dem Tisch. Pro Zug spielst du eine Handkarte: Gibt es auf dem Tisch eine Karte vom <b>gleichen Monat</b>, nimmst du beide. Sonst legst du die Karte ab.</li>
       <li>Danach wird die oberste Karte vom Stapel aufgedeckt und genauso behandelt.</li>
@@ -271,10 +271,15 @@ function clientMsg(m){
   else if(m.k==='info'){showInfo(m.spec);}
   else if(m.k==='closedlg'){closeDlg();}
 }
+function onRejoin(seat){
+  if(!G||!G.seats[seat]||!G.seats[seat].away)return;
+  const o=G.seats[seat].orig;G.seats[seat]={type:'remote',name:o};
+  say(-1,`${o} ist zurück im Spiel.`);push();
+}
 function onSeatDrop(seat){
   if(!G||!G.seats[seat])return;
-  const was=G.seats[seat].name;G.seats[seat]={type:'cpu',name:'Computer'};
-  say(-1,`${was} hat das Spiel verlassen. Der Computer übernimmt.`);
+  const was=G.seats[seat].name;G.seats[seat]={type:'cpu',name:'Computer',orig:was,away:true};
+  say(-1,`${was} hat das Spiel verlassen. Der Computer übernimmt, bis die Person zurückkommt.`);
   const e=pend[seat];if(e){delete pend[seat];e.res(e.ai());}
   push();
 }
@@ -636,13 +641,16 @@ function exitGame(){
 }
 $('start').onclick=()=>{ROLE='local';ME=0;startGame([{type:'host',name:'Du'},{type:'cpu'}]);};
 $('online').onclick=()=>L.open();
+$('rejoinBtn').onclick=()=>L.rejoin();
+function updRejoin(){$('rejoinBtn').hidden=!L.hasRejoin();}
 $('again').onclick=exitGame;
 
 // ---------- Online ----------
 L=MP.init({
   prefix:'hnf-v1-',title:'Hanafuda',
   seats:[{name:'Spieler 1',color:'#ff2a55'},{name:'Spieler 2',color:'#00f0ff'}],
-  minPlayers:2,bots:true,
+  minPlayers:2,bots:true,rejoin:true,
+  onRejoin:onRejoin,
   onStart(info){
     token++;ROLE=info.role;ME=info.you;
     if(info.role==='host')startGame(info.seats.map(s=>({type:s.type==='host'||s.type==='remote'||s.type==='cpu'?s.type:'cpu',name:s.name})));
@@ -654,6 +662,7 @@ L=MP.init({
   onLeave(){ROLE='local';backToSetup();}
 });
 $('rounds').addEventListener('change',()=>{});
+updRejoin();setInterval(updRejoin,3000);
 
 try{want3d=localStorage.getItem('hnf-3d')==='1';}catch(e){}
 </script>

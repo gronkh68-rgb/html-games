@@ -5,22 +5,37 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Farbchaos</title>
 <link rel="stylesheet" href="../common.css">
+<script>window.RAIN_OPTION=1;</script>
 <script src="../theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
 <script src="../net-config.js"></script>
 <script src="../net.js"></script>
 <script src="../mplobby.js"></script>
+<script src="../room3d.js"></script>
+<script src="view3d.js"></script>
 <style>
-.wrap{max-width:1250px}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+.wrap{max-width:1560px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start}
 @media (max-width:900px){.layout{grid-template-columns:1fr}}
 .main{display:flex;flex-direction:column;gap:10px;min-width:0}
-.board{--cw:clamp(44px,calc((100vw - 60px)/9),86px);background:radial-gradient(ellipse at 50% 45%,#2a5d8f,#12304f);border:2px solid #0b1c30;border-radius:18px;padding:12px 10px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.board{--cw:clamp(40px,calc((100vw - 440px)/8),124px);background:radial-gradient(ellipse at 50% 45%,#2a5d8f,#12304f);border:3px solid #0b1c30;border-radius:22px;padding:18px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:22px;min-width:0;min-height:min(78vh,860px);transition:border-color .3s,box-shadow .3s}
+.board.myturn{border-color:#ffd23f;animation:turnGlow 1s ease-in-out infinite alternate}
+@keyframes turnGlow{from{box-shadow:0 0 0 0 rgba(255,210,63,.0),inset 0 0 30px rgba(255,210,63,.10)}to{box-shadow:0 0 28px 4px rgba(255,210,63,.55),inset 0 0 60px rgba(255,210,63,.22)}}
+#turnBanner{border-radius:12px;padding:10px 14px;text-align:center;font-weight:900;letter-spacing:.04em;font-size:1.05rem;background:rgba(0,0,0,.35);color:#cfe3ff;border:2px solid rgba(255,255,255,.12);transition:all .25s}
+#turnBanner.me{background:linear-gradient(90deg,#ffb300,#ffd23f,#ffb300);color:#1b1200;border-color:#fff;font-size:1.4rem;animation:bannerPulse .8s ease-in-out infinite alternate}
+@keyframes bannerPulse{from{transform:scale(1);box-shadow:0 0 10px rgba(255,210,63,.5)}to{transform:scale(1.015);box-shadow:0 0 30px rgba(255,210,63,.95)}}
+#stage3d{position:relative;height:min(80vh,820px);min-height:400px;border-radius:22px;overflow:hidden;border:3px solid #0b1c30;background:#06080d}
+#stage3d.myturn{border-color:#ffd23f;animation:turnGlow 1s ease-in-out infinite alternate}
+#stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
+.board[hidden],#stage3d[hidden]{display:none!important}
+#hint3d{position:absolute;left:10px;bottom:8px;font-size:.72rem;color:#d7e8ff;opacity:.8;pointer-events:none;text-shadow:0 1px 2px #000}
 #status{background:rgba(0,0,0,.4);color:#fff;border-radius:10px;padding:8px 12px;text-align:center;min-height:2.6em;display:flex;align-items:center;justify-content:center;font-weight:600}
 .opps{display:flex;justify-content:space-around;gap:10px;flex-wrap:wrap;min-height:calc(var(--cw)*1.5*.62 + 44px)}
+.opp{font-size:.95rem}
 .opp{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 10px;border-radius:12px;border:2px solid transparent;color:#e8f2ff;font-weight:700;font-size:.85rem;transition:background .2s,border-color .2s}
-.opp.turn{border-color:#ffd23f;background:rgba(255,210,63,.14);box-shadow:0 0 14px rgba(255,210,63,.4)}
+.opp.turn{border-color:#ffd23f;background:rgba(255,210,63,.18);box-shadow:0 0 22px rgba(255,210,63,.6);animation:bannerPulse .8s ease-in-out infinite alternate}
+.opp.turn>span:first-child::before{content:"▶ "}
 .opp .obacks{display:flex;min-height:calc(var(--cw)*1.5*.62)}
 .opp .obacks .uc{--w:calc(var(--cw)*.62);margin-right:calc(var(--cw)*-.4)}
 .opp .obacks .uc:last-child{margin-right:0}
@@ -35,7 +50,8 @@
 .curcol{display:flex;flex-direction:column;align-items:center;gap:4px;color:#d6e8ff;font-size:.8rem;font-weight:700}
 .curcol i{display:block;width:calc(var(--cw)*.5);height:calc(var(--cw)*.5);border-radius:50%;border:3px solid #fff;box-shadow:0 0 14px rgba(255,255,255,.5);transition:background .3s}
 .me .pname{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#e8f2ff;font-weight:700;font-size:.9rem;margin-bottom:6px}
-.me.turn .pname span:first-child{color:#ffd23f}
+.me.turn .pname span:first-child{color:#ffd23f;font-size:1.1rem}
+.me.turn .hand{filter:drop-shadow(0 0 10px rgba(255,210,63,.5))}
 .pname .sc{background:rgba(0,0,0,.35);padding:2px 10px;border-radius:999px}
 .hand{display:flex;flex-wrap:wrap;justify-content:center;gap:calc(var(--cw)*.08);min-height:calc(var(--cw)*1.5 + 8px)}
 .hand .uc{margin-right:calc(var(--cw)*-.28)}
@@ -51,7 +67,7 @@
 .uc{--w:var(--cw,64px);--c:#e53935;width:var(--w);height:calc(var(--w)*1.5);border-radius:calc(var(--w)*.11);background:var(--c);border:calc(var(--w)*.055) solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.45);
   position:relative;flex:none;box-sizing:border-box;overflow:hidden;color:#fff;font-weight:900;user-select:none;transition:transform .15s}
 .uc::before{content:'';position:absolute;inset:13% 6%;background:#fff;border-radius:50%;transform:rotate(-26deg);opacity:.96}
-.uc .big{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--w)*.5);color:var(--c);z-index:2;line-height:1;font-family:system-ui,sans-serif}
+.uc .big{position:absolute;inset:0;z-index:3;display:grid;place-items:center;font-size:calc(var(--w)*.5);color:var(--c);z-index:2;line-height:1;font-family:system-ui,sans-serif}
 .uc .big.sm{font-size:calc(var(--w)*.4)}
 .uc .cn{position:absolute;font-size:calc(var(--w)*.2);line-height:1;z-index:2;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .uc .cn.a{left:8%;top:5%}.uc .cn.b{right:8%;bottom:5%;transform:rotate(180deg)}
@@ -61,7 +77,26 @@
 .uc.wild .big{color:#fff;text-shadow:0 0 6px #000,0 0 3px #000}
 .uc.back{--c:#15171c}
 .uc.back::before{background:#e53935}
+.hx{display:none}
 .uc.back .big{color:#fff;font-size:calc(var(--w)*.34);text-shadow:0 1px 3px #000}
+html[data-style="cyber"] .uc{--hx:polygon(50% 0,100% 16%,100% 84%,50% 100%,0 84%,0 16%);background:transparent;border:0;box-shadow:none;overflow:visible;border-radius:0;filter:drop-shadow(0 0 5px var(--c))}
+html[data-style="cyber"] .uc::before{display:none}
+html[data-style="cyber"] .hx{display:block;position:absolute;inset:0;background:var(--c);clip-path:var(--hx)}
+html[data-style="cyber"] .hx::after{content:'';position:absolute;inset:calc(var(--w)*.05);background:linear-gradient(160deg,#0b1424,#04070d);clip-path:var(--hx)}
+html[data-style="cyber"] .uc .big{color:var(--c);text-shadow:0 0 10px var(--c)}
+html[data-style="cyber"] .uc .cn{color:var(--c);text-shadow:0 0 6px var(--c)}
+html[data-style="cyber"] .uc.wild{--c:#fff}
+html[data-style="cyber"] .uc.wild .hx{background:conic-gradient(#ff2a55 0 25%,#fcee09 0 50%,#2dff7a 0 75%,#00f0ff 0)}
+html[data-style="cyber"] .uc.wild .big{color:#fff;text-shadow:0 0 8px #fff,0 0 14px #00f0ff}
+html[data-style="cyber"] .uc.c0{--c:#ff2a55}html[data-style="cyber"] .uc.c1{--c:#fcee09}html[data-style="cyber"] .uc.c2{--c:#2dff7a}html[data-style="cyber"] .uc.c3{--c:#00b4ff}
+html[data-style="cyber"] .uc.back{--c:#00f0ff}
+html[data-style="cyber"] .uc.back .big{color:#00f0ff}
+html[data-style="cyber"] .uc .bk{clip-path:var(--hx);background:#04070d}
+html[data-style="cyber"] .hand .uc.dim{filter:drop-shadow(0 0 3px var(--c)) brightness(.42)}
+html[data-style="cyber"] #drawPile.can .uc{box-shadow:none;filter:drop-shadow(0 0 12px #fcee09)}
+html[data-style="cyber"] .board{background:radial-gradient(ellipse at 50% 45%,#0b1a2e,#04070d);border-color:#00f0ff55}
+html[data-style="cyber"] .board.myturn,html[data-style="cyber"] #stage3d.myturn{border-color:#fcee09}
+html[data-style="cyber"] #turnBanner.me{background:linear-gradient(90deg,#c9bd00,#fcee09,#c9bd00)}
 .uc .bk{position:absolute;inset:0;background:#15171c;z-index:5;pointer-events:none;border-radius:inherit}
 
 .side{display:flex;flex-direction:column;gap:12px}
@@ -79,6 +114,16 @@
 .mbtns .btn{width:100%}
 .mbtns.cols{display:grid;grid-template-columns:1fr 1fr}
 .mbtns .btn.col0{background:#e53935;color:#fff}.mbtns .btn.col1{background:#f9a825;color:#222}.mbtns .btn.col2{background:#2e9a4a;color:#fff}.mbtns .btn.col3{background:#1e6fd0;color:#fff}
+#spin{position:fixed;inset:0;z-index:950;display:grid;place-items:center;background:rgba(5,8,18,.7);pointer-events:none}
+#spin[hidden]{display:none}
+#spin .sp{background:var(--card,#1a1e33);border:2px solid #ffd23f;border-radius:20px;padding:18px 22px;text-align:center;min-width:280px;box-shadow:0 0 40px rgba(255,210,63,.4)}
+#spin svg{width:230px;height:230px;transition:transform 2.3s cubic-bezier(.12,.7,.15,1)}
+#spin .pt{font-size:2rem;line-height:1;color:#ffd23f;margin-bottom:-6px;position:relative;z-index:2}
+#spin .rt{font-weight:800;font-size:1.1rem;margin-top:8px;min-height:2.6em}
+.opts{display:grid;gap:6px;margin:8px 0}
+.opts label{display:flex;gap:10px;align-items:flex-start;line-height:1.35;font-size:.9rem;cursor:pointer}
+.opts input{margin-top:3px}
+.opts small{display:block;color:var(--muted)}
 .slotrow{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
 .toolrow{display:flex;gap:8px;flex-wrap:wrap}.toolrow .btn{flex:1;min-width:110px}
 </style>
@@ -94,7 +139,14 @@
       <select id="nopp"><option value="1">1 Gegner</option><option value="2" selected>2 Gegner</option><option value="3">3 Gegner</option></select></div>
     <div class="slotrow"><label for="goal">Spielziel</label>
       <select id="goal"><option value="0">Eine Runde</option><option value="100">Bis 100 Punkte</option><option value="250" selected>Bis 250 Punkte</option></select></div>
-    <div class="row"><button class="btn" id="start">Gegen den Computer</button><button class="btn alt" id="online">🌐 Online spielen</button></div>
+    <h3 style="margin:14px 0 4px;font-size:.95rem">Zusatzregeln (optional)</h3>
+    <div class="opts">
+      <label><input type="checkbox" id="oStack"><span><b>Plus-Karten kontern (stapeln)</b><small>Wer eine +2 oder +4 bekommt, kann mit einer Plus-Karte kontern und die Strafe weitergeben. Auf +2 passt jede +2 oder +4. Auf eine +4 mit Farbwahl Gelb passt nur eine gelbe +2 (oder wieder eine +4). Wer nicht kontern kann, zieht alles.</small></span></label>
+      <label><input type="checkbox" id="oChal"><span><b>+4 anzweifeln</b><small>Der Betroffene darf zweifeln: Hatte der Spieler die bisherige Farbe auf der Hand, zieht er selbst 4. Sonst zieht der Zweifler 6.</small></span></label>
+      <label><input type="checkbox" id="oSeven"><span><b>7 und 0 (Tauschregel)</b><small>Eine 7 tauscht deine Hand mit einem Spieler deiner Wahl, eine 0 lässt alle Hände in Spielrichtung weiterwandern.</small></span></label>
+      <label><input type="checkbox" id="oSpin"><span><b>Glücksrad (Spin)</b><small>Bei jeder Farbwahl-Karte dreht sich ein Rad mit 8 Überraschungen: alle ziehen, Richtungswechsel, aussetzen, Handtausch, Hände weitergeben und mehr.</small></span></label>
+    </div>
+    <div class="row"><button class="btn" id="start">Gegen den Computer</button><button class="btn alt" id="online">🌐 Online spielen</button><button class="btn alt" id="rejoinBtn" hidden>↩ Wieder ins laufende Spiel</button></div>
     <details class="rules" style="margin-top:14px"><summary><b>Regeln</b></summary><ul>
       <li>Jeder bekommt 7 Karten. Du darfst eine Karte legen, die zur obersten Karte in <b>Farbe</b> oder <b>Zahl/Symbol</b> passt. Kannst du nicht, ziehst du eine Karte. Ist sie spielbar, darfst du sie sofort legen.</li>
       <li><b>⊘ Aussetzen:</b> Der Nächste ist nicht dran. <b>⇄ Richtungswechsel:</b> Die Reihenfolge dreht sich (zu zweit wie Aussetzen). <b>+2:</b> Der Nächste zieht 2 Karten und setzt aus.</li>
@@ -108,13 +160,14 @@
   <div id="game" hidden>
     <div class="layout">
       <div class="main">
+        <div id="turnBanner"></div>
         <div id="status"></div>
         <div class="board" id="board">
           <div class="opps" id="opps"></div>
           <div class="center">
             <div id="drawPile"></div>
             <div id="disc"></div>
-            <div class="curcol"><i id="curDot"></i><span id="curTxt"></span><span id="dirTxt"></span></div>
+            <div class="curcol"><i id="curDot"></i><span id="curTxt"></span><span id="dirTxt"></span><span id="penTxt" style="color:#ffd23f"></span></div>
           </div>
           <div class="me" id="me">
             <div class="pname"><span id="myName">Du</span><span class="sc" id="mySc">0 Punkte</span></div>
@@ -122,17 +175,20 @@
             <div class="actions"><button id="unoBtn">UNO!</button></div>
           </div>
         </div>
+        <div id="stage3d" hidden><div id="hint3d">Ziehen: Ansicht drehen · Mausrad/Pinch: Zoom · Karte antippen: legen · Stapel antippen: ziehen</div></div>
       </div>
       <div class="side">
         <div class="panel"><div class="scoreline"><span>Runde</span><b id="rnd">1</b></div><div id="scores"></div></div>
         <div class="panel"><div id="log"></div></div>
-        <div class="toolrow"><button class="btn alt" id="snd">Ton: an</button></div>
+        <details class="panel rules"><summary>Regeln und aktive Optionen</summary><div id="ruleList" style="font-size:.85rem;line-height:1.5;margin-top:6px"></div></details>
+        <div class="toolrow"><button class="btn alt" id="v3d">3D-Ansicht</button><button class="btn alt" id="snd">Ton: an</button></div>
         <button class="btn alt" id="again">Zur Auswahl</button>
       </div>
     </div>
   </div>
 </div>
 
+<div id="spin" hidden><div class="sp"><div class="pt">▼</div><svg id="spinSvg" viewBox="-100 -100 200 200"></svg><div class="rt" id="spinTxt"></div></div></div>
 <div class="overlay" id="modal" hidden>
   <div class="box"><div class="ico" id="mIco"></div><h2 id="mTitle"></h2><p id="mText"></p><div class="mbtns" id="mBtns"></div></div>
 </div>
@@ -160,15 +216,16 @@ const pts=c=>c.k<=9?c.k:(c.k<=12?20:50);
 const sym=c=>c.k<=9?String(c.k):SYM[c.k];
 const cname=c=>c.col===4?(c.k===14?'Farbwahl +4':'Farbwahl'):`${COLN[c.col]} ${c.k<=9?c.k:({10:'Aussetzen',11:'Richtungswechsel',12:'+2'})[c.k]}`;
 function cardHtml(c,cls='',extra=''){
-  if(cls.includes('back'))return `<div class="uc back ${cls}"><span class="big">✦</span></div>`;
+  if(cls.includes('back'))return `<div class="uc back ${cls}"><i class="hx"></i><span class="big">✦</span></div>`;
   const s=sym(c),sm=s.length>1?' sm':'';
-  return `<div class="uc ${c.col===4?'wild':'c'+c.col} ${cls}" data-id="${c.id}" ${extra} title="${esc(cname(c))}"><span class="cn a">${s}</span><span class="big${sm}">${s}</span><span class="cn b">${s}</span></div>`;
+  return `<div class="uc ${c.col===4?'wild':'c'+c.col} ${cls}" data-id="${c.id}" ${extra} title="${esc(cname(c))}"><i class="hx"></i><span class="cn a">${s}</span><span class="big${sm}">${s}</span><span class="cn b">${s}</span></div>`;
 }
 
 /* =====================================================================================
    Der Host (Einzelspiel oder Online-Host) führt das Spiel (G). Jeder Platz bekommt nur seine eigene Sicht V.
    Mitspieler schicken nur Antworten auf Fragen.
    ===================================================================================== */
+let use3d=false,want3d=false;
 let G=null,V=null,prevV=null,inp=null,token=0,askN=0,pend={},ME=0,ROLE='local',L=null,hintTxt='',snd=true,dlgSeq=0,unoOn=false,lastCnt={};
 try{snd=localStorage.getItem('fc-snd')!=='0';}catch(e){}
 const sleep=ms=>{const t=token;return new Promise((res,rej)=>setTimeout(()=>t===token?res():rej(CANCEL),ms));};
@@ -182,7 +239,7 @@ const sortHand=h=>h.slice().sort((a,b)=>a.col-b.col||a.k-b.k);
 function buildView(s){
   const ids=a=>a.map(c=>c.id);
   return {me:s,n:N(),names:G.seats.map((x,i)=>i===s?'Du':x.name),round:G.round,goal:G.goal,scores:G.scores.slice(),
-    hand:ids(G.hands[s]),counts:G.hands.map(h=>h.length),deckN:G.deck.length,top:ids(G.disc.slice(-4)),color:G.color,dir:G.dir,cur:G.cur,
+    hand:ids(G.hands[s]),counts:G.hands.map(h=>h.length),deckN:G.deck.length,top:ids(G.disc.slice(-4)),color:G.color,dir:G.dir,cur:G.cur,opts:G.opts,pen:G.pen,
     src:G.src,status:G.logE.length?fmt(G.logE[0],s):'',log:G.logE.slice(1).map(e=>fmt(e,s))};
 }
 function push(){
@@ -213,15 +270,21 @@ function hostMsg(from,m){
 }
 function clientMsg(m){
   if(!m)return;
+  if(m.k==='spin'){showSpin(m.i,m.t,m.who);return;}
   if(m.k==='v'){V=m.v;applyV();}
   else if(m.k==='ask'){uiAsk(m.spec).then(a=>L.send({k:'ans',id:m.id,a}));}
   else if(m.k==='info'){dlg(m.spec).then(()=>exitGame());}
   else if(m.k==='closedlg'){closeDlg();}
 }
+function onRejoin(seat){
+  const p=G?G.seats.findIndex(s=>s.seat===seat&&s.away):-1;if(p<0)return;
+  const o=G.seats[p].orig;G.seats[p]={type:'remote',name:o,seat};
+  say(-1,`${o} ist zurück im Spiel.`);push();
+}
 function onSeatDrop(seat){
   const p=G?G.seats.findIndex(s=>s.seat===seat):-1;if(p<0)return;
-  const was=G.seats[p].name;G.seats[p]={type:'cpu',name:was+' (Computer)',seat:G.seats[p].seat};
-  say(-1,`${was} hat das Spiel verlassen. Ein Computer übernimmt.`);
+  const was=G.seats[p].name;G.seats[p]={type:'cpu',name:was+' (Computer)',seat:G.seats[p].seat,orig:was,away:true};
+  say(-1,`${was} hat das Spiel verlassen. Ein Computer übernimmt, bis die Person zurückkommt.`);
   const e=pend[p];if(e){delete pend[p];e.res(e.ai());}
   push();
 }
@@ -278,6 +341,7 @@ function closeDlg(){dlgSeq++;$('modal').hidden=true;}
 
 // ---------- Ton ----------
 let AC=null,lastSfx=0;
+function tone(f,d){const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.18,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d);}
 function noise(dur,f0,f1,gain){
   const t=AC.currentTime,n=Math.floor(AC.sampleRate*dur),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
@@ -290,7 +354,7 @@ function sfx(kind){
   if(!snd)return;
   const now=performance.now();if(now-lastSfx<40)return;lastSfx=now;
   try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();
-    if(kind==='lay')noise(.07,1300,380,.5);else if(kind==='take')noise(.06,2200,700,.4);else if(kind==='flip')noise(.14,900,3000,.22);}catch(e){}
+    if(kind==='lay')noise(.07,1300,380,.5);else if(kind==='take')noise(.06,2200,700,.4);else if(kind==='flip')noise(.14,900,3000,.22);else if(kind==='ping'){tone(880,.12);setTimeout(()=>{try{tone(1320,.2);}catch(e){}},120);}}catch(e){}
 }
 $('snd').onclick=()=>{snd=!snd;$('snd').textContent=snd?'Ton: an':'Ton: aus';try{localStorage.setItem('fc-snd',snd?'1':'0');}catch(e){}};
 $('snd').textContent=snd?'Ton: an':'Ton: aus';
@@ -317,7 +381,26 @@ function render(flip){
   lastCnt=V.counts.slice();
   unoCheck();
 }
+function updateBanner(){
+  const b=$('turnBanner'),me=V.cur===V.me;
+  if(V.cur<0){b.className='';b.textContent='Runde beendet';}
+  else if(me){b.className='me';b.textContent=V.pen?`▶ DU BIST DRAN: Kontern oder ${V.pen.n} Karten ziehen`:'▶ DU BIST DRAN: Lege eine Karte oder ziehe';}
+  else{b.className='';b.textContent=`⏳ ${V.names[V.cur]} ist dran`;}
+  $('board').classList.toggle('myturn',me);$('stage3d').classList.toggle('myturn',me);
+  document.title=me?'▶ Du bist dran! – Farbchaos':'Farbchaos';
+  if(me&&!(prevV&&prevV.cur===V.me&&prevV.round===V.round))sfx('ping');
+}
+function ruleText(o){
+  const l=['Farbe oder Zahl/Symbol passt. Wer nicht legen kann, zieht eine Karte (und darf sie legen, wenn sie passt).','UNO! vor der vorletzten Karte drücken, sonst 2 Strafkarten.'];
+  if(o.stack)l.push('<b>Kontern:</b> +2 auf +2 oder +4, auf eine +4 nur +4 oder eine +2 in der gewählten Farbe. Wer nicht kontern kann, zieht alles.');
+  if(o.challenge)l.push('<b>+4 anzweifeln:</b> Hatte der Spieler die bisherige Farbe, zieht er 4, sonst zieht der Zweifler 6.');
+  if(o.sevenzero)l.push('<b>7 und 0:</b> 7 = Hand mit Wunschspieler tauschen, 0 = alle Hände weitergeben.');
+  if(o.spin)l.push('<b>Glücksrad:</b> Bei jeder Farbwahl-Karte dreht sich das Rad mit 8 Überraschungen.');
+  if(!o.stack&&!o.challenge&&!o.sevenzero&&!o.spin)l.push('Keine Zusatzregeln aktiv.');
+  return '<ul style="margin:0;padding-left:18px">'+l.map(x=>`<li>${x}</li>`).join('')+'</ul>';
+}
 function renderSide(){
+  updateBanner();$('ruleList').innerHTML=ruleText(V.opts||{});$('penTxt').textContent=V.pen?`Strafe: +${V.pen.n}`:'';
   $('status').textContent=hintTxt||V.status;
   $('log').innerHTML=V.log.map(l=>`<div>${esc(l)}</div>`).join('');
   $('rnd').textContent=V.round+1;
@@ -368,20 +451,76 @@ function runFlip(b){
 function applyV(){
   if(!V)return;
   hintTxt=inp?hintTxt:'';
-  renderSide();render(true);prevV=V;
+  renderSide();
+  if(use3d&&window.FC3D&&FC3D.ready)FC3D.update(V,inp);else if(!use3d)render(true);
+  prevV=V;
 }
 function refresh(){
   if(!V)return;
-  $('status').textContent=hintTxt||V.status;render(false);
+  $('status').textContent=hintTxt||V.status;
+  if(use3d&&window.FC3D&&FC3D.ready)FC3D.update(V,inp);else if(!use3d)render(false);
+  unoCheck();
 }
 
+// ---------- Glücksrad ----------
+let spinRot=0,spinTimer=0;
+function showSpin(i,text,who){
+  const svg=$('spinSvg'),cols=['#e53935','#f9a825','#2e9a4a','#1e6fd0'],n=SPINS.length;let h='<g id="wheel" style="transform-origin:0 0">';
+  for(let k=0;k<n;k++){
+    const a0=k*2*Math.PI/n-Math.PI/2,a1=(k+1)*2*Math.PI/n-Math.PI/2,m=(a0+a1)/2;
+    h+=`<path d="M0 0 L${95*Math.cos(a0)} ${95*Math.sin(a0)} A95 95 0 0 1 ${95*Math.cos(a1)} ${95*Math.sin(a1)} Z" fill="${cols[k%4]}" stroke="#fff" stroke-width="2"/>`;
+    h+=`<text x="${62*Math.cos(m)}" y="${62*Math.sin(m)}" font-size="22" text-anchor="middle" dominant-baseline="central">${SPINS[k].i}</text>`;
+  }
+  svg.innerHTML=h+'</g>';
+  const w=svg.querySelector('#wheel');w.style.transition='none';w.style.transform='rotate(0deg)';
+  $('spinTxt').textContent=`${who} dreht am Glücksrad …`;$('spin').hidden=false;
+  void w.getBoundingClientRect();
+  spinRot+=360*5+(360-(i+.5)*360/n)-(spinRot%360);
+  svg.style.transition='none';
+  w.style.transition='transform 2.3s cubic-bezier(.12,.7,.15,1)';w.style.transform=`rotate(${360*5+360-(i+.5)*360/n}deg)`;
+  sfx('flip');
+  clearTimeout(spinTimer);
+  setTimeout(()=>{$('spinTxt').textContent=SPINS[i].i+' '+text;sfx('take');},2400);
+  spinTimer=setTimeout(()=>{$('spin').hidden=true;},3400);
+}
+async function set3d(on){
+  if(on){
+    $('v3d').disabled=true;$('v3d').textContent='Lade 3D …';
+    try{
+      await FC3D.load();
+      $('board').hidden=true;$('stage3d').hidden=false;
+      FC3D.init($('stage3d'),{CARDS,COLN,sym,cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard:id=>clickHand(id),onDraw:()=>{if(inp&&inp.mode==='turn')answerTurn({c:null});}});
+      FC3D.setActive(true);use3d=true;
+      if(V)FC3D.update(V,inp,true);
+    }catch(e){$('board').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
+    $('v3d').disabled=false;
+  }else{
+    use3d=false;if(window.FC3D&&FC3D.ready)FC3D.setActive(false);
+    $('board').hidden=false;$('stage3d').hidden=true;prevV=null;if(V)render(false);
+  }
+  $('v3d').textContent=use3d?'2D-Ansicht':'3D-Ansicht';
+  try{localStorage.setItem('fc-3d',use3d?'1':'0');}catch(e){}
+}
+$('v3d').onclick=()=>set3d(!use3d);
+try{want3d=localStorage.getItem('fc-3d')==='1';}catch(e){}
+// Zusatzregeln merken
+const OPT_IDS={oStack:'stack',oChal:'challenge',oSeven:'sevenzero',oSpin:'spin'};
+function readOpts(){const o={};for(const id in OPT_IDS)o[OPT_IDS[id]]=$(id).checked;try{localStorage.setItem('fc-opts',JSON.stringify(o));}catch(e){}return o;}
+try{const o=JSON.parse(localStorage.getItem('fc-opts')||'{}');for(const id in OPT_IDS)$(id).checked=!!o[OPT_IDS[id]];}catch(e){}
 // ---------- Computer ----------
 function aiColor(p){
   const cnt=[0,0,0,0];G.hands[p].forEach(c=>{if(c.col<4)cnt[c.col]++;});
   const m=Math.max(...cnt);if(m===0)return rnd(4);
   const best=cnt.map((n,i)=>n===m?i:-1).filter(i=>i>=0);return best[rnd(best.length)];
 }
-function canPlay(c){const t=G.disc[G.disc.length-1];return c.col===4||c.col===G.color||(t.col!==4&&c.k===t.k);}
+function canPlay(c){
+  if(G.pen){            // offene Strafe: nur kontern. Auf +2 passt jede +2 oder +4, auf +4 passt eine +4 oder eine +2 in der gewählten Farbe
+    if(c.k===14)return true;
+    return c.k===12&&(G.pen.k===12||c.col===G.color);
+  }
+  const t=G.disc[G.disc.length-1];
+  return c.col===4||c.col===G.color||(t.col!==4&&c.k===t.k);
+}
 function aiTurn(p){
   const pl=G.hands[p].filter(canPlay);
   const uno=G.hands[p].length===2?Math.random()<.9:false;
@@ -390,12 +529,9 @@ function aiTurn(p){
   let best=null,bs=-1e9;
   for(const c of pl){
     let s=Math.random()*.5;
-    if(c.col===4)s-=hasOther?30:0;
-    else{
-      s+=pts(c)*.3;
-      if(c.k>=10)s+=nextFew?12:3;
-      s+=G.hands[p].filter(x=>x.col===c.col).length*.8;       // Farbe behalten, in der man viele hat
-    }
+    if(G.pen)s+=(c.k===12?60:40);
+    else if(c.col===4)s-=hasOther?30:0;
+    else{s+=pts(c)*.3;if(c.k>=10)s+=nextFew?12:3;s+=G.hands[p].filter(x=>x.col===c.col).length*.8;}
     if(c.k===14&&nextFew)s+=40;
     if(s>bs){bs=s;best=c;}
   }
@@ -415,8 +551,35 @@ async function drawCards(p,n,quick){
     push();await sleep(quick?170:300);
   }
 }
+function rotateHands(){const nh=[];G.hands.forEach((h,i)=>{nh[nextOf(i)]=h;});G.hands=nh.map(sortHand);}
+const SPINS=[
+  {i:'🃏',t:'Alle anderen ziehen 1 Karte',f:async p=>{for(let q=0;q<N();q++)if(q!==p)await drawCards(q,1,true);}},
+  {i:'🔄',t:'Richtungswechsel',f:async p=>{G.dir*=-1;}},
+  {i:'⊘',t:'Der Nächste setzt aus',f:async p=>{G.extraSkip=true;}},
+  {i:'😖',t:'Pech: Der Spieler zieht 2 Karten',f:async p=>{await drawCards(p,2,true);}},
+  {i:'🎁',t:'Der Spieler gibt eine Zufallskarte ab',f:async p=>{const h=G.hands[p];if(h.length>2){const c=h.splice(rnd(h.length),1)[0];G.deck.unshift(c);}}},
+  {i:'🤝',t:'Handtausch mit dem Nächsten',f:async p=>{const x=nextOf(p);[G.hands[p],G.hands[x]]=[G.hands[x],G.hands[p]];}},
+  {i:'🔁',t:'Alle geben ihre Hand weiter',f:async p=>{rotateHands();}},
+  {i:'😌',t:'Nichts passiert',f:async p=>{}}];
+async function spinWheel(p){
+  const i=rnd(SPINS.length),text=SPINS[i].t;
+  say(p,`${nm(p)} dreht am Glücksrad …`,'Du drehst am Glücksrad …');push();
+  showSpin(i,text,nm(p));
+  G.seats.forEach(s=>{if(s.type==='remote')L.sendTo(s.seat,{k:'spin',i,t:text,who:nm(p)});});
+  await sleep(3300);
+  await SPINS[i].f(p);G.hands=G.hands.map(sortHand);
+  say(-1,`Glücksrad: ${text}.`);push();await sleep(700);
+}
+async function sevenZero(p,c){
+  if(c.k===0){rotateHands();say(-1,`Die Null: Alle geben ihre Hand weiter.`);push();await sleep(900);return;}
+  const others=[];for(let q=0;q<N();q++)if(q!==p)others.push(q);
+  const i=await ask(p,{k:'dlg',ico:'🔄',title:'Handtausch',html:'Mit wem willst du deine Hand tauschen?',btns:others.map(q=>nm(q))},()=>{let b=0;others.forEach((q,j)=>{if(G.hands[q].length<G.hands[others[b]].length)b=j;});return b;});
+  const t=others[i];[G.hands[p],G.hands[t]]=[G.hands[t],G.hands[p]];G.hands=G.hands.map(sortHand);
+  say(p,`${nm(p)} tauscht die Hand mit ${nm(t)}.`,`Du tauschst die Hand mit ${nm(t)}.`);push();await sleep(900);
+}
 async function playCard(p,c,uno){
   G.hands[p]=G.hands[p].filter(x=>x!==c);G.disc.push(c);G.src[c.id]='hand'+p;
+  G.prevColor=G.color;G.preHad=c.k===14&&G.hands[p].some(x=>x.col===G.prevColor);
   if(c.col===4){
     const pick=await ask(p,{k:'dlg',ico:'🎨',title:'Farbe wählen',html:'Welche Farbe soll es sein?',btns:COLN,cols:true},()=>aiColor(p));
     G.color=pick;
@@ -432,32 +595,51 @@ async function applyEffect(p,c){
   if(c.k===10){const x=nextOf(p);say(x,`${nm(x)} muss aussetzen.`,'Du musst aussetzen.');G.cur=x;push();await sleep(600);return nextOf(p,2);}
   if(c.k===11){
     G.dir*=-1;
-    if(N()===2){const x=nextOf(p,0);say(-1,'Richtungswechsel: zu zweit wie Aussetzen.');push();await sleep(500);return p;}
+    if(N()===2){say(-1,'Richtungswechsel: zu zweit wie Aussetzen.');push();await sleep(500);return p;}
     say(-1,'Richtungswechsel!');push();await sleep(500);return nextOf(p);
   }
   if(c.k===12||c.k===14){
-    const x=nextOf(p),n=c.k===12?2:4;
+    const x=nextOf(p);let n=c.k===12?2:4;
+    if(c.k===14&&G.opts.challenge){
+      const i=await ask(x,{k:'dlg',ico:'🤔',title:'Farbwahl +4: anzweifeln?',html:`${esc(nm(p))} hat +4 gelegt und wählt <b>${COLN[G.color]}</b>.<br>Anzweifeln? Hatte die Person die bisherige Farbe <b>${COLN[G.prevColor]}</b> auf der Hand, muss sie selbst 4 Karten ziehen. Hatte sie keine, ziehst du 6 statt 4.`,btns:['Hinnehmen','Anzweifeln']},()=>Math.random()<.3?1:0);
+      if(i===1){
+        if(G.preHad){say(p,`${nm(x)} zweifelt an: Zu Recht! ${nm(p)} zieht 4 Karten.`,`${nm(x)} zweifelt an: Zu Recht! Du ziehst 4 Karten.`);push();await sleep(700);await drawCards(p,4,true);return x;}
+        say(x,`${nm(x)} zweifelt an: Zu Unrecht! Er/Sie zieht 6 Karten.`,'Du zweifelst an: Zu Unrecht! Du ziehst 6 Karten.');n=6;push();await sleep(700);
+      }
+    }
+    if(G.opts.stack){
+      G.pen={n:(G.pen?G.pen.n:0)+n,k:c.k};
+      say(x,`Plus-Karte: ${nm(x)} kann kontern oder zieht ${G.pen.n} Karten.`,`Plus-Karte: Du kannst kontern oder ${G.pen.n} Karten ziehen.`);push();await sleep(500);
+      return x;
+    }
     say(x,`${nm(x)} zieht ${n} Karten und setzt aus.`,`Du ziehst ${n} Karten und setzt aus.`);G.cur=x;push();await sleep(500);
     await drawCards(x,n,true);return nextOf(p,2);
   }
   return nextOf(p);
 }
+async function takePenalty(p){
+  const n=G.pen.n;G.pen=null;
+  say(p,`${nm(p)} zieht ${n} Karten.`,`Du ziehst ${n} Karten.`);push();await sleep(500);
+  await drawCards(p,n,true);return nextOf(p);
+}
 async function turn(p){
   G.cur=p;
   const cpu=G.seats[p].type==='cpu';
   const can=G.hands[p].filter(canPlay).map(c=>c.id);
-  say(p,`${nm(p)} ist dran.`,'Du bist dran: Lege eine passende Karte oder ziehe vom Stapel.');
+  if(G.pen&&!can.length){say(p,`${nm(p)} kann nicht kontern.`,'Du kannst nicht kontern.');push();await sleep(700);return takePenalty(p);}
+  say(p,`${nm(p)} ist dran.`,G.pen?`Strafe offen: Kontere mit einer Plus-Karte oder ziehe ${G.pen.n} Karten.`:'Du bist dran: Lege eine passende Karte oder ziehe vom Stapel.');
   push();
   if(cpu)await sleep(900);
   const a=await ask(p,{k:'turn',can},()=>aiTurn(p));
   if(a.c===null){
+    if(G.pen)return takePenalty(p);
     say(p,`${nm(p)} zieht eine Karte.`,'Du ziehst eine Karte.');
     await drawCards(p,1);
     const c=G.hands[p][G.hands[p].length-1];
     if(c&&canPlay(c)){
       const keep=await ask(p,{k:'dlg',ico:'🃏',title:'Gezogene Karte passt',html:`<b>${esc(cname(c))}</b> kannst du sofort legen.`,btns:['Legen','Behalten']},()=>0);
       if(keep===0){
-        const uno=G.hands[p].length===2?(cpu?Math.random()<.9:unoAuto(p)):false;
+        const uno=G.hands[p].length===2?(cpu?Math.random()<.9:true):false;
         await playCard(p,c,uno);
         return winCheck(p,c);
       }
@@ -469,38 +651,46 @@ async function turn(p){
   await playCard(p,c,!!a.uno);
   return winCheck(p,c);
 }
-function unoAuto(p){return true;}   // wer nach dem Ziehen direkt legt, bekommt UNO automatisch (kein Knopf zwischendurch)
 async function winCheck(p,c){
   if(G.hands[p].length===0)return {win:p};
+  if(G.opts.spin&&c.col===4)await spinWheel(p);
+  if(G.opts.sevenzero&&c.col<4&&(c.k===7||c.k===0))await sevenZero(p,c);
   return applyEffect(p,c);
+}
+// Abstimmung unter allen Menschen: Mehrheit entscheidet, bei Gleichstand wird weitergespielt
+async function vote(specFor){
+  const res=await Promise.all(G.seats.map((s,q)=>s.type==='cpu'?null:ask(q,Object.assign({k:'dlg'},specFor(q)),()=>null)));
+  const v=res.filter(x=>x!==null&&x!==undefined),yes=v.filter(x=>x===0).length,no=v.length-yes;
+  say(-1,`Abstimmung: ${yes} dafür, ${no} dagegen.`);push();await sleep(1100);
+  return yes>=no;
 }
 async function endRound(w){
   let pt=0;G.hands.forEach((h,i)=>{if(i!==w)h.forEach(c=>{pt+=pts(c);});});
-  G.scores[w]+=pt;G.round++;G.cur=-1;G.dealer=w;
+  G.scores[w]+=pt;G.round++;G.cur=-1;G.dealer=w;G.pen=null;
   say(w,`${nm(w)} gewinnt die Runde (+${pt} Punkte).`,`Du gewinnst die Runde (+${pt} Punkte).`);push();
   const over=G.goal===0||G.scores[w]>=G.goal;
-  await dlgAll(q=>({ico:w===q?'🏆':'🃏',title:w===q?'Du gewinnst die Runde!':`${esc(nm(w))} gewinnt die Runde`,html:`<b>${pt} Punkte</b> für ${w===q?'dich':esc(nm(w))}.<br><br>`+G.seats.map((s,i)=>`${i===q?'Du':esc(s.name)}: <b>${G.scores[i]}</b>`).join('<br>'),btns:[over?'Ergebnis':'Nächste Runde']}),0);
   if(over)return finishGame();
-  return playRound();
+  const more=await vote(q=>({ico:w===q?'🏆':'🃏',title:w===q?'Du gewinnst die Runde!':`${esc(nm(w))} gewinnt die Runde`,
+    html:`<b>${pt} Punkte</b> für ${w===q?'dich':esc(nm(w))}.<br><br>`+G.seats.map((s,i)=>`${i===q?'Du':esc(s.name)}: <b>${G.scores[i]}</b>`).join('<br>')+'<br><br><b>Abstimmung:</b> Weiterspielen?',btns:['Weiterspielen','Beenden']}));
+  if(more)return playRound();
+  return finishGame(true);
 }
-async function finishGame(){
-  const best=Math.max(...G.scores),w=G.scores.indexOf(best);
-  const spec=q=>({ico:w===q?'🏆':'🃏',title:w===q?'Du hast gewonnen!':`${nm(w)} hat gewonnen`,html:G.seats.map((s,i)=>`${i===q?'Du':esc(s.name)}: <b>${G.scores[i]}</b>`).join('<br>')});
-  const online=ROLE==='host'&&G.seats.some(s=>s.type==='remote');
-  G.seats.forEach(s=>{if(s.type==='remote')L.sendTo(s.seat,{k:'info',spec:Object.assign(spec(G.seats.indexOf(s)),{btns:['Spiel verlassen']})});});
-  const i=await dlg(Object.assign(spec(ME),{btns:['Nochmal spielen',online?'Zurück zur Lobby':'Zur Auswahl']}));
-  if(i===0){G.seats.forEach(s=>{if(s.type==='remote')L.sendTo(s.seat,{k:'closedlg'});});return startGame(G.seats,G.goal);}
+async function finishGame(stopped){
+  const best=Math.max(...G.scores),top=G.scores.indexOf(best);
+  const again=await vote(q=>({ico:top===q?'🏆':'🃏',title:top===q?'Du hast gewonnen!':`${esc(nm(top))} hat gewonnen`,
+    html:(stopped?'Das Spiel wurde per Abstimmung beendet.<br><br>':'')+G.seats.map((s,i)=>`${i===q?'Du':esc(s.name)}: <b>${G.scores[i]}</b>`).join('<br>')+'<br><br><b>Abstimmung:</b> Noch eine Partie?',btns:['Nochmal spielen','Beenden']}));
+  if(again)return startGame(G.seats,G.goal,G.opts);
   exitGame();
 }
 async function playRound(){
   try{
     const n=N();
-    let d;do{d=shuffle(CARDS);}while(false);
+    const d=shuffle(CARDS);
     G.hands=G.seats.map(()=>[]);
     for(let i=0;i<7;i++)for(let p=0;p<n;p++)G.hands[p].push(d.pop());
     G.hands=G.hands.map(sortHand);
     const fi=d.findIndex(c=>c.k<=9);const first=d.splice(fi,1)[0];
-    G.deck=d;G.disc=[first];G.color=first.col;G.dir=1;G.src={};CARDS.forEach(c=>{G.src[c.id]='deck';});
+    G.deck=d;G.disc=[first];G.color=first.col;G.dir=1;G.pen=null;G.extraSkip=false;G.src={};CARDS.forEach(c=>{G.src[c.id]='deck';});
     G.cur=G.dealer%n;
     const st=G.cur,rn=G.round+1;
     G.logE.unshift({p:-1,a:'',b:'',per:s=>`Runde ${rn}: ${st===s?'Du beginnst.':nm(st)+' beginnt.'}`});
@@ -510,17 +700,19 @@ async function playRound(){
       const r=await turn(p);
       if(typeof r==='object')return endRound(r.win);
       p=r;
+      if(G.extraSkip){G.extraSkip=false;say(p,`${nm(p)} muss wegen des Glücksrads aussetzen.`,'Du musst wegen des Glücksrads aussetzen.');push();await sleep(700);p=nextOf(p);}
     }
   }catch(e){if(e!==CANCEL)throw e;}
 }
-function startGame(seats,goal){
+function startGame(seats,goal,opts){
   token++;inp=null;pend={};closeDlg();prevV=null;V=null;lastCnt={};hintTxt='';unoOn=false;unoWarned=false;
-  G={round:0,goal:goal,scores:seats.map(()=>0),dealer:0,hands:[],deck:[],disc:[],color:0,dir:1,cur:0,
+  G={round:0,goal:goal,opts:opts,scores:seats.map(()=>0),dealer:0,hands:[],deck:[],disc:[],color:0,dir:1,cur:0,pen:null,
     seats:seats.map(s=>({type:s.type,name:s.name,seat:s.seat})),logE:[],src:{}};
   $('setup').hidden=true;$('game').hidden=false;
+  if(want3d&&!use3d){want3d=false;set3d(true);}
   playRound();
 }
-function backToSetup(){token++;inp=null;pend={};closeDlg();G=null;V=null;prevV=null;$('game').hidden=true;$('setup').hidden=false;}
+function backToSetup(){token++;inp=null;pend={};closeDlg();G=null;V=null;prevV=null;$('game').hidden=true;$('setup').hidden=false;document.title='Farbchaos';}
 function exitGame(){
   if(ROLE==='host'&&L.role==='host'){backToSetup();ROLE='local';L.backToLobby();return;}
   if(ROLE==='client'){try{L.leave();}catch(e){}ROLE='local';}
@@ -530,16 +722,19 @@ const CPU_NAMES=['Kira','Bolt','Nova'];
 $('start').onclick=()=>{
   ROLE='local';ME=0;const n=+$('nopp').value;
   const seats=[{type:'host',name:'Du',seat:0}];for(let i=0;i<n;i++)seats.push({type:'cpu',name:CPU_NAMES[i],seat:-1});
-  startGame(seats,+$('goal').value);
+  startGame(seats,+$('goal').value,readOpts());
 };
 $('online').onclick=()=>L.open();
+$('rejoinBtn').onclick=()=>L.rejoin();
+function updRejoin(){$('rejoinBtn').hidden=!L.hasRejoin();}
 $('again').onclick=exitGame;
 
 // ---------- Online ----------
 L=MP.init({
   prefix:'fch-v1-',title:'Farbchaos',
   seats:[{name:'Rot',color:'#e53935'},{name:'Gelb',color:'#f9a825'},{name:'Grün',color:'#2e9a4a'},{name:'Blau',color:'#1e6fd0'}],
-  minPlayers:2,bots:true,
+  minPlayers:2,bots:true,rejoin:true,
+  onRejoin:onRejoin,
   onStart(info){
     token++;ROLE=info.role;
     if(info.role==='host'){
@@ -549,14 +744,15 @@ L=MP.init({
         else if(s.type==='cpu')seats.push({type:'cpu',name:CPU_NAMES[k++%3],seat:-1});
       });
       ME=seats.findIndex(s=>s.type==='host');
-      startGame(seats,+$('goal').value);
-    }else{backToSetup();$('setup').hidden=true;$('game').hidden=false;hint('Warte auf den Host …');L.send({k:'sync'});}
+      startGame(seats,+$('goal').value,readOpts());
+    }else{backToSetup();$('setup').hidden=true;$('game').hidden=false;if(want3d&&!use3d){want3d=false;set3d(true);}hint('Warte auf den Host …');L.send({k:'sync'});}
   },
   onData(from,m){if(L.role==='client')clientMsg(m);else hostMsg(from,m);},
   onSeatDrop:onSeatDrop,
   onBackToLobby(){ROLE='local';backToSetup();},
   onLeave(){ROLE='local';backToSetup();}
 });
+updRejoin();setInterval(updRejoin,3000);
 </script>
 </body>
 </html>

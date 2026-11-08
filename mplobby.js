@@ -53,7 +53,7 @@
       '  <div class="mprow"><button class="btn" id="mpStart">Spiel starten</button></div>' +
       '</div>' +
       '<div id="mpJoin" hidden>' +
-      '  <div id="mpJoinForm"><h3>Offene Spiele</h3><div id="mpList" class="mphint">Suche …</div>' +
+      '  <div id="mpJoinForm"><div class="mprow" id="mpRejoin" hidden><span class="mphint" style="margin:0">Zuletzt gespielt in Raum <b id="mpRejoinCode"></b></span><button class="btn mpmini" id="mpRejoinBtn">Wieder beitreten</button></div><h3>Offene Spiele</h3><div id="mpList" class="mphint">Suche …</div>' +
       '  <h3>Mit Code beitreten</h3><div class="mprow"><input id="mpJoinCode" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase;letter-spacing:.2em;width:8em"><button class="btn" id="mpJoinBtn">Beitreten</button></div></div>' +
       '  <div id="mpLobby" hidden><h3>Lobby</h3><div id="mpJoinSlots"></div><p class="mphint">Warte, bis der Host das Spiel startet.</p></div>' +
       '</div>' +
@@ -63,6 +63,15 @@
     document.body.appendChild(ov);
     try { $('mpName').value = localStorage.getItem('mp-name') || ''; } catch (e) {}
     var err = function (t) { $('mpErr').textContent = t || ''; };
+    // Wiederbeitritt: eigene Kennung und letzten Raum merken
+    var LASTK = 'mp-last-' + cfg.prefix;
+    function myRid() { try { var r = localStorage.getItem('mp-rid'); if (!r) { r = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); localStorage.setItem('mp-rid', r); } return r; } catch (e) { return 'x' + Math.random().toString(36).slice(2, 10); } }
+    function getLast() { if (!cfg.rejoin) return null; try { var l = JSON.parse(localStorage.getItem(LASTK) || 'null'); return l && Date.now() - l.t < 6 * 3600e3 ? l : null; } catch (e) { return null; } }
+    function saveLast(code) { if (!cfg.rejoin || !code) return; try { localStorage.setItem(LASTK, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {} }
+    function clearLast() { try { localStorage.removeItem(LASTK); } catch (e) {} updateRejoin(); }
+    function updateRejoin() { var l = getLast(), show = !!l && L.role !== 'client'; $('mpRejoin').hidden = !show; if (show) $('mpRejoinCode').textContent = l.code; }
+    L.hasRejoin = function () { return !!getLast(); };
+    L.rejoin = function () { var l = getLast(); if (!l) return false; ov.hidden = false; showMode('join'); joinRoom(l.code); return true; };
     var myName = function () { var n = ($('mpName').value || '').trim().slice(0, 14) || 'Spieler'; try { localStorage.setItem('mp-name', n); } catch (e) {} return n; };
     var dot = function (i) { return '<span class="mpdot" style="background:' + cfg.seats[i].color + '"></span>' + esc(cfg.seats[i].name); };
     var row = function (i, html) { return '<div class="mpslot"><span class="nm">' + dot(i) + '</span>' + html + '</div>'; };
@@ -71,6 +80,7 @@
       Array.prototype.forEach.call($('mpTabs').querySelectorAll('.btn'), function (b) { b.classList.toggle('alt', b.dataset.m !== m); });
       $('mpHost').hidden = m !== 'host'; $('mpJoin').hidden = m !== 'join'; err('');
       if (m === 'join' && L.role !== 'client') startWatch(); else stopWatch();
+      updateRejoin();
     }
     L.open = function () {
       ov.hidden = false;
@@ -107,10 +117,19 @@
       if (m.t === 'hello') {
         if (conn.slot !== undefined) return;
         var full = function (why) { try { conn.send({ t: 'full', why: why }); } catch (e) {} setTimeout(function () { try { conn.close(); } catch (e) {} }, 400); };
-        if (L.playing) { full('Das Spiel läuft schon'); return; }
+        if (L.playing) {
+          var ri = -1;
+          if (cfg.rejoin && m.rid) L.seats.forEach(function (s, k) { if (ri < 0 && s.away && s.rid === m.rid) ri = k; });
+          if (ri < 0) { full('Das Spiel läuft schon' + (cfg.rejoin ? ' und dein alter Platz ist nicht mehr frei' : '')); return; }
+          L.seats[ri] = { type: 'remote', name: String(m.name || 'Spieler').slice(0, 14), conn: conn, rid: m.rid }; conn.slot = ri;
+          try { conn.send({ t: 'welcome', slot: ri }); } catch (e) {}
+          try { conn.send({ t: 'start', you: ri, seats: lobbyInfo() }); } catch (e) {}
+          if (cfg.onRejoin) cfg.onRejoin(ri);
+          return;
+        }
         var i = -1; L.seats.forEach(function (s, k) { if (i < 0 && s.type === 'open') i = k; });
         if (i < 0) { full('Der Raum ist voll'); return; }
-        L.seats[i] = { type: 'remote', name: String(m.name || 'Spieler').slice(0, 14), conn: conn }; conn.slot = i;
+        L.seats[i] = { type: 'remote', name: String(m.name || 'Spieler').slice(0, 14), conn: conn, rid: m.rid }; conn.slot = i;
         try { conn.send({ t: 'welcome', slot: i }); } catch (e) {}
         broadcastLobby(); return;
       }
@@ -125,7 +144,8 @@
       var i = conn.slot; if (i === undefined || !L.seats[i] || L.seats[i].conn !== conn) return;
       conn.slot = undefined;
       if (!L.playing) { L.seats[i] = { type: 'open' }; broadcastLobby(); return; }
-      L.seats[i] = { type: cfg.bots ? 'cpu' : 'left', name: '' };
+      var old = L.seats[i];
+      L.seats[i] = { type: cfg.bots ? 'cpu' : 'left', name: '', rid: cfg.rejoin ? old.rid : undefined, away: !!(cfg.rejoin && old.rid) };
       if (cfg.onSeatDrop) cfg.onSeatDrop(i);
     }
     function moveSlot(from, to) {
@@ -208,16 +228,16 @@
     function joinRoom(codeArg) {
       var code = ((typeof codeArg === 'string' ? codeArg : '') || $('mpJoinCode').value || '').trim().toUpperCase();
       if (code.length < 4) { err('Bitte den Raumcode eingeben.'); return; }
-      var name = myName(); err('Verbinde …'); $('mpJoinBtn').disabled = true; stopWatch();
+      L.joinCode = code; var name = myName(); err('Verbinde …'); $('mpJoinBtn').disabled = true; stopWatch();
       L.joiner = Net.join(cfg.prefix, code, {
         attach: function (c) { L.hostConn = c; c.on('data', onClientMsg); c.on('close', onClientClose); },
-        open: function (c) { L.role = 'client'; err(''); try { c.send({ t: 'hello', name: name }); } catch (e) {} },
-        fail: function (msg) { $('mpJoinBtn').disabled = false; L.hostConn = null; L.joiner = null; err(msg || 'Verbindung fehlgeschlagen.'); showMode('join'); }
+        open: function (c) { L.role = 'client'; err(''); try { c.send({ t: 'hello', name: name, rid: myRid() }); } catch (e) {} },
+        fail: function (msg) { clearLast(); $('mpJoinBtn').disabled = false; L.hostConn = null; L.joiner = null; err(msg || 'Verbindung fehlgeschlagen.'); showMode('join'); }
       });
     }
     function onClientMsg(m) {
       if (!m || typeof m !== 'object') return;
-      if (m.t === 'welcome') { L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
+      if (m.t === 'welcome') { saveLast(L.joinCode); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
       else if (m.t === 'lobby') {
         L.you = m.you; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false;
         if (L.playing || m.back) { L.playing = false; if (cfg.onBackToLobby) cfg.onBackToLobby(); ov.hidden = false; showMode('join'); $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
@@ -229,14 +249,15 @@
       }
       else if (m.t === 'start') { L.playing = true; L.you = m.you; ov.hidden = true; if (cfg.onStart) cfg.onStart({ role: 'client', you: m.you, seats: m.seats }); }
       else if (m.t === 'g') { if (cfg.onData) cfg.onData(-1, m.d); }
-      else if (m.t === 'full') { var w = m.why || 'Der Raum ist voll'; L.leave(); err(w); showMode('join'); }
-      else if (m.t === 'kicked') { var why = m.why || 'Verbindung beendet'; L.leave(); ov.hidden = false; showMode('join'); err(why); if (cfg.onLeave) cfg.onLeave(why); }
+      else if (m.t === 'full') { var w = m.why || 'Der Raum ist voll'; L.leave(); clearLast(); err(w); showMode('join'); }
+      else if (m.t === 'kicked') { var why = m.why || 'Verbindung beendet'; if (/Host/.test(why)) clearLast(); L.leave(); ov.hidden = false; showMode('join'); err(why); if (cfg.onLeave) cfg.onLeave(why); }
     }
     function onClientClose() {
       if (L.role !== 'client') return;
       L.leave(); ov.hidden = false; showMode('join'); err('Die Verbindung zum Host ist abgebrochen.'); if (cfg.onLeave) cfg.onLeave('Verbindung zum Host abgebrochen');
     }
     $('mpJoinBtn').onclick = function () { joinRoom(); };
+    $('mpRejoinBtn').onclick = function () { var l = getLast(); if (l) joinRoom(l.code); };
     $('mpJoinCode').addEventListener('keydown', function (e) { if (e.key === 'Enter') joinRoom(); });
     $('mpJoinSlots').addEventListener('click', function (e) { var b = e.target.closest('[data-take]'); if (b) L.send2host({ t: 'color', slot: +b.dataset.take }); });
     $('mpList').addEventListener('click', function (e) { var b = e.target.closest('[data-join]'); if (b) { $('mpJoinCode').value = b.dataset.join; joinRoom(b.dataset.join); } });
@@ -249,7 +270,7 @@
     L.backToLobby = function () {                                                    // Host: nach dem Spiel zurück in die Lobby
       if (L.role !== 'host') return;
       L.playing = false;
-      L.seats = L.seats.map(function (s) { return s.type === 'off' ? { type: 'open' } : (s.type === 'left' ? { type: 'open' } : s); });
+      L.seats = L.seats.map(function (s) { return s.away ? { type: 'open' } : (s.type === 'off' ? { type: 'open' } : (s.type === 'left' ? { type: 'open' } : s)); });
       broadcastLobby(true); ov.hidden = false; showMode('host'); renderHost();
     };
     L.leave = function () {
