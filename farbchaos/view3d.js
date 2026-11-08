@@ -194,7 +194,7 @@
     for (var i = tw.length - 1; i >= 0; i--) {
       var w = tw[i], k = Math.max(0, Math.min(1, (now - w.t0) / w.dur)), e = k * k * (3 - 2 * k), m = w.o.mesh, up = Math.sin(k * Math.PI);
       m.position.lerpVectors(w.p0, w.p1, e); m.position.y += up * w.arc;
-      m.rotation.set(w.rx0 + (w.rx1 - w.rx0) * e, w.ry0 + (w.ry1 - w.ry0) * e + (w.far ? up * w.spin : 0), 0);
+      m.rotation.set(w.rx0 + (w.rx1 - w.rx0) * e, w.ry0 + (w.ry1 - w.ry0) * e + (w.far ? up * w.spin : 0), w.far ? up * w.spin * .6 : 0);
       m.scale.setScalar((w.s0 + (w.s1 - w.s0) * e) * (1 + (w.far ? .14 : 0) * up));
       if (k >= 1) { tw.splice(i, 1); if (w.snd) { api.sfx(w.snd); ring(w.p1.x, w.p1.z, w.snd === 'lay' ? 0xffffff : 0xffd23f); } }
     }
@@ -255,7 +255,8 @@
       var sl = slots[oi], cnt = Math.min(V.counts[seat], MAXV), sp = Math.min(1.1, 11 / Math.max(1, cnt)), tx = Math.cos(sl.yaw), tz = -Math.sin(sl.yaw);
       for (j = 0; j < cnt; j++) {
         var off = (j - (cnt - 1) / 2) * sp;
-        W('o' + seat + '_' + j, { x: sl.x + tx * off, y: .1 + j * .01, z: sl.z + tz * off, rx: Math.PI / 2, ry: sl.yaw, s: .8, anon: 1, seat: seat });
+        var dl = Math.hypot(sl.x, sl.z) || 1, arc = off * off * .035;   // Fächer: Mitte vorgewölbt, Karten leicht gedreht
+        W('o' + seat + '_' + j, { x: sl.x + tx * off - sl.x / dl * arc, y: .1 + j * .012, z: sl.z + tz * off - sl.z / dl * arc, rx: Math.PI / 2, ry: sl.yaw + off * .07, s: .85, anon: 1, seat: seat });
       }
       glowFor('g' + seat, sl.x, sl.z, sl.yaw, V.cur === seat);
       var ol=Math.hypot(sl.x,sl.z)||1; label('l' + seat, V.names[seat], V.scores[seat] + ' P · ' + V.counts[seat] + ' Karten', V.cur === seat, sl.x + sl.x/ol*3.8, sl.z + sl.z/ol*3.8);

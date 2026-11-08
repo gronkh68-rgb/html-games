@@ -37,7 +37,8 @@
 .opp.turn{border-color:#ffd23f;background:rgba(255,210,63,.18);box-shadow:0 0 22px rgba(255,210,63,.6);animation:bannerPulse .8s ease-in-out infinite alternate}
 .opp.turn>span:first-child::before{content:"▶ "}
 .opp .obacks{display:flex;min-height:calc(var(--cw)*1.5*.62)}
-.opp .obacks .uc{--w:calc(var(--cw)*.62);margin-right:calc(var(--cw)*-.4)}
+.opp .obacks{padding:6px 10px 2px;min-height:calc(var(--cw)*1.5*.74 + 10px);align-items:flex-end}
+.opp .obacks .uc{--w:calc(var(--cw)*.74);margin-right:calc(var(--cw)*-.46);rotate:calc(var(--k,0)*5deg);translate:0 calc(var(--k,0)*var(--k,0)*var(--cw)*.014)}
 .opp .obacks .uc:last-child{margin-right:0}
 .opp .cnt{background:rgba(0,0,0,.4);padding:1px 9px;border-radius:999px;font-size:.78rem}
 .opp.uno .cnt{background:#e53935;color:#fff}
@@ -75,8 +76,8 @@
 .uc.wild{--c:#222}
 .uc.wild::before{background:conic-gradient(#e53935 0 25%,#f9a825 0 50%,#2e9a4a 0 75%,#1e6fd0 0);transform:rotate(-26deg)}
 .uc.wild .big{color:#fff;text-shadow:0 0 6px #000,0 0 3px #000}
-.uc.back{--c:#15171c}
-.uc.back::before{background:#e53935}
+.uc.back{--c:#15171c;background:repeating-linear-gradient(45deg,#1c2030 0 7px,#121520 7px 14px)}
+.uc.back::before{background:radial-gradient(circle,#ff6a5e,#c62828);border:calc(var(--w)*.03) solid #fff;inset:24% 12%}
 .hx{display:none}
 .uc.back .big{color:#fff;font-size:calc(var(--w)*.34);text-shadow:0 1px 3px #000}
 html[data-style="cyber"] .uc{--hx:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);height:calc(var(--w)*1.1547);background:transparent;border:0;box-shadow:none;overflow:visible;border-radius:0;filter:drop-shadow(0 0 5px var(--c))}
@@ -88,7 +89,6 @@ html[data-style="cyber"] .uc .big.sm{font-size:calc(var(--w)*.36)}
 html[data-style="cyber"] #disc .uc{margin:calc(var(--cw)*-.58) 0 0 calc(var(--cw)*-.5)}
 html[data-style="cyber"] #disc{height:calc(var(--cw)*1.3)}
 html[data-style="cyber"] .hand .uc{margin-right:calc(var(--cw)*-.06)}
-html[data-style="cyber"] .opp .obacks .uc{margin-right:calc(var(--cw)*-.2)}
 html[data-style="cyber"] .uc .cn{color:var(--c);text-shadow:0 0 6px var(--c);font-size:calc(var(--w)*.15)}
 html[data-style="cyber"] .uc .cn.a{left:17%;top:29%}
 html[data-style="cyber"] .uc .cn.b{right:17%;bottom:29%}
@@ -99,6 +99,8 @@ html[data-style="cyber"] .uc.wild .big{color:#fff;text-shadow:0 0 8px #fff,0 0 1
 html[data-style="cyber"] .uc.c0{--c:#ff2a55}html[data-style="cyber"] .uc.c1{--c:#fcee09}html[data-style="cyber"] .uc.c2{--c:#2dff7a}html[data-style="cyber"] .uc.c3{--c:#00b4ff}
 html[data-style="cyber"] .uc.back{--c:#00f0ff}
 html[data-style="cyber"] .uc.back .big{color:#00f0ff}
+html[data-style="cyber"] .uc.back .hx::after{background:repeating-linear-gradient(60deg,#06101c 0 6px,#0c2236 6px 12px)}
+html[data-style="cyber"] .opp .obacks .uc{margin-right:calc(var(--cw)*-.3)}
 html[data-style="cyber"] .uc .bk{clip-path:var(--hx);background:#04070d}
 html[data-style="cyber"] .hand .uc.dim{filter:drop-shadow(0 0 3px var(--c)) brightness(.42)}
 html[data-style="cyber"] #drawPile.can .uc{box-shadow:none;filter:drop-shadow(0 0 12px #fcee09)}
@@ -379,18 +381,47 @@ $('snd').textContent=snd?'Ton: an':'Ton: aus';
 
 // ---------- Anzeige ----------
 const oppOrder=()=>{const o=[];for(let i=1;i<V.n;i++)o.push((V.me+i)%V.n);return o;};
+// Karten-Elemente bleiben erhalten (kein Neuaufbau): so laufen Animationen ohne Flackern weiter
+const EL={},OPPEL={},BACKS={};
+const mkEl=html=>{const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild;};
+function faceEl(id,cls,rot){
+  let e=EL[id];
+  if(!e){e=mkEl(cardHtml(C(id)));e._base=e.className.trim();EL[id]=e;}
+  e.className=e._base+(cls?' '+cls:'');
+  e.style.rotate=rot!=null?rot+'deg':'';
+  return e;
+}
+function syncList(box,list){          // nur Geändertes verschieben, Rest bleibt unberührt
+  for(let i=0;i<list.length;i++){if(box.children[i]!==list[i])box.insertBefore(list[i],box.children[i]||null);}
+  while(box.children.length>list.length)box.removeChild(box.lastChild);
+}
 function render(flip){
   if(!V)return;
   const b=flip?measure():null;
   const mine=inp&&inp.mode==='turn';
-  $('opps').innerHTML=oppOrder().map(s=>{
-    const n=V.counts[s],backs=Array(Math.min(n,14)).fill(0).map(()=>cardHtml({},'back')).join('');
-    return `<div class="opp${V.cur===s?' turn':''}${n===1?' uno':''}" data-s="${s}"><span>${esc(V.names[s])} · ${V.scores[s]}</span><div class="obacks">${backs}</div><span class="cnt">${n} ${n===1?'Karte':'Karten'}</span></div>`;
-  }).join('');
-  $('hand').innerHTML=V.hand.map(id=>cardHtml(C(id),mine?(inp.can.includes(id)?'can':'dim'):'')).join('');
-  $('drawPile').innerHTML=V.deckN?cardHtml({},'back')+`<div>Stapel: ${V.deckN}</div>`:'<div>Stapel leer</div>';
-  $('drawPile').classList.toggle('can',!!mine);
-  $('disc').innerHTML=V.top.map(id=>cardHtml(C(id),'',`style="rotate:${(id*37%25)-12}deg"`)).join('');
+  // Gegner mit gefächerten Kartenrücken
+  const oels=[];
+  oppOrder().forEach(s=>{
+    let o=OPPEL[s];
+    if(!o){o=OPPEL[s]=mkEl(`<div class="opp" data-s="${s}"><span class="oname"></span><div class="obacks"></div><span class="cnt"></span></div>`);BACKS[s]=[];}
+    const n=V.counts[s],want=Math.min(n,14),bk=BACKS[s];
+    o.className='opp'+(V.cur===s?' turn':'')+(n===1?' uno':'');
+    o.querySelector('.oname').textContent=`${V.names[s]} · ${V.scores[s]}`;
+    o.querySelector('.cnt').textContent=`${n} ${n===1?'Karte':'Karten'}`;
+    while(bk.length<want){const e=mkEl(cardHtml({},'back'));e._new=true;bk.push(e);}
+    while(bk.length>want)bk.pop();
+    bk.forEach((e,i)=>e.style.setProperty('--k',(i-(want-1)/2).toFixed(2)));
+    syncList(o.querySelector('.obacks'),bk);
+    oels.push(o);
+  });
+  syncList($('opps'),oels);
+  syncList($('hand'),V.hand.map(id=>faceEl(id,mine?(inp.can.includes(id)?'can':'dim'):'')));
+  syncList($('disc'),V.top.map(id=>faceEl(id,'',(id*37%25)-12)));
+  const dp=$('drawPile');
+  if(!dp.firstChild){dp.appendChild(mkEl(cardHtml({},'back')));dp.appendChild(mkEl('<div class="pn"></div>'));}
+  dp.firstChild.style.visibility=V.deckN?'':'hidden';
+  dp.lastChild.textContent=V.deckN?`Stapel: ${V.deckN}`:'Stapel leer';
+  dp.classList.toggle('can',!!mine);
   $('curDot').style.background=['#e53935','#f9a825','#2e9a4a','#1e6fd0'][V.color];
   $('curTxt').textContent=COLN[V.color];$('dirTxt').textContent=V.dir>0?'↻ im Uhrzeigersinn':'↺ gegen den Uhrzeigersinn';
   $('me').classList.toggle('turn',V.cur===V.me);
@@ -427,44 +458,60 @@ function renderSide(){
 }
 function measure(){
   const r={};document.querySelectorAll('#board .uc[data-id]').forEach(e=>{r[e.dataset.id]=e.getBoundingClientRect();});
-  const opp={};document.querySelectorAll('#opps .opp').forEach(e=>{opp[e.dataset.s]=e.querySelector('.obacks').getBoundingClientRect();});
-  return {r,opp,pile:$('drawPile').firstElementChild?$('drawPile').firstElementChild.getBoundingClientRect():$('drawPile').getBoundingClientRect(),hand:$('hand').getBoundingClientRect()};
+  const last={},box={};
+  for(const s in OPPEL){
+    if(!OPPEL[s].isConnected)continue;
+    const bk=BACKS[s],e=bk&&bk[bk.length-1];
+    if(e&&e.isConnected)last[s]=e.getBoundingClientRect();
+    box[s]=OPPEL[s].querySelector('.obacks').getBoundingClientRect();
+  }
+  const pc=$('drawPile').firstElementChild;
+  return {r,last,box,pile:(pc||$('drawPile')).getBoundingClientRect()};
 }
+// Karte fliegt vom alten zum neuen Platz: Bogen, Drehung um die Hochachse (Umdrehen) bzw. leichtes Kippen, Aufprall
 function fly(e,from,delay,turn){
+  e.getAnimations({subtree:true}).forEach(a=>{a.onfinish=null;a.cancel();});
+  const old=e.querySelector(':scope>.bk');if(old)old.remove();
+  e.style.zIndex='';
   const r1=e.getBoundingClientRect();
   const dx=(from.left+from.width/2)-(r1.left+r1.width/2),dy=(from.top+from.height/2)-(r1.top+r1.height/2),s0=from.width/r1.width,dist=Math.hypot(dx,dy);
   if(dist<3&&Math.abs(s0-1)<.03)return;
-  const dur=360+Math.min(440,dist*.5),lift=Math.min(80,18+dist*.1),rot=(dx>0?-1:1)*(10+Math.min(14,dist*.02)),sm=Math.max(s0,1)*1.12;
+  const dur=420+Math.min(520,dist*.55),lift=Math.min(110,24+dist*.14),rot=(dx>0?-1:1)*(8+Math.min(12,dist*.02)),sm=Math.max(s0,1)*1.14;
   e.style.zIndex=60;
-  const tf=(x,y,s,r,sx)=>`translate(${x}px,${y}px) scale(${s}) rotate(${r}deg) scaleX(${sx})`;
-  const a=e.animate([{transform:tf(dx,dy,s0,rot,1),offset:0},{transform:tf(dx*.5,dy*.5-lift,sm,rot/2,turn?.06:1),offset:.5},{transform:tf(0,0,1,0,1),offset:1}],
-    {duration:dur,delay,easing:'cubic-bezier(.22,.75,.3,1)',fill:'backwards'});
+  const tf=(x,y,s,r,ry,rx)=>`perspective(900px) translate(${x}px,${y}px) scale(${s}) rotate(${r}deg) rotateY(${ry}deg) rotateX(${rx}deg)`;
+  const k0=tf(dx,dy,s0,rot,turn?180:0,turn?0:24),k1=tf(dx*.5,dy*.5-lift,sm,rot/2,turn?90:0,turn?0:-14),k2=tf(0,0,1,0,0,0);
+  const a=e.animate([{transform:k0,offset:0},{transform:k1,offset:.5},{transform:k2,offset:1}],{duration:dur,delay,easing:'cubic-bezier(.25,.7,.25,1)',fill:'backwards'});
   if(turn){
     const bk=document.createElement('i');bk.className='bk';e.appendChild(bk);
-    bk.animate([{opacity:1},{opacity:1,offset:.5},{opacity:0,offset:.51},{opacity:0}],{duration:dur,delay,easing:'linear',fill:'both'});
+    bk.animate([{opacity:1},{opacity:1,offset:.5},{opacity:0,offset:.501},{opacity:0}],{duration:dur,delay,easing:'linear',fill:'both'});
     setTimeout(()=>sfx('flip'),delay+dur*.4);
   }
   a.onfinish=()=>{
-    e.style.zIndex='';const bk=e.querySelector('.bk');if(bk)bk.remove();
-    e.animate([{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:180,easing:'ease-out'});
+    e.style.zIndex='';const bk=e.querySelector(':scope>.bk');if(bk)bk.remove();
+    e.animate([{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:200,easing:'ease-out'});
     sfx(e.closest('#disc')?'lay':'take');
   };
 }
 function runFlip(b){
   const newRound=!prevV||prevV.round!==V.round;let k=0;
+  const rectOf=(z,r1)=>({left:z.left+z.width/2-r1.width/2,top:z.top+z.height/2-r1.height/2,width:r1.width,height:r1.height});
   document.querySelectorAll('#board .uc[data-id]').forEach(e=>{
     const id=e.dataset.id,p=newRound?null:b.r[id];
     if(p){fly(e,p,0,false);return;}
     const s=V.src[id]||'deck',r1=e.getBoundingClientRect();
     let z=b.pile;
-    if(s.startsWith('hand')){const q=+s.slice(4);if(q!==V.me&&b.opp[q])z=b.opp[q];}
-    fly(e,{left:z.left+z.width/2-r1.width/2,top:z.top+z.height/2-r1.height/2,width:r1.width,height:r1.height},newRound?Math.min(1500,k++*55):0,true);
+    if(s.startsWith('hand')){const q=+s.slice(4);if(q!==V.me)z=b.last[q]||b.box[q]||b.pile;}
+    fly(e,rectOf(z,r1),newRound?Math.min(1500,k++*55):0,true);
   });
-  document.querySelectorAll('#opps .opp').forEach(o=>{
-    const s=+o.dataset.s,backs=[...o.querySelectorAll('.uc')],prev=newRound?0:(lastCnt[s]||0);
-    backs.forEach((e,j)=>{if(newRound||j>=prev){const r1=e.getBoundingClientRect(),z=b.pile;
-      fly(e,{left:z.left+z.width/2-r1.width/2,top:z.top+z.height/2-r1.height/2,width:r1.width,height:r1.height},newRound?Math.min(1500,k++*55):(j-prev)*90,false);}});
-  });
+  for(const s in OPPEL){
+    let j=0;
+    BACKS[s].forEach(e=>{
+      if(e._new||newRound){
+        e._new=false;if(!e.isConnected)return;
+        fly(e,rectOf(b.pile,e.getBoundingClientRect()),newRound?Math.min(1500,k++*55):(j++)*90,false);
+      }
+    });
+  }
 }
 function applyV(){
   if(!V)return;
