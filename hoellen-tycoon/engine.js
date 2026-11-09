@@ -1,4 +1,4 @@
-/* Höllen-Tycoon: Spiellogik (läuft nur beim Host). */
+/* Helluva Tycoon: Spiellogik (läuft nur beim Host). */
 (function () {
   var F = HT.F, L2 = HK.L2, K = null;
   var E = window.HTE = {};
@@ -89,7 +89,7 @@
     } else {
       F.forEach(function (x) { if (g.own[x.i] === p) { g.own[x.i] = -1; g.mort[x.i] = false; } });
       for (var k = 0; k < g.free[p]; k++) { var fc = g.freeCards.shift(); if (fc) { var pr = fc.split(':'); (pr[0] === 'fate' ? g.fate : g.pact).push(+pr[1]); } }
-      say2(p, nm(p) + ' ist bankrott! Der Besitz fällt an die Hölle zurück.', nm(p) + ' is bankrupt! The property returns to hell.', 'Du bist bankrott! Dein Besitz fällt an die Hölle zurück.', 'You are bankrupt! Your property returns to hell.');
+      say2(p, nm(p) + ' ist bankrott! Der Besitz fällt an die Bank zurück.', nm(p) + ' is bankrupt! The property returns to the bank.', 'Du bist bankrott! Dein Besitz fällt an die Bank zurück.', 'You are bankrupt! Your property returns to the bank.');
     }
     g.cash[p] = 0; g.free[p] = 0; g.out[p] = true; g.jail[p] = -1;
     K.sfx('bad'); K.push();
@@ -167,11 +167,11 @@
     K.push();
     var n = Math.abs(g.move.back ? steps : g.move.steps);
     await K.sleep(Math.min(2600, 180 * n + 300));
-    if (passed && to !== 30 && !g.out[p]) { give(p, 200); say2(p, nm(p) + ' passiert das Höllentor und kassiert 200.', nm(p) + ' passes Hell Gate and collects 200.', 'Du passierst das Höllentor und kassierst 200.', 'You pass Hell Gate and collect 200.'); K.fx({ k: 'cash', p: p, n: 200 }); K.sfx('coin'); K.push(); }
+    if (passed && to !== 30 && !g.out[p]) { give(p, 200); say2(p, nm(p) + ' kommt durch Imp City und kassiert 200.', nm(p) + ' passes Imp City and collects 200.', 'Du kommst durch Imp City und kassierst 200.', 'You pass Imp City and collect 200.'); K.fx({ k: 'cash', p: p, n: 200 }); K.sfx('coin'); K.push(); }
   }
   async function toJail(p) {
     var g = G(); g.pos[p] = 10; g.jail[p] = 0; g.move = { p: p, from: g.pos[p], to: 10, jump: true, seq: (g.move ? g.move.seq : 0) + 1 };
-    say2(p, nm(p) + ' muss in den Seelenkerker!', nm(p) + ' goes to the Soul Prison!', 'Du musst in den Seelenkerker!', 'You go to the Soul Prison!'); K.sfx('bad'); K.push(); await K.sleep(700);
+    say2(p, nm(p) + ' muss in den Knast!', nm(p) + ' goes to jail!', 'Du musst in den Knast!', 'You go to jail!'); K.sfx('bad'); K.push(); await K.sleep(700);
   }
   async function land(p, roll, mult) {
     var g = G(), f = g.pos[p], x = F[f];
@@ -246,7 +246,7 @@
     var g = G(), deck = kind === 'fate' ? g.fate : g.pact, idx = deck.shift(), c = (kind === 'fate' ? HT.FATE : HT.PACT)[idx];
     if (c.a !== 'free') deck.push(idx); else { g.freeCards.push(kind + ':' + idx); g.free[p]++; }
     g.card = { kind: kind, idx: idx, p: p, seq: (g.card ? g.card.seq : 0) + 1 };
-    K.say(p, L2(nm(p) + ' zieht ' + (kind === 'fate' ? 'Schicksalsrad' : 'Teufelspakt') + ': ' + c.d.de, nm(p) + ' draws ' + (kind === 'fate' ? 'Wheel of Fate' : 'Devil’s Pact') + ': ' + c.d.en), L2('Du ziehst: ' + c.d.de, 'You draw: ' + c.d.en));
+    K.say(p, L2(nm(p) + ' zieht ' + HT.DECKN[kind].de + ': ' + c.d.de, nm(p) + ' draws ' + HT.DECKN[kind].en + ': ' + c.d.en), L2('Du ziehst: ' + c.d.de, 'You draw: ' + c.d.en));
     K.fx({ k: 'card' }); K.sfx('flip'); K.push(); await K.sleep(1500);
     var i, n;
     switch (c.a) {
@@ -328,7 +328,7 @@
       if (!a) continue;
       if (a.t === 'end') { nextPlayer(); continue; }
       if (a.t === 'bankrupt') { bankrupt(p, -1); checkOver(); nextPlayer(); continue; }
-      if (a.t === 'payjail') { if (await pay(p, 50, g.opts.pot ? -2 : -1)) { g.jail[p] = -1; say2(p, nm(p) + ' kauft sich für 50 aus dem Kerker frei.', nm(p) + ' pays 50 to leave the prison.', 'Du kaufst dich für 50 frei.', 'You pay 50 to get out.'); } checkOver(); continue; }
+      if (a.t === 'payjail') { if (await pay(p, 50, g.opts.pot ? -2 : -1)) { g.jail[p] = -1; say2(p, nm(p) + ' kauft sich für 50 aus dem Knast frei.', nm(p) + ' pays 50 to leave jail.', 'Du kaufst dich für 50 frei.', 'You pay 50 to get out.'); } checkOver(); continue; }
       if (a.t === 'cardjail') { g.free[p]--; var fc = g.freeCards.shift(); if (fc) { var pr = fc.split(':'); (pr[0] === 'fate' ? g.fate : g.pact).push(+pr[1]); } g.jail[p] = -1; say2(p, nm(p) + ' nutzt eine Freikarte.', nm(p) + ' uses a free pass.', 'Du nutzt eine Freikarte.', 'You use a free pass.'); continue; }
       if (a.t === 'roll') { await doRoll(p); checkOver(); if (g.out[p]) nextPlayer(); continue; }
       await manage(p, a); checkOver();
@@ -342,7 +342,7 @@
       if (dbl) { g.jail[p] = -1; say2(p, nm(p) + ' würfelt einen Pasch und kommt frei!', nm(p) + ' rolls doubles and gets out!', 'Pasch! Du kommst frei!', 'Doubles! You get out!'); }
       else {
         g.jail[p]++;
-        if (g.jail[p] < 3) { say2(p, nm(p) + ' bleibt im Kerker.', nm(p) + ' stays in prison.', 'Kein Pasch: Du bleibst im Kerker.', 'No doubles: you stay in prison.'); g.phase = 'post'; return; }
+        if (g.jail[p] < 3) { say2(p, nm(p) + ' bleibt im Knast.', nm(p) + ' stays in jail.', 'Kein Pasch: Du bleibst im Knast.', 'No doubles: you stay in jail.'); g.phase = 'post'; return; }
         say2(p, nm(p) + ' muss nach drei Versuchen 50 zahlen.', nm(p) + ' must pay 50 after three tries.', 'Nach drei Versuchen zahlst du 50.', 'After three tries you pay 50.');
         if (!(await pay(p, 50, g.opts.pot ? -2 : -1))) return;
         g.jail[p] = -1;

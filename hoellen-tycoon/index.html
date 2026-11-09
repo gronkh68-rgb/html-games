@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Höllen-Tycoon</title>
+<title>Helluva Tycoon</title>
 <link rel="stylesheet" href="../common.css">
 <script src="../theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
@@ -104,23 +104,23 @@ html[data-style="cyber"] .center{background:radial-gradient(circle,#1a0d2e,#0503
 <script>
 const $=id=>document.getElementById(id);
 const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
-const {F,GROUPS,TOKENS,COLORS}=HT;
-const TT=T('Höllen-Tycoon','Hell Tycoon');document.title=TT;$('ttl').textContent=TT;
+const {F,GROUPS,TOKENS,COLORS,CHARS}=HT;
+const TT='Helluva Tycoon';document.title=TT;$('ttl').textContent=TT;
 const RULES=()=>`<ul>
 <li>${T('Würfle und ziehe um das Spielfeld. Unbesessene Straßen, Fähren und Werke darfst du kaufen. Wer auf deinem Feld landet, zahlt dir Miete in Seelen 💀.','Roll and move around the board. You may buy unowned streets, ferries and works. Whoever lands on your field pays you rent in souls 💀.')}</li>
 <li>${T('Besitzt du eine ganze Farbgruppe, verdoppelt sich die Grundmiete und du darfst <b>Häuser</b> bauen (gleichmäßig), nach 4 Häusern einen <b>Palast</b>.','Own a whole colour set and the base rent doubles and you may build <b>houses</b> (evenly), after 4 houses a <b>palace</b>.')}</li>
-<li>${T('Über das Höllentor gibt es 200. Pasch: nochmal würfeln. Drei Pasch hintereinander: ab in den Seelenkerker.','Passing Hell Gate pays 200. Doubles: roll again. Three doubles in a row: off to the Soul Prison.')}</li>
-<li>${T('Im Kerker: 50 zahlen, Freikarte nutzen oder auf einen Pasch hoffen (höchstens 3 Versuche).','In prison: pay 50, use a free pass or try for doubles (at most 3 tries).')}</li>
+<li>${T('Wer durch Imp City kommt, kassiert 200. Pasch: nochmal würfeln. Drei Pasch hintereinander: ab in den Knast.','Passing Imp City pays 200. Doubles: roll again. Three doubles in a row: off to jail.')}</li>
+<li>${T('Im Knast: 50 zahlen, Freikarte nutzen oder auf einen Pasch hoffen (höchstens 3 Versuche).','In jail: pay 50, use a free pass or try for doubles (at most 3 tries).')}</li>
 <li>${T('Fehlt Geld, kannst du Häuser zum halben Preis verkaufen oder Hypotheken aufnehmen. Wer nicht zahlen kann, ist bankrott.','If you are short of money, sell houses at half price or take mortgages. Whoever cannot pay is bankrupt.')}</li>
 <li>${T('<b>Handeln:</b> Biete anderen Straßen und Geld an. <b>Versteigerung:</b> Kauft jemand ein Feld nicht, wird es versteigert (abschaltbar).','<b>Trading:</b> offer streets and money to others. <b>Auction:</b> if someone doesn’t buy a field, it is auctioned (optional).')}</li>
 <li>${T('Wer als Letzter übrig ist, gewinnt. Mit Rundenlimit gewinnt das größte Vermögen.','The last player standing wins. With a round limit the greatest fortune wins.')}</li></ul>`;
-$('setup').innerHTML=`<h2>😈 ${T('Höllen-Tycoon: Immobilien in der Unterwelt','Hell Tycoon: real estate in the underworld')}</h2>
-<p style="margin:0 0 10px;color:var(--muted)">${T('Kaufe Straßen der Unterwelt, baue Häuser und Paläste, handle mit den anderen und treibe sie in den Ruin. 2 bis 6 Spieler.','Buy streets of the underworld, build houses and palaces, trade with the others and drive them into ruin. 2 to 6 players.')}</p>
+$('setup').innerHTML=`<h2>😈 ${T('Helluva Tycoon: Immobilien-Spiel im Helluva-Boss-Stil','Helluva Tycoon: the Helluva Boss property game')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Spiele als Blitzø, Moxxie, Millie, Loona, Stolas oder Fizzarolli: Kaufe Orte aus den Ringen der Hölle, von Imp City über Ozzie’s bis Stolas’ Herrenhaus, baue Häuser und Paläste, handle und treibe die anderen in den Ruin. 2 bis 6 Spieler.<br><small>Inoffizielles Fan-Spiel. „Helluva Boss“ gehört Vivienne Medrano / SpindleHorse Toons.</small>','Play as Blitzø, Moxxie, Millie, Loona, Stolas or Fizzarolli: buy places across the rings of Hell, from Imp City to Ozzie’s to Stolas’ Mansion, build houses and palaces, trade and drive the others into ruin. 2 to 6 players.<br><small>Unofficial fan game. “Helluva Boss” belongs to Vivienne Medrano / SpindleHorse Toons.</small>')}</p>
 <div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
 <div class="row"><label for="rounds">${T('Spieldauer','Game length')}</label><select id="rounds"><option value="0">${T('Bis zum Bankrott (klassisch)','Until bankruptcy (classic)')}</option><option value="40">${T('40 Runden, dann zählt das Vermögen','40 rounds, then fortune counts')}</option><option value="25" selected>${T('25 Runden, dann zählt das Vermögen','25 rounds, then fortune counts')}</option><option value="15">${T('15 Runden (kurz)','15 rounds (short)')}</option></select></div>
 <div class="row"><label for="cash">${T('Startkapital','Starting money')}</label><select id="cash"><option value="1500" selected>1500 💀</option><option value="2000">2000 💀</option><option value="1000">1000 💀</option></select></div>
 <div class="hk-opts"><label><input type="checkbox" id="oAuc" checked><span><b>${T('Versteigerungen','Auctions')}</b><small>${T('Kauft jemand ein Feld nicht, wird es an alle versteigert.','If a player doesn’t buy a field, it is auctioned to everyone.')}</small></span></label>
-<label><input type="checkbox" id="oPot"><span><b>${T('Höllentopf (Hausregel)','Hell pot (house rule)')}</b><small>${T('Steuern und Strafen kommen in einen Topf. Wer auf dem Ruhelosen Feld landet, bekommt ihn.','Taxes and fines go into a pot. Whoever lands on Restless Rest gets it.')}</small></span></label></div>
+<label><input type="checkbox" id="oPot"><span><b>${T('Loonas Spardose (Hausregel)','Loona’s piggy bank (house rule)')}</b><small>${T('Steuern und Strafen kommen in einen Topf. Wer auf Loonas Couch landet, bekommt ihn.','Taxes and fines go into a pot. Whoever lands on Loona’s Couch gets it.')}</small></span></label></div>
 <div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
 <details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
 $('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
@@ -163,14 +163,14 @@ function render(v,prev){
   // Mitte: Würfel, Karte, Topf
   let c=`<div class="logo">😈 ${TT.toUpperCase()}</div>`;
   if(V.dice){const fresh=V.dice.seq!==lastDice;c+=`<div class="dice"><span class="${fresh?'spin':''}">${DF[V.dice.a]}</span><span class="${fresh?'spin':''}">${DF[V.dice.b]}</span></div><div style="font-size:.85rem">${nameOf(V.dice.p)}: ${V.dice.a+V.dice.b}${V.dice.a===V.dice.b?' · '+T('Pasch!','Doubles!'):''}</div>`;if(fresh){lastDice=V.dice.seq;}}
-  if(V.card&&Date.now()-(V.card._t||0)<1e9){const cd=(V.card.kind==='fate'?HT.FATE:HT.PACT)[V.card.idx];c+=`<div class="cardv" ${V.card.seq!==lastCard?'':'style="animation:none"'}><b>${V.card.kind==='fate'?'🎡 '+T('Schicksalsrad','Wheel of Fate'):'📜 '+T('Teufelspakt','Devil’s Pact')}</b>${esc(tx(cd.d))}</div>`;lastCard=V.card.seq;}
+  if(V.card&&Date.now()-(V.card._t||0)<1e9){const cd=(V.card.kind==='fate'?HT.FATE:HT.PACT)[V.card.idx];c+=`<div class="cardv" ${V.card.seq!==lastCard?'':'style="animation:none"'}><b>${V.card.kind==='fate'?'📖 '+tx(HT.DECKN.fate):'📋 '+tx(HT.DECKN.pact)}</b>${esc(tx(cd.d))}</div>`;lastCard=V.card.seq;}
   if(V.auc){c+=`<div class="cardv" style="border-color:#ffd23f">🔨 ${T('Versteigerung','Auction')}: <b style="display:inline;color:inherit">${esc(tx(F[V.auc.f].n))}</b><br>${T('Höchstgebot','Highest bid')}: ${V.auc.bid}${V.auc.lead>=0?' ('+nameOf(V.auc.lead)+')':''}</div>`;}
-  if(V.opts.pot)c+=`<div class="pot">🪦 ${T('Höllentopf','Hell pot')}: ${V.pot} 💀</div>`;
+  if(V.opts.pot)c+=`<div class="pot">🐷 ${T('Spardose','Piggy bank')}: ${V.pot} 💀</div>`;
   if(V.opts.rounds)c+=`<div class="pot">${T('Runde','Round')} ${Math.min(V.round+1,V.opts.rounds)} / ${V.opts.rounds}</div>`;
   $('center').innerHTML=c;
   renderTokens(prev);
   // Spieler
-  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk">${TOKENS[i]}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b><small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Kerker','in prison'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small></div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
+  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk">${TOKENS[i]}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b>${V.types[i]!=='cpu'?' <small style="display:inline">('+CHARS[i]+')</small>':''}<small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Knast','in jail'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small></div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
   renderActs();
   // Banner
   const b=$('hkBanner'),my=V.cur===V.me&&!V.over;
@@ -268,7 +268,7 @@ $('board').addEventListener('click',e=>{
   if(f.price){h+=`<p>${T('Preis','Price')}: <b>${f.price} 💀</b> · ${T('Besitzer','Owner')}: <b>${o>=0?TOKENS[o]+' '+nameOf(o):T('niemand','nobody')}</b>${V.mort[f.i]?' · '+T('Hypothek','mortgaged'):''}</p>`;
     if(f.t==='st')h+=`<table class="rt"><tr><td>${T('Grundmiete','Base rent')}</td><td>${f.rent[0]}</td></tr><tr><td>${T('mit ganzer Farbgruppe','with full colour set')}</td><td>${f.rent[0]*2}</td></tr>${[1,2,3,4].map(k=>`<tr><td>${'🏠'.repeat(k)}</td><td>${f.rent[k]}</td></tr>`).join('')}<tr><td>🏰 ${T('Palast','Palace')}</td><td>${f.rent[5]}</td></tr><tr><td>${T('Hauspreis','House price')}</td><td>${f.hc}</td></tr><tr><td>${T('Hypothek','Mortgage')}</td><td>${f.price/2}</td></tr></table>`;
     else h+=`<p>${tx(L2(HTE.rentInfo(f,'de'),HTE.rentInfo(f,'en')))}</p>`;}
-  else h+=`<p>${f.t==='tax'?T('Zahle ','Pay ')+f.amt+' 💀':f.t==='fate'||f.t==='pact'?T('Ziehe eine Karte.','Draw a card.'):f.t==='go'?T('Wer hier vorbeikommt, kassiert 200.','Passing here pays 200.'):f.t==='gojail'?T('Ab in den Seelenkerker!','Off to the Soul Prison!'):f.t==='jail'?T('Nur zu Besuch, wenn du nicht eingesperrt bist.','Just visiting unless you are locked up.'):V.opts.pot?T('Hier gibt es den Höllentopf.','The hell pot is paid out here.'):T('Hier passiert nichts.','Nothing happens here.')}</p>`;
+  else h+=`<p>${f.t==='tax'?T('Zahle ','Pay ')+f.amt+' 💀':f.t==='fate'||f.t==='pact'?T('Ziehe eine Karte.','Draw a card.'):f.t==='go'?T('Wer hier vorbeikommt, kassiert 200.','Passing here pays 200.'):f.t==='gojail'?T('Ab in den Knast!','Off to jail!'):f.t==='jail'?T('Nur zu Besuch, wenn du nicht eingesperrt bist.','Just visiting unless you are locked up.'):V.opts.pot?T('Hier gibt es Loonas Spardose.','Loona’s piggy bank is paid out here.'):T('Hier passiert nichts.','Nothing happens here.')}</p>`;
   h+=`<div class="row"><button class="btn alt" onclick="document.getElementById('fi').hidden=true">${T('Schließen','Close')}</button></div>`;
   $('fiB').innerHTML=h;$('fi').hidden=false;
 });
@@ -292,13 +292,13 @@ async function main(){
 function startGame(seats,opts){
   K.reset();shownPos=null;$('tokens').innerHTML='';
   K.G=HTE.setup(seats,opts||readOpts());
-  K.say(-1,L2('Willkommen in der Unterwelt! '+K.nm(K.G.cur)+' beginnt.','Welcome to the underworld! '+K.nm(K.G.cur)+' starts.'));
+  K.say(-1,L2('Willkommen bei I.M.P.! '+K.nm(K.G.cur)+' beginnt.','Welcome to I.M.P.! '+K.nm(K.G.cur)+' starts.'));
   K.push();K.run(main);
 }
 K=HK.init({
-  prefix:'htc-v1-',title:L2('Höllen-Tycoon','Hell Tycoon'),minPlayers:2,
-  seats:TOKENS.map((t,i)=>({name:t,color:COLORS[i]})),
-  cpuNames:['Asmo','Bael','Lilith','Mammon','Belial','Azazel'],
+  prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
+  seats:TOKENS.map((t,i)=>({name:t+' '+CHARS[i],color:COLORS[i]})),
+  cpuNames:CHARS,cpuNameFor:i=>CHARS[i],
   view,valid:HTE.valid,render,ui,fx,
   start:s=>startGame(s,readOpts()),
   resume(){K.run(main);},

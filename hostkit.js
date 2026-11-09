@@ -142,7 +142,7 @@
     K.startLocal = function (nCpu) {
       K.ROLE = 'local'; K.ME = 0;
       var names = HK.shuffle(cfg.cpuNames || ['Computer']), seats = [{ type: 'host', name: K.myName(), seat: 0 }];
-      for (var i = 0; i < nCpu; i++) seats.push({ type: 'cpu', name: names[i % names.length], seat: -1 });
+      for (var i = 0; i < nCpu; i++) seats.push({ type: 'cpu', name: cfg.cpuNameFor ? cfg.cpuNameFor(i + 1) : names[i % names.length], seat: -1 });
       K.reset(); cfg.start(seats);
     };
     K.backToSetup = function () { K.reset(); K.G = null; if (cfg.onSetup) cfg.onSetup(); };
@@ -220,7 +220,7 @@
             var seats = [], k = 0, names = HK.shuffle(cfg.cpuNames || ['Computer']);
             info.seats.forEach(function (s, i) {
               if (s.type === 'host' || s.type === 'remote') seats.push({ type: s.type, name: s.name || 'Spieler', seat: i });
-              else if (s.type === 'cpu') seats.push({ type: 'cpu', name: names[k++ % names.length], seat: -1 });
+              else if (s.type === 'cpu') seats.push({ type: 'cpu', name: cfg.cpuNameFor ? cfg.cpuNameFor(seats.length) : names[k++ % names.length], seat: -1 });
             });
             K.ME = seats.findIndex(function (s) { return s.type === 'host'; });
             cfg.start(seats);

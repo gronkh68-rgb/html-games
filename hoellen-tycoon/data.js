@@ -1,9 +1,10 @@
-/* Höllen-Tycoon: Spielfeld und Karten (eigene Namen und Texte). */
+/* Helluva Tycoon: Spielfeld und Karten. Inoffizielles Fan-Spiel zu „Helluva Boss“ (Vivienne Medrano / SpindleHorse Toons).
+   Nur Namen und Anspielungen, keine Bilder oder Texte aus der Serie. */
 (function () {
   var L2 = function (de, en) { return { de: de, en: en }; };
   var GROUPS = [
-    { c: '#8d5524', hc: 50 }, { c: '#7fd3f7', hc: 50 }, { c: '#e056a0', hc: 100 }, { c: '#ff8f1f', hc: 100 },
-    { c: '#e53935', hc: 150 }, { c: '#fdd835', hc: 150 }, { c: '#2e9a4a', hc: 200 }, { c: '#283593', hc: 200 }
+    { c: '#8d5524', hc: 50, n: L2('Imp City', 'Imp City') }, { c: '#7fd3f7', hc: 50, n: L2('Zorn-Ring', 'Wrath Ring') }, { c: '#e056a0', hc: 100, n: L2('Lust-Ring', 'Lust Ring') }, { c: '#ff8f1f', hc: 100, n: L2('Gier-Ring', 'Greed Ring') },
+    { c: '#e53935', hc: 150, n: L2('Völlerei- und Neid-Ring', 'Gluttony & Envy Ring') }, { c: '#fdd835', hc: 150, n: L2('Stolz-Ring', 'Pride Ring') }, { c: '#2e9a4a', hc: 200, n: L2('Ars Goetia', 'Ars Goetia') }, { c: '#283593', hc: 200, n: L2('Königshaus', 'Royal Court') }
   ];
   var R = {
     60: [[2, 10, 30, 90, 160, 250], [4, 20, 60, 180, 320, 450]], 100: [6, 30, 90, 270, 400, 550], 120: [8, 40, 100, 300, 450, 600], 140: [10, 50, 150, 450, 625, 750], 160: [12, 60, 180, 500, 700, 900],
@@ -13,59 +14,66 @@
   var F = [];
   function st(de, en, g, price, k) { F.push({ t: 'st', n: L2(de, en), g: g, price: price, rent: price === 60 ? R[60][k] : R[price] }); }
   function sp(t, de, en, ico, extra) { var o = { t: t, n: L2(de, en), ico: ico }; for (var k in extra || {}) o[k] = extra[k]; F.push(o); }
-  sp('go', 'Höllentor', 'Hell Gate', '🔥');
-  st('Schwefelgasse', 'Brimstone Lane', 0, 60, 0); sp('pact', 'Teufelspakt', 'Devil’s Pact', '📜'); st('Aschenweg', 'Ash Road', 0, 60, 1); sp('tax', 'Seelensteuer', 'Soul Tax', '💸', { amt: 200 });
-  sp('ferry', 'Styx-Fähre', 'Styx Ferry', '⛴️', { price: 200 });
-  st('Fegefeuerallee', 'Purgatory Avenue', 1, 100); sp('fate', 'Schicksalsrad', 'Wheel of Fate', '🎡'); st('Grollstraße', 'Grudge Street', 1, 100); st('Jammertal', 'Wailing Vale', 1, 120);
-  sp('jail', 'Seelenkerker', 'Soul Prison', '⛓️');
-  st('Lustgarten', 'Garden of Lust', 2, 140); sp('util', 'Lavawerk', 'Lava Works', '🌋', { price: 150 }); st('Gierplatz', 'Greed Square', 2, 140); st('Neidweg', 'Envy Way', 2, 160);
-  sp('ferry', 'Charons Fähre', 'Charon’s Ferry', '⛴️', { price: 200 });
-  st('Zornstraße', 'Wrath Street', 3, 180); sp('pact', 'Teufelspakt', 'Devil’s Pact', '📜'); st('Trägheitsallee', 'Sloth Avenue', 3, 180); st('Hochmutplatz', 'Pride Plaza', 3, 200);
-  sp('free', 'Ruheloses Feld', 'Restless Rest', '🪦');
-  st('Feuergraben', 'Fire Trench', 4, 220); sp('fate', 'Schicksalsrad', 'Wheel of Fate', '🎡'); st('Glutboulevard', 'Ember Boulevard', 4, 220); st('Flammenring', 'Ring of Flames', 4, 240);
-  sp('ferry', 'Phlegyas-Fähre', 'Phlegyas Ferry', '⛴️', { price: 200 });
-  st('Dämonenmarkt', 'Demon Market', 5, 260); st('Imp-Viertel', 'Imp Quarter', 5, 260); sp('util', 'Schwefelquelle', 'Sulphur Spring', '♨️', { price: 150 }); st('Höllenhund-Allee', 'Hellhound Avenue', 5, 280);
-  sp('gojail', 'Ab in den Kerker', 'Go to Prison', '👮');
-  st('Sündenpalast-Straße', 'Sin Palace Street', 6, 300); st('Pandämonium', 'Pandemonium', 6, 300); sp('pact', 'Teufelspakt', 'Devil’s Pact', '📜'); st('Luziferring', 'Lucifer Ring', 6, 320);
-  sp('ferry', 'Höllenexpress', 'Hell Express', '🚂', { price: 200 });
-  sp('fate', 'Schicksalsrad', 'Wheel of Fate', '🎡'); st('Thronsaal-Gasse', 'Throne Hall Alley', 7, 350); sp('tax', 'Ablass-Abgabe', 'Indulgence Fee', '💸', { amt: 100 }); st('Höllenthron', 'Hell Throne', 7, 400);
+  sp('go', 'Imp City', 'Imp City', '😈');
+  st('I.M.P.-Büro', 'I.M.P. Office', 0, 60, 0); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Blitzøs Wohnung', 'Blitzø’s Apartment', 0, 60, 1); sp('tax', 'Seelensteuer', 'Soul Tax', '💸', { amt: 200 });
+  sp('ferry', 'Portal zur Erde', 'Portal to Earth', '🌀', { price: 200 });
+  st('Harvest-Moon-Festival', 'Harvest Moon Festival', 1, 100); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Millies Familienfarm', 'Millie’s Family Farm', 1, 100); st('Zorn-Ring-Rodeo', 'Wrath Ring Rodeo', 1, 120);
+  sp('jail', 'Imp-City-Knast', 'Imp City Jail', '⛓️');
+  st('Ozzie’s', 'Ozzie’s', 2, 140); sp('util', 'Höllenfeuer-Werk', 'Hellfire Works', '🌋', { price: 150 }); st('Asmodeus’ Palast', 'Asmodeus’ Palace', 2, 140); st('Fizzarollis Bühne', 'Fizzarolli’s Stage', 2, 160);
+  sp('ferry', 'Höllen-Taxi', 'Hell Taxi', '🚕', { price: 200 });
+  st('Mammons Studio', 'Mammon’s Studio', 3, 180); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Crimsons Casino', 'Crimson’s Casino', 3, 180); st('Cash Buckzos Zirkus', 'Cash Buckzo’s Circus', 3, 200);
+  sp('free', 'Loonas Couch', 'Loona’s Couch', '🛋️');
+  st('Beelzebubs Party-Villa', 'Beelzebub’s Party Villa', 4, 220); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Völlerei-Buffet', 'Gluttony Buffet', 4, 220); st('Neid-Ring-Basar', 'Envy Ring Bazaar', 4, 240);
+  sp('ferry', 'Grimoire-Portal', 'Grimoire Portal', '🌀', { price: 200 });
+  st('Loo Loo Land', 'Loo Loo Land', 5, 260); st('Verosikas Konzert', 'Verosika’s Concert', 5, 260); sp('util', 'Seelen-Kraftwerk', 'Soul Power Plant', '⚡', { price: 150 }); st('Pride-Ring-Mall', 'Pride Ring Mall', 5, 280);
+  sp('gojail', 'Ausrottungstag!', 'Extermination Day!', '👼');
+  st('Goetia-Akademie', 'Goetia Academy', 6, 300); st('Stolas’ Sternwarte', 'Stolas’ Observatory', 6, 300); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Paimons Anwesen', 'Paimon’s Estate', 6, 320);
+  sp('ferry', 'Stolas’ Kutsche', 'Stolas’ Carriage', '🦉', { price: 200 });
+  sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Stolas’ Herrenhaus', 'Stolas’ Mansion', 7, 350); sp('tax', 'Mammons Gebühr', 'Mammon’s Fee', '💸', { amt: 100 }); st('Luzifers Palast', 'Lucifer’s Palace', 7, 400);
   F.forEach(function (f, i) { f.i = i; if (f.t === 'st') { f.hc = GROUPS[f.g].hc; } });
-  // Karten: a = Aktion
+  // Grimoire (Ereigniskarten)
   var FATE = [
-    { a: 'to', f: 0, d: L2('Rücke vor zum Höllentor.', 'Advance to Hell Gate.') },
-    { a: 'to', f: 39, d: L2('Rücke vor zum Höllenthron.', 'Advance to Hell Throne.') },
-    { a: 'to', f: 21, d: L2('Rücke vor zum Feuergraben. Kommst du über das Höllentor, kassiere 200.', 'Advance to Fire Trench. If you pass Hell Gate, collect 200.') },
-    { a: 'to', f: 11, d: L2('Rücke vor zum Lustgarten.', 'Advance to Garden of Lust.') },
-    { a: 'ferry', d: L2('Rücke vor zur nächsten Fähre. Gehört sie jemandem, zahle die doppelte Miete.', 'Advance to the nearest ferry. If owned, pay double rent.') },
-    { a: 'ferry', d: L2('Rücke vor zur nächsten Fähre. Gehört sie jemandem, zahle die doppelte Miete.', 'Advance to the nearest ferry. If owned, pay double rent.') },
-    { a: 'util', d: L2('Rücke vor zum nächsten Werk. Gehört es jemandem, würfle und zahle das Zehnfache.', 'Advance to the nearest works. If owned, roll and pay ten times the roll.') },
-    { a: 'back', n: 3, d: L2('Ein Dämon schubst dich: Gehe 3 Felder zurück.', 'A demon shoves you: go back 3 fields.') },
-    { a: 'jail', d: L2('Gehe direkt in den Seelenkerker. Kein Geld über das Höllentor.', 'Go straight to the Soul Prison. Do not pass Hell Gate.') },
-    { a: 'free', d: L2('Freikarte: Du kommst aus dem Seelenkerker frei. Behalte die Karte.', 'Free pass: get out of the Soul Prison. Keep this card.') },
-    { a: 'money', n: 50, d: L2('Die Hölle zahlt dir eine Dividende von 50.', 'Hell pays you a dividend of 50.') },
-    { a: 'money', n: -15, d: L2('Strafe für zu gute Laune: Zahle 15.', 'Fine for being too cheerful: pay 15.') },
-    { a: 'repair', h: 25, p: 100, d: L2('Renovierung: Zahle 25 je Haus und 100 je Palast.', 'Renovations: pay 25 per house and 100 per palace.') },
-    { a: 'each', n: -50, d: L2('Du wirst zum Obersten Folterer gewählt: Zahle jedem Spieler 50.', 'You are elected Chief Tormentor: pay each player 50.') },
-    { a: 'money', n: 150, d: L2('Dein Seelenkredit wird fällig: Kassiere 150.', 'Your soul loan matures: collect 150.') },
-    { a: 'to', f: 5, d: L2('Fahre mit der Styx-Fähre. Kommst du über das Höllentor, kassiere 200.', 'Take the Styx Ferry. If you pass Hell Gate, collect 200.') }
+    { a: 'to', f: 0, d: L2('Zurück nach Imp City! Kassiere 200.', 'Back to Imp City! Collect 200.') },
+    { a: 'to', f: 39, d: L2('Eine Einladung zu Luzifers Palast. Rücke vor.', 'An invitation to Lucifer’s Palace. Advance.') },
+    { a: 'to', f: 21, d: L2('Beelzebub schmeißt eine Party: Rücke vor zu ihrer Villa. Über Imp City kassierst du 200.', 'Beelzebub is throwing a party: advance to her villa. Passing Imp City pays 200.') },
+    { a: 'to', f: 11, d: L2('Ozzie’s hat noch einen Tisch frei. Rücke vor.', 'Ozzie’s has a table free. Advance.') },
+    { a: 'ferry', d: L2('Das Grimoire öffnet ein Portal: Rücke zum nächsten Portal oder Fahrzeug vor. Gehört es jemandem, zahle doppelt.', 'The grimoire opens a portal: advance to the nearest portal or ride. If owned, pay double.') },
+    { a: 'ferry', d: L2('Blitzø „leiht“ sich das Grimoire: Rücke zum nächsten Portal oder Fahrzeug vor. Gehört es jemandem, zahle doppelt.', 'Blitzø “borrows” the grimoire: advance to the nearest portal or ride. If owned, pay double.') },
+    { a: 'util', d: L2('Stromausfall in Imp City: Rücke zum nächsten Werk vor. Gehört es jemandem, würfle und zahle das Zehnfache.', 'Power outage in Imp City: advance to the nearest works. If owned, roll and pay ten times the roll.') },
+    { a: 'back', n: 3, d: L2('Loona hat keine Lust. Gehe 3 Felder zurück.', 'Loona can’t be bothered. Go back 3 fields.') },
+    { a: 'jail', d: L2('Erwischt beim Auftrag auf der Erde! Ab in den Knast, ohne über Imp City zu gehen.', 'Caught on a job on Earth! Go straight to jail without passing Imp City.') },
+    { a: 'free', d: L2('Stolas zieht ein paar Fäden: Du kommst aus dem Knast frei. Behalte die Karte.', 'Stolas pulls some strings: get out of jail free. Keep this card.') },
+    { a: 'money', n: 50, d: L2('Ein Auftrag läuft ausnahmsweise glatt: Kassiere 50.', 'For once a job goes smoothly: collect 50.') },
+    { a: 'money', n: -15, d: L2('Moxxie hat sich in der Bestellung vertan: Zahle 15.', 'Moxxie got the order wrong: pay 15.') },
+    { a: 'repair', h: 25, p: 100, d: L2('Millie war zu enthusiastisch: Zahle 25 je Haus und 100 je Palast für Reparaturen.', 'Millie got a bit too enthusiastic: pay 25 per house and 100 per palace for repairs.') },
+    { a: 'each', n: -50, d: L2('Du gibst eine Runde bei Ozzie’s aus: Zahle jedem Spieler 50.', 'You buy a round at Ozzie’s: pay each player 50.') },
+    { a: 'money', n: 150, d: L2('Mammon zahlt dir Werbegeld: Kassiere 150.', 'Mammon pays you for an ad: collect 150.') },
+    { a: 'to', f: 5, d: L2('Ab durchs Portal zur Erde! Über Imp City kassierst du 200.', 'Through the portal to Earth! Passing Imp City pays 200.') }
   ];
+  // I.M.P.-Aufträge (Gemeinschaftskarten)
   var PACT = [
-    { a: 'to', f: 0, d: L2('Rücke vor zum Höllentor.', 'Advance to Hell Gate.') },
-    { a: 'money', n: 200, d: L2('Ein Fehler der Höllenbank zu deinen Gunsten: Kassiere 200.', 'Hell bank error in your favour: collect 200.') },
-    { a: 'money', n: -50, d: L2('Rechnung vom Höllenarzt: Zahle 50.', 'Bill from the hell doctor: pay 50.') },
-    { a: 'money', n: 50, d: L2('Du verkaufst alte Seelen: Kassiere 50.', 'You sell some old souls: collect 50.') },
-    { a: 'free', d: L2('Freikarte: Du kommst aus dem Seelenkerker frei. Behalte die Karte.', 'Free pass: get out of the Soul Prison. Keep this card.') },
-    { a: 'jail', d: L2('Gehe direkt in den Seelenkerker. Kein Geld über das Höllentor.', 'Go straight to the Soul Prison. Do not pass Hell Gate.') },
-    { a: 'money', n: 100, d: L2('Dein Sündenfonds wird ausgezahlt: Kassiere 100.', 'Your sin fund pays out: collect 100.') },
-    { a: 'money', n: 20, d: L2('Steuerrückzahlung aus der Unterwelt: Kassiere 20.', 'Underworld tax refund: collect 20.') },
-    { a: 'each', n: 10, d: L2('Es ist dein Verdammnistag: Jeder Spieler zahlt dir 10.', 'It is your damnation day: every player pays you 10.') },
-    { a: 'money', n: 100, d: L2('Eine Lebensversicherung wird fällig: Kassiere 100.', 'A life insurance matures: collect 100.') },
-    { a: 'money', n: -100, d: L2('Krankenhausgebühren im Fegefeuer: Zahle 100.', 'Purgatory hospital fees: pay 100.') },
-    { a: 'money', n: -50, d: L2('Schulgeld für die Dämonenakademie: Zahle 50.', 'Demon academy fees: pay 50.') },
-    { a: 'money', n: 25, d: L2('Beraterhonorar für einen Fluch: Kassiere 25.', 'Consulting fee for a curse: collect 25.') },
-    { a: 'repair', h: 40, p: 115, d: L2('Straßenreparatur: Zahle 40 je Haus und 115 je Palast.', 'Street repairs: pay 40 per house and 115 per palace.') },
-    { a: 'money', n: 10, d: L2('Zweiter Platz beim Schönheitswettbewerb der Hölle: Kassiere 10.', 'Second prize in hell’s beauty contest: collect 10.') },
-    { a: 'money', n: 100, d: L2('Du erbst ein Höllenvermögen: Kassiere 100.', 'You inherit a hellish fortune: collect 100.') }
+    { a: 'to', f: 0, d: L2('Feierabend: Zurück nach Imp City. Kassiere 200.', 'Quitting time: back to Imp City. Collect 200.') },
+    { a: 'money', n: 200, d: L2('Ein reicher Kunde zahlt doppelt: Kassiere 200.', 'A rich client pays double: collect 200.') },
+    { a: 'money', n: -50, d: L2('Arztrechnung nach dem letzten Auftrag: Zahle 50.', 'Doctor’s bill after the last job: pay 50.') },
+    { a: 'money', n: 50, d: L2('Du verkaufst Blitzøs alte Pferde-Poster: Kassiere 50.', 'You sell Blitzø’s old horse posters: collect 50.') },
+    { a: 'free', d: L2('Loona kennt den Wärter: Du kommst aus dem Knast frei. Behalte die Karte.', 'Loona knows the guard: get out of jail free. Keep this card.') },
+    { a: 'jail', d: L2('Der Ausrottungstag erwischt dich: Ab in den Knast, ohne über Imp City zu gehen.', 'Extermination Day catches you: go straight to jail without passing Imp City.') },
+    { a: 'money', n: 100, d: L2('Ein Auftrag für Stolas wird bezahlt: Kassiere 100.', 'A job for Stolas gets paid: collect 100.') },
+    { a: 'money', n: 20, d: L2('Steuerrückzahlung aus Imp City: Kassiere 20.', 'Imp City tax refund: collect 20.') },
+    { a: 'each', n: 10, d: L2('Du hast Geburtstag, Loona hat sogar daran gedacht: Jeder Spieler zahlt dir 10.', 'It’s your birthday and Loona even remembered: every player pays you 10.') },
+    { a: 'money', n: 100, d: L2('Moxxie findet einen Fehler in der Buchhaltung zu deinen Gunsten: Kassiere 100.', 'Moxxie finds an accounting error in your favour: collect 100.') },
+    { a: 'money', n: -100, d: L2('Ein Auftrag geht komplett schief: Zahle 100 Schadensersatz.', 'A job goes completely wrong: pay 100 in damages.') },
+    { a: 'money', n: -50, d: L2('Teambuilding im Freizeitpark: Zahle 50.', 'Team building at the theme park: pay 50.') },
+    { a: 'money', n: 25, d: L2('Trinkgeld vom Kunden: Kassiere 25.', 'A tip from the client: collect 25.') },
+    { a: 'repair', h: 40, p: 115, d: L2('Das Büro wurde mal wieder zerschossen: Zahle 40 je Haus und 115 je Palast.', 'The office got shot up again: pay 40 per house and 115 per palace.') },
+    { a: 'money', n: 10, d: L2('Zweiter Platz beim Talentwettbewerb von Imp City: Kassiere 10.', 'Second place at the Imp City talent show: collect 10.') },
+    { a: 'money', n: 100, d: L2('Ein Erbe aus dem Zorn-Ring: Kassiere 100.', 'An inheritance from the Wrath Ring: collect 100.') }
   ];
-  window.HT = { F: F, GROUPS: GROUPS, FATE: FATE, PACT: PACT, TOKENS: ['😈', '👹', '💀', '🦇', '🐍', '🔥'], COLORS: ['#ff3d3d', '#ffb300', '#3ddc84', '#40a9ff', '#c86bff', '#ff7ac6'] };
+  window.HT = {
+    F: F, GROUPS: GROUPS, FATE: FATE, PACT: PACT,
+    TOKENS: ['😈', '🔫', '🪓', '🐺', '🦉', '🃏'],
+    CHARS: ['Blitzø', 'Moxxie', 'Millie', 'Loona', 'Stolas', 'Fizzarolli'],
+    COLORS: ['#ff3d3d', '#ffb300', '#3ddc84', '#b0b0c8', '#c86bff', '#ff7ac6'],
+    DECKN: { fate: L2('Grimoire', 'Grimoire'), pact: L2('I.M.P.-Auftrag', 'I.M.P. Job') }
+  };
 })();
