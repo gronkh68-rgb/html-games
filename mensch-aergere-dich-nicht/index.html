@@ -279,7 +279,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
         <div class="panel" style="display:flex;flex-wrap:wrap;gap:8px">
           <button class="btn alt" id="view3d">3D-Ansicht</button>
           <button class="btn alt" id="lookBtn">Figuren-Look</button>
-          <button class="btn alt" id="physBtn" title="Würfel rollt als 3D-Würfel über das Brett">Physischer Würfel: aus</button>
+          <button class="btn alt" id="physBtn" title="Nur Optik: Ein 3D-Würfel rollt über das Brett, die Zahl wird vorher gewürfelt. Beim „Echten Wurf“ (Würfelfeld) nicht nötig.">Würfel-Animation: aus</button>
           <span id="cam3" style="display:contents" hidden>
             <button class="btn alt" id="camIso3">Schräg</button>
             <button class="btn alt" id="camTop3">Von oben</button>
@@ -360,11 +360,13 @@ const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():
 // cfg: 'human' = an diesem Gerät, 'remote' = Online-Spieler, 'cpu', 'off'
 const isLocal=p=>cfg[p]==='human';
 const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
-let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe=null,lastPhys=false;
+let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe={},lastPhys=false;
 // Würfel-Tablett: in der 3D-Ansicht steht es als echtes Objekt neben dem Brett auf dem Tisch (Kamera fährt beim eigenen Wurf hin), in 2D als Dock
-const TRAY3={pos:[0,-.25,0],r:10.8,scale:.78};      // Das Tablett steht immer rechts neben dem Brett, vom Blickwinkel der Kamera aus gesehen
+const TRAY3={y:-.25,scale:.72,x:11.2,z:5.2};
+// Jeder Spieler hat sein eigenes Würfelfeld neben seiner Farbe (an der Ecke seines Startfelds, außen am Brett)
+const trayOf=p=>{const [bx,by]=[[0,0],[9,0],[9,9],[0,9]][p],sx=bx===0?-1:1,sz=by===0?-1:1;return {pos:[sx*TRAY3.x,TRAY3.y,sz*TRAY3.z],rotY:sz>0?0:Math.PI};};
 let camSave3=null,manual3=false,autoDice3=(()=>{try{return localStorage.getItem('mdn-autodice')==='1';}catch(e){return false;}})();      // Standard: Kamera wird nicht erzwungen
-function focusTray3(on,manual){
+function focusTray3(on,manual,p){
   if(!T3)return;
   if(!manual){            // automatische Fahrten: nur wenn erlaubt, und nie die manuelle Würfel-Cam überstimmen
     if(on&&(!autoDice3||manual3||camSave3))return;
@@ -375,8 +377,8 @@ function focusTray3(on,manual){
   const p0=cam.position.clone(),t0=ctl.target.clone();
   if(on){
     camSave3={pos:p0.clone(),target:t0.clone()};
-    const th=T3.trayTheta||0,off=(lx,ly,lz)=>new THREE.Vector3(lx*Math.cos(th)+lz*Math.sin(th),ly,-lx*Math.sin(th)+lz*Math.cos(th));
-    const gp=DVe&&DVe.R?DVe.R.group.position:new THREE.Vector3(TRAY3.pos[0],TRAY3.pos[1],TRAY3.pos[2]),c=new THREE.Vector3(gp.x,gp.y,gp.z),to={pos:c.clone().add(off(0,17.5,9.5)),target:c.clone().add(off(0,0,.3))};
+    const g=DVe[p]&&DVe[p].R?DVe[p].R.group:null,th=g?g.rotation.y:0,off=(lx,ly,lz)=>new THREE.Vector3(lx*Math.cos(th)+lz*Math.sin(th),ly,-lx*Math.sin(th)+lz*Math.cos(th));
+    const c=g?g.position.clone():new THREE.Vector3(trayOf(p).pos[0],TRAY3.y,trayOf(p).pos[2]),to={pos:c.clone().add(off(0,17.5,9.5)),target:c.clone().add(off(0,0,.3))};
     ctl.enabled=false;
     tw3(900,k=>{const e=k*k*(3-2*k);cam.position.lerpVectors(p0,to.pos,e);ctl.target.lerpVectors(t0,to.target,e);},'dicecam');
   }else if(camSave3){
@@ -384,30 +386,26 @@ function focusTray3(on,manual){
     tw3(900,k=>{const e=k*k*(3-2*k);cam.position.lerpVectors(p0,sv.pos,e);ctl.target.lerpVectors(t0,sv.target,e);if(k>=1)ctl.enabled=true;},'dicecam');
   }else ctl.enabled=true;
 }
-const DICEV=()=>{
-  if(v3&&T3&&T3.scene)return DVe||(DVe=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:TRAY3.pos,scale:TRAY3.scale,focus:focusTray3}));
+const DICEV=p=>{
+  if(v3&&T3&&T3.scene){
+    p=(p==null||p<0)?(active[0]||0):p;
+    if(!DVe[p]){const tr=trayOf(p);DVe[p]=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:tr.pos,scale:TRAY3.scale,rotY:tr.rotY,focus:on=>focusTray3(on,false,p)});}
+    return DVe[p];
+  }
   return DVd||(DVd=Dice3D.view($('diceDock')));
 };
-function placeTray3(){
-  if(!DVe||!DVe.R||!T3)return;
-  const g=DVe.R.group;
-  if(!camSave3){      // nicht während der Kamerafahrt zum Tablett
-    const cam=T3.camera,target=Math.atan2(cam.position.x,cam.position.z);
-    let cu=T3.trayTheta;if(cu==null)cu=target;
-    cu+=Math.atan2(Math.sin(target-cu),Math.cos(target-cu))*.12;T3.trayTheta=cu;
-  }
-  const th=T3.trayTheta||0;
-  g.position.set(TRAY3.r*Math.cos(th),TRAY3.pos[1],-TRAY3.r*Math.sin(th));g.rotation.y=th;
-}
-const cancelDice=()=>{manual3=false;if(DVd)DVd.cancel();if(DVe)DVe.cancel();if(T3&&camSave3)focusTray3(false,true);syncCamBtns();};
+const cancelDice=()=>{manual3=false;if(DVd)DVd.cancel();Object.keys(DVe).forEach(k=>DVe[k].cancel());if(T3&&camSave3)focusTray3(false,true);syncCamBtns();};
 function syncCamBtns(){const d=$('diceCam'),a=$('autoCam');if(d)d.textContent=manual3?'🔍 Tablett: nah':'🔍 Tablett heranzoomen';if(a)a.textContent='🎲 Würfel-Cam: '+(autoDice3?'an':'aus');}
+const myTray=()=>{if(netRole==='client')return mySlot;if(typeof cur==='number'&&isLocal(cur))return cur;const q=active.find(isLocal);return q==null?(active[0]||0):q;};
 async function toggleDiceCam(){
   if(!T3||!v3)return;
-  await DICEV().show();
-  if(manual3){manual3=false;focusTray3(false,true);}else{manual3=true;focusTray3(true,true);}
+  const p=myTray();
+  await DICEV(p).show();
+  if(manual3){manual3=false;focusTray3(false,true);}else{manual3=true;focusTray3(true,true,p);}
   syncCamBtns();
 }
-const syncDock=on=>{const d=$('diceDock'),want=on&&!v3;if(d.hidden===want)d.hidden=!want;if(on)DICEV().show();};
+const syncPhysBtn=()=>{const b=$('physBtn');if(b)b.hidden=(netRole==='client'?lastPhys:physOn());};      // die reine Animation braucht man beim echten Wurf nicht
+const syncDock=on=>{const d=$('diceDock'),want=on&&!v3;if(d.hidden===want)d.hidden=!want;if(on){if(v3)active.forEach(p=>DICEV(p).show());else DICEV().show();}syncPhysBtn();};
 const physOn=()=>($('diceMode')||{}).value==='phys';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pname=p=>names[p]?` (${esc(names[p])})`:'';
@@ -659,7 +657,7 @@ const PD=(()=>{
 })();
 function setPhys(on){
   PHYS=on;try{localStorage.setItem('mdn-physdie',on?'1':'0');}catch(e){}
-  $('physBtn').textContent='Physischer Würfel: '+(on?'an':'aus');
+  $('physBtn').textContent='Würfel-Animation: '+(on?'an':'aus');
   if(!on)PD.cancel();
 }
 
@@ -694,8 +692,8 @@ async function doRoll(p){
     setMsg(phys?`${chip(p)}Ziehe den Würfel und lass los, oder klicke auf <b>${rollLabel()}</b>.`:`Klicke auf <b>${rollLabel()}</b>.`);
     netPhase={k:'idle'};netPush();
     if(phys){
-      tp=await new Promise(res=>{rollWait=()=>res(null);DICEV().drag(1,{color:COLORS[p].c}).then(res,()=>{});});
-      if(!tp)DICEV().stopDrag();
+      tp=await new Promise(res=>{rollWait=()=>res(null);DICEV(p).drag(1,{color:COLORS[p].c,zoom:v3}).then(res,()=>{});});
+      if(!tp)DICEV(p).stopDrag();
       rollWait=null;btn.disabled=true;setMine(false);
     }else{
       await new Promise(res=>{rollWait=res;});
@@ -713,7 +711,7 @@ async function doRoll(p){
     const r=await Dice3D.simulate(par);
     v=r.v[0];throwId++;
     netPhase={k:'rolling',p,v,track:r.track,tid:throwId};netPush();      // alle Geräte spielen dieselbe Bahn ab
-    await DICEV().play(r.track,{color:COLORS[p].c});
+    await DICEV(p).play(r.track,{color:COLORS[p].c});
   }else if(PHYS){
     PD.start();await sleep(700,t);
     v=rollValue(p);
@@ -879,12 +877,12 @@ $('start').onclick=startGame;
 $('again').onclick=backToSetup;
 $('winBtn').onclick=backToSetup;
 const rollClick=()=>{
-  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;if(clientDrag){clientDrag=false;DICEV().stopDrag();}sendHost({t:'roll'});}}
+  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;if(clientDrag){clientDrag=false;DICEV(mySlot).stopDrag();}sendHost({t:'roll'});}}
   else if(rollWait)rollWait();
 };
 $('rollBtn').onclick=rollClick;$('die').onclick=rollClick;
 try{$('diceMode').value=localStorage.getItem('mdn-dice')||'phys';}catch(e){}
-$('diceMode').onchange=()=>{try{localStorage.setItem('mdn-dice',$('diceMode').value);}catch(e){}};
+$('diceMode').onchange=()=>{try{localStorage.setItem('mdn-dice',$('diceMode').value);}catch(e){}syncPhysBtn();};
 buildSetup();setDie(0);
 </script>
 <script>
@@ -1191,7 +1189,7 @@ function applySnap(s,you){
   lastPhys=!!s.phys;syncDock(lastPhys);
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'&&ph.track){
-    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV().play(ph.track,{color:COLORS[ph.p]?COLORS[ph.p].c:null}).then(()=>dieDone(v));}
+    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV(ph.p).play(ph.track,{color:COLORS[ph.p]?COLORS[ph.p].c:null}).then(()=>dieDone(v));}
   }else if(ph.k==='rolling'){
     if(s.phys){}else if(!cRolling){cRolling=true;cLand=false;clearInterval(rollAnim);if(PHYS)PD.start();else{let k=0;rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}}
     if(!s.phys&&PHYS&&ph.v&&!cLand){cLand=true;const v=ph.v;PD.land(v).then(()=>dieDone(v));}
@@ -1203,8 +1201,8 @@ function applySnap(s,you){
   // Meine Aktionen
   const myRoll=ph.k==='roll'&&ph.p===you;
   canRollNet=myRoll;$('rollBtn').disabled=!myRoll;$('rollBtn').textContent=rollLabel();
-  if(myRoll&&s.phys&&!clientDrag){clientDrag=true;DICEV().drag(1,{color:COLORS[you]?COLORS[you].c:null}).then(par=>{clientDrag=false;if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'throw',d:par});}},()=>{clientDrag=false;});}
-  else if(!myRoll&&clientDrag){clientDrag=false;DICEV().cancel();}
+  if(myRoll&&s.phys&&!clientDrag){clientDrag=true;DICEV(you).drag(1,{color:COLORS[you]?COLORS[you].c:null,zoom:v3}).then(par=>{clientDrag=false;if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'throw',d:par});}},()=>{clientDrag=false;});}
+  else if(!myRoll&&clientDrag){clientDrag=false;DICEV(you).cancel();}
   if(myRoll)$('msg').innerHTML=`${chip(you)}Du bist dran: Klicke auf <b>${esc(rollLabel())}</b>.`;
   if(ph.k==='pick'&&ph.p===you){
     pick={p:you,moves:ph.moves.map(i=>({i})),res:m=>sendHost({t:'pick',i:m.i})};
@@ -1382,7 +1380,7 @@ function init3(){
   r.setPixelRatio(Math.min(devicePixelRatio||1,2));r.setClearColor(0x05060b);
   el3.appendChild(r.domElement);
   const scene=new THREE.Scene();
-  const camera=new THREE.PerspectiveCamera(55,1,.1,200);camera.position.set(0,14,15);
+  const camera=new THREE.PerspectiveCamera(55,1,.1,200);camera.position.set(0,16.5,18);
   const controls=new THREE.OrbitControls(camera,r.domElement);
   controls.enableDamping=true;controls.enablePan=false;controls.minDistance=8;controls.maxDistance=36;controls.maxPolarAngle=1.38;
   let composer=null;
@@ -1594,7 +1592,7 @@ function tick3(now){
   if(!v3||!T3)return;
   if(T3.perf)T3.perf.frame(now);
   const dt=Math.min(.05,(now-last3)/1000);last3=now;
-  runTw3(now);placeTray3();
+  runTw3(now);
   const t=now/1000;
   for(const k in T3.pm){
     const pm=T3.pm[k],pulse=.5+.5*Math.sin(t*6+pm.i);
@@ -1614,7 +1612,7 @@ function tick3(now){
   if(T3.composer&&CY())T3.composer.render();else T3.r.render(T3.scene,T3.camera);
 }
 $('view3d').onclick=()=>setView(!v3);
-$('physBtn').onclick=()=>setPhys(!PHYS);setPhys(PHYS);
+$('physBtn').onclick=()=>setPhys(!PHYS);setPhys(PHYS);syncPhysBtn();
 $('lookBtn').onclick=openLook;$('lookDone').onclick=()=>$('lookBox').classList.remove('open');
 $('camTop3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),to=new THREE.Vector3(0,26,.01);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};
 $('camIso3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),a=Math.atan2(f.x,f.z),to=new THREE.Vector3(Math.sin(a)*15,14,Math.cos(a)*15);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};

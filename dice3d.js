@@ -164,6 +164,7 @@
     var st = document.createElement('style');
     st.textContent = '.dice-wrap{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:rgba(8,12,22,.55);border:2px solid rgba(255,255,255,.18);box-shadow:0 6px 20px rgba(0,0,0,.45)}' +
       '.dice-wrap canvas{display:block;width:100%;height:100%;touch-action:none}' +
+      '.dice-wrap .dzoom{position:absolute;right:6px;top:6px;z-index:5;width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(20,24,42,.85);color:#fff;font:700 15px system-ui,sans-serif;cursor:pointer;line-height:1;padding:0}' +
       '.dice-embed{position:absolute;inset:0;pointer-events:none;z-index:60}' +
       '.dice-wrap .dh,.dice-embed .dh{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:3;pointer-events:none;background:rgba(10,14,30,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 10px;font:700 12px system-ui,sans-serif;text-align:center;display:none;width:88%}' +
       '.dice-wrap.big .dh,.dice-embed .dh{font-size:15px;padding:8px 14px;width:auto;max-width:92%}' +
@@ -353,6 +354,7 @@
     var wrap = document.createElement('div'); wrap.className = 'dice-wrap'; wrap.setAttribute('data-noi18n', '');
     var cv = document.createElement('canvas'), hint = document.createElement('div'); hint.className = 'dh';
     wrap.appendChild(cv); wrap.appendChild(hint); host.appendChild(wrap);
+    var zb = document.createElement('button'); zb.className = 'dzoom'; zb.textContent = '⤢'; zb.title = 'Würfelfeld vergrößern / verkleinern'; wrap.appendChild(zb); zb.onclick = function () { V.zoom(!V.zoomed); zb.textContent = V.zoomed ? '⤡' : '⤢'; };
     var env = { host: host, wrap: wrap, R: null }, V;
     var renderer, scene, cam, ray, plane, tmp = null, raf = 0, anim = 0, visible = true, backdrop = null, zoomed = false;
     function build() {
