@@ -195,6 +195,12 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
 .rules summary{cursor:pointer;color:var(--text);font-weight:700}
 .rules ul{margin:8px 0 0;padding-left:18px}
 .scores div{display:flex;justify-content:space-between;padding:3px 0;color:var(--muted)}
+  .teambox{margin:10px 0;padding:10px 12px;border:1px solid var(--line,#2a3a55);border-radius:12px}
+  .teambox .tcheck{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+  .teambox .tcheck small{display:block;color:var(--muted);font-size:.78rem;margin-top:2px}
+  .teambox .tsel{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:8px}
+  .teambox .tsel label{display:flex;align-items:center;gap:6px}
+  .teambox select{margin-left:4px}
 </style>
 </head>
 <body>
@@ -216,6 +222,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
     <div id="pLocal">
       <h2>Spieler wählen</h2>
       <div id="slots"></div>
+      <div class="teambox" id="teamLocal"></div>
       <div class="row"><button class="btn" id="start">Spiel starten</button></div>
     </div>
     <div id="pHost" hidden>
@@ -230,6 +237,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
       <h2>Spieler<span class="count" id="hostCount"></span></h2>
       <div class="seats" id="hostSlots"></div>
       <div class="note" id="lobbyNote"></div>
+      <div class="teambox" id="teamHost"></div>
       <div class="row"><button class="btn big" id="hostStart">Spiel starten</button></div>
     </div>
     <div id="pJoin" hidden>
@@ -411,7 +419,22 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const pname=p=>names[p]?` (${esc(names[p])})`:'';
 function netPush(){}                     // wird im Mehrspieler-Teil ersetzt (Host schickt den Spielstand)
 function sendHost(m){}                   // dito (Mitspieler schickt Aktionen)
+// ---------- Teams (optional, freie Teamwahl, gleiches Brett) ----------
+let teamsOn=false, team=[0,1,0,1];
+try{teamsOn=localStorage.getItem('mdn-teams')==='1';const t=JSON.parse(localStorage.getItem('mdn-team')||'null');if(Array.isArray(t)&&t.length===4&&t.every(x=>x>=0&&x<4))team=t;}catch(e){}
+const TL='ABCD';
+const tm=p=>teamsOn?team[p]:p;
+const mates=(a,b)=>a!==b&&tm(a)===tm(b);
+const teamWon=p=>active.filter(q=>tm(q)===tm(p)).every(q=>wins(q));
+function teamName(p){const m=active.filter(q=>tm(q)===tm(p));return teamsOn?`Team ${TL[tm(p)]} (${m.map(q=>COLORS[q].n).join(' + ')})`:COLORS[p].n;}
+function teamChips(p){return teamsOn?active.filter(q=>tm(q)===tm(p)).map(chip).join(''):chip(p);}
+function winHtml(p){return `${teamChips(p)}${teamName(p)}${teamsOn?'':pname(p)} gewinnt! 🎉`;}
 const absIdx=(p,pos)=>(p*10+pos)%40;
+function blockedByMate(p,to){
+  if(!teamsOn||to>=40)return false;
+  const abs=absIdx(p,to);
+  return active.some(q=>mates(p,q)&&pieces[q].some(x=>x>=0&&x<40&&absIdx(q,x)===abs));
+}
 function cellOf(p,i){
   const pos=pieces[p][i];
   if(pos<0)return BASE[p][i];
@@ -431,11 +454,13 @@ function legalMoves(p,roll){
   own.forEach((pos,i)=>{
     if(pos===-1){
       if(roll!==6||baseDone||own.includes(0))return;
+      if(blockedByMate(p,0))return;
       baseDone=true;moves.push({i,to:0});return;
     }
     const to=pos+roll;
     if(to>43)return;
     if(own.some(q=>q===to||(q>=40&&q>pos&&q<to)))return;
+    if(blockedByMate(p,to))return;
     moves.push({i,to});
   });
   if(own.includes(-1)){
@@ -568,7 +593,7 @@ function showTurn(p){
   showScores();
 }
 function showScores(){
-  $('scores').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${COLORS[p].n}${pname(p)}${isHuman(p)?'':' (PC)'}${netRole==='host'&&cfg[p]==='remote'?`<button class="btn alt mini" data-bot="${p}" title="Computer übernimmt">Bot</button>`:''}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
+  $('scores').innerHTML=active.map(p=>`<div class="${p===cur?'act':''}"><span>${p===cur?'▶ ':''}${chip(p)}${COLORS[p].n}${teamsOn?` [${TL[tm(p)]}]`:''}${pname(p)}${isHuman(p)?'':' (PC)'}${netRole==='host'&&cfg[p]==='remote'?`<button class="btn alt mini" data-bot="${p}" title="Computer übernimmt">Bot</button>`:''}</span><span>${pieces[p].filter(q=>q>=40).length}/4 im Ziel</span></div>`).join('');
 }
 function markMovable(p,moves){
   setMine(p!==null&&(isLocal(p)||(netRole==='client'&&p===mySlot)),p);
@@ -751,7 +776,7 @@ function aiPick(p,roll,moves){
   const myAbs=pos=>absIdx(p,pos);
   const danger=(abs)=>{
     for(const q of active){
-      if(q===p)continue;
+      if(q===p||mates(p,q))continue;
       for(const pos of pieces[q]){
         if(pos<0||pos>=40)continue;
         const a=absIdx(q,pos),d=(abs-a+40)%40;
@@ -765,7 +790,7 @@ function aiPick(p,roll,moves){
     if(np<40){
       const abs=myAbs(np);
       for(const q of active){
-        if(q===p)continue;
+        if(q===p||mates(p,q))continue;
         if(pieces[q].some(x=>x>=0&&x<40&&absIdx(q,x)===abs))s+=100;
       }
       if(danger(abs))s-=25;
@@ -791,7 +816,7 @@ async function applyMove(p,m){
   if(m.to<40){
     const abs=absIdx(p,m.to);
     for(const q of active){
-      if(q===p)continue;
+      if(q===p||mates(p,q))continue;
       pieces[q].forEach((pos,j)=>{
         if(pos>=0&&pos<40&&absIdx(q,pos)===abs){
           pieces[q][j]=-1;placePiece(q,j);
@@ -811,7 +836,8 @@ async function playTurn(p){
     if(moves.length){
       const mv=isHuman(p)?await pickMove(p,moves):(await sleep(450),aiPick(p,roll,moves));
       await applyMove(p,mv);
-      if(wins(p))return true;
+      if(teamWon(p))return true;
+      if(wins(p))return false;      // selbst fertig, das Team noch nicht
       if(roll===6){tries=isWaiting(p)?3:1;setMsg(`${chip(p)}Eine 6! <b>${COLORS[p].n}</b> darf nochmal.`);await sleep(700);continue;}
       return false;
     }
@@ -826,9 +852,10 @@ async function gameLoop(){
     let i=0;
     for(;;){
       cur=active[i%active.length];
+      if(teamsOn&&wins(cur)){i++;continue;}
       showTurn(cur);
       if(await playTurn(cur)){
-        $('winTitle').innerHTML=`${chip(cur)}${COLORS[cur].n}${pname(cur)} gewinnt! 🎉`;
+        $('winTitle').innerHTML=winHtml(cur);
         $('winText').textContent='Glückwunsch!';
         $('winBox').hidden=false;netPhase={k:'win',p:cur};netPush();return;
       }
@@ -855,9 +882,27 @@ function setMine(on,p){
   if(on&&p!=null&&p>=0){document.body.style.setProperty('--pc',COLORS[p].c);}
   f.classList.toggle('on',!!on);b.classList.toggle('on',!!on);
 }
+function renderTeams(){
+  const h=`<label class="tcheck"><input type="checkbox" class="tOn"${teamsOn?' checked':''}><span><b>Teams spielen</b><small>Gleiches Brett, freie Teamwahl. Figuren im selben Team blockieren sich, werfen sich nicht raus – das Team gewinnt, wenn alle Figuren aller Mitglieder im Ziel sind.</small></span></label>`
+   +`<div class="tsel"${teamsOn?'':' hidden'}>${COLORS.map((c,p)=>`<label><span class="chip" style="background:${c.c}"></span>${c.n}<select class="tPick" data-p="${p}">${[0,1,2,3].map(k=>`<option value="${k}"${team[p]===k?' selected':''}>Team ${TL[k]}</option>`).join('')}</select></label>`).join('')}</div>`;
+  ['teamLocal','teamHost'].forEach(id=>{$(id).innerHTML=h;});
+}
+function saveTeams(){try{localStorage.setItem('mdn-teams',teamsOn?'1':'0');localStorage.setItem('mdn-team',JSON.stringify(team));}catch(e){}}
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.classList&&t.classList.contains('tOn')){teamsOn=t.checked;saveTeams();renderTeams();}
+  else if(t.classList&&t.classList.contains('tPick')){team[+t.dataset.p]=+t.value;saveTeams();}
+});
+renderTeams();
+function teamsOk(list){
+  if(!teamsOn)return true;
+  const ts=new Set(list.map(p=>team[p]));
+  return ts.size>=2;
+}
 function startGame(){
   cfg=[0,1,2,3].map(p=>$('slot'+p).value);names=[];
   if(cfg.filter(c=>c!=='off').length<2){$('setupErr').textContent='Bitte mindestens 2 Spieler wählen.';return;}
+  if(!teamsOk([0,1,2,3].filter(p=>cfg[p]!=='off'))){$('setupErr').textContent='Für Teams braucht es mindestens zwei verschiedene Teams.';return;}
   $('setupErr').textContent='';
   launch();
 }
@@ -1100,6 +1145,7 @@ $('hostStart').onclick=()=>{
   if(netRole!=='host')return;
   const n=lobby.filter(s=>s.type==='host'||s.type==='remote'||s.type==='cpu').length;
   if(n<2){errMsg('Mindestens 2 Spieler nötig.');return;}
+  if(!teamsOk(lobby.map((x,i)=>i).filter(i=>['host','remote','cpu'].includes(lobby[i].type)))){errMsg('Für Teams braucht es mindestens zwei verschiedene Teams.');return;}
   cfg=lobby.map(s=>s.type==='host'?'human':s.type==='remote'?'remote':s.type==='cpu'?'cpu':'off');
   names=lobby.map(s=>(s.type==='host'||s.type==='remote')?s.name:'');
   held=[];netPlaying=true;launch();broadcastSnap();
@@ -1117,7 +1163,7 @@ netPush=function(){
   pushQ=true;queueMicrotask(()=>{pushQ=false;broadcastSnap();});
 };
 function snapObj(){
-  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,phys:physOn(),msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k)};
+  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,phys:physOn(),msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k),teams:teamsOn?team:null};
 }
 function broadcastSnap(){
   if(netRole!=='host')return;
@@ -1173,7 +1219,7 @@ function goMenu(why){
 }
 function applySnap(s,you){
   mySlot=you;if(s.cols)s.cols.forEach((k,i)=>setSeatColor(i,k));
-  cfg=s.types;names=s.names||[];
+  cfg=s.types;names=s.names||[];teamsOn=!!s.teams;if(s.teams)team=s.teams.slice();
   const fresh=!cReady||s.active.join()!==active.join();
   if(fresh){
     token++;active=s.active.slice();pieces=s.pieces.map(a=>a.slice());
@@ -1212,8 +1258,8 @@ function applySnap(s,you){
   setMine(myRoll||(ph.k==='pick'&&ph.p===you),you);
   document.title=(myRoll||(ph.k==='pick'&&ph.p===you))?'▶ Du bist dran! – Mensch ärgere dich nicht':'Mensch ärgere dich nicht';
   if(ph.k==='win'){
-    $('winTitle').innerHTML=`${chip(ph.p)}${COLORS[ph.p].n}${pname(ph.p)} gewinnt! 🎉`;
-    $('winText').textContent=ph.p===you?'Glückwunsch, du hast gewonnen!':'Der Host startet eine neue Runde.';
+    $('winTitle').innerHTML=winHtml(ph.p);
+    $('winText').textContent=active.some(q=>q===you&&tm(q)===tm(ph.p))?'Glückwunsch, ihr habt gewonnen!':'Der Host startet eine neue Runde.';
     $('winBox').hidden=false;
   }
 }
