@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Heldengilde</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<script src="cards.js"></script>
+<script src="engine.js"></script>
+<style>
+.wrap{max-width:1500px}
+.board{background:radial-gradient(ellipse at 50% 30%,#3b2a4f,#17111f);border:3px solid #120c18;border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:14px;transition:border-color .3s,box-shadow .3s}
+.board.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.35),0 0 40px rgba(255,210,63,.2)}
+html[data-style="cyber"] .board{background:radial-gradient(ellipse at 50% 30%,#1a0d2e,#05030a);border-color:#ff2a5555}
+.sec{color:#cdbfe6;font-size:.75rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin:0 0 6px}
+.mons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:700px){.mons{grid-template-columns:1fr}}
+.mon{background:linear-gradient(160deg,#4a1f1f,#200d12);border:2px solid #7a3b3b;border-radius:14px;padding:10px 12px;color:#ffe9e0;display:flex;flex-direction:column;gap:4px;transition:all .15s;position:relative}
+.mon .mt{display:flex;align-items:center;gap:8px;font-weight:900;font-size:1.05rem}.mon .mt .ic{font-size:1.8rem}
+.mon .rq{font-size:.82rem}.mon .rw{font-size:.78rem;color:#ffd9a0}.mon .th{font-size:.82rem;display:flex;gap:10px}
+.mon .th .ok{color:#8dffb0}.mon .th .bad{color:#ff8a8a}
+.mon.can{border-color:#ffd23f;box-shadow:0 0 18px rgba(255,210,63,.5);cursor:pointer}.mon.can:hover{transform:translateY(-3px)}
+.mon.can::after{content:attr(data-go);position:absolute;right:8px;top:8px;background:#ffd23f;color:#222;font-weight:900;font-size:.72rem;border-radius:999px;padding:2px 8px}
+.mon.atk{animation:monShake .4s infinite}
+@keyframes monShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.mon.empty{opacity:.4;justify-content:center;align-items:center}
+.players{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.pl{background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.1);border-radius:14px;padding:8px 10px;color:#efe6ff;display:flex;flex-direction:column;gap:6px}
+.pl.turn{border-color:#ffd23f;background:rgba(255,210,63,.1);box-shadow:0 0 18px rgba(255,210,63,.35)}
+.pl .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800}
+.pl .ph .cnt{margin-left:auto;font-size:.78rem;background:rgba(0,0,0,.4);border-radius:999px;padding:1px 9px;font-weight:700}
+.pl .goal{font-size:.78rem;color:#cdbfe6;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pl .goal .cls{display:inline-flex;gap:2px}.pl .goal .cls i{font-style:normal;opacity:.22;filter:grayscale(1)}.pl .goal .cls i.on{opacity:1;filter:none}
+.party{display:flex;gap:6px;flex-wrap:wrap;min-height:30px}
+.mine .party{min-height:60px}
+.hc{width:96px;border-radius:10px;background:#f6efe2;color:#2a1d10;border:3px solid var(--cc);box-shadow:0 2px 6px rgba(0,0,0,.4);padding:4px 5px 5px;font-size:.66rem;line-height:1.2;position:relative;display:flex;flex-direction:column;gap:2px;user-select:none}
+.hc .hn{font-weight:900;font-size:.72rem;display:flex;gap:3px;align-items:flex-start}
+.hc .hr{position:absolute;right:-6px;top:-8px;background:var(--cc);color:#fff;border-radius:999px;padding:1px 6px;font-weight:900;font-size:.7rem;border:2px solid #fff}
+.hc .it{margin-top:2px;background:#2b2140;color:#ffe08a;border-radius:6px;padding:2px 4px;font-weight:700}
+.hc .it.cu{background:#5a1020;color:#ffb3c0}
+.hc.used{opacity:.6}.hc.used::after{content:'✓';position:absolute;left:4px;bottom:2px;font-weight:900;color:#2e7d32}
+.hc.can{cursor:pointer;box-shadow:0 0 0 3px #ffd23f,0 4px 12px rgba(0,0,0,.5)}.hc.can:hover{transform:translateY(-3px)}
+.hc.lead{background:linear-gradient(160deg,#fff4c9,#e9d08a);border-style:double;border-width:4px}
+.hc.small{width:78px;font-size:.6rem}.hc.small .hn{font-size:.64rem}.hc.small .tx{display:none}
+html[data-style="cyber"] .hc{background:linear-gradient(160deg,#0d1424,#05070d);color:#e6f2ff;border-width:2px;box-shadow:0 0 10px var(--cc)}
+html[data-style="cyber"] .hc.lead{background:linear-gradient(160deg,#1c1730,#0a0812)}
+.hand{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.card{width:118px;min-height:160px;border-radius:12px;padding:6px 7px;font-size:.72rem;line-height:1.25;display:flex;flex-direction:column;gap:4px;background:#f6efe2;color:#2a1d10;border:3px solid var(--cc,#888);box-shadow:0 3px 8px rgba(0,0,0,.45);position:relative;user-select:none;transition:transform .15s,box-shadow .15s,opacity .2s}
+.card .ty{font-size:.6rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+.card .ti{font-weight:900;font-size:.82rem}
+.card .bigv{font-size:1.7rem;font-weight:900;text-align:center;margin:auto 0}
+.card .rqb{position:absolute;right:-6px;top:-8px;background:var(--cc);color:#fff;border-radius:999px;padding:1px 7px;font-weight:900;border:2px solid #fff}
+.card.can{cursor:pointer;box-shadow:0 0 0 3px #ffd23f,0 6px 14px rgba(0,0,0,.5)}.card.can:hover{transform:translateY(-6px)}
+.card.dim{opacity:.62}
+.card.t-magic{--cc:#7b1fa2;background:linear-gradient(170deg,#f3e5ff,#e3cff7)}.card.t-item{--cc:#6d4c41;background:linear-gradient(170deg,#fff3e0,#f1dcc0)}.card.t-mod{--cc:#455a64;background:linear-gradient(170deg,#eceff1,#cfd8dc)}.card.t-chal{--cc:#c62828;background:linear-gradient(170deg,#ffebee,#ffcdd2)}
+html[data-style="cyber"] .card{background:linear-gradient(160deg,#0d1424,#05070d)!important;color:#e6f2ff;border-width:2px;box-shadow:0 0 12px var(--cc)}
+.actbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
+.ap{display:flex;gap:4px;align-items:center;color:#fff;font-weight:800;margin-right:6px}
+.ap i{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid #ffd23f}.ap i.on{background:#ffd23f;box-shadow:0 0 8px #ffd23f}
+.actbar .btn{padding:8px 14px}
+.limbo{display:flex;justify-content:center;align-items:center;gap:10px;color:#fff;font-weight:800;min-height:0}
+.limbo .card{animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4) rotate(-10deg);opacity:0}to{transform:none;opacity:1}}
+#dice{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:800;background:rgba(14,10,24,.94);border:2px solid #ffd23f;border-radius:18px;padding:12px 18px;color:#fff;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6);min-width:260px;transition:opacity .3s}
+#dice .dl{font-weight:800;margin-bottom:6px}
+#dice .dd{display:flex;gap:10px;justify-content:center;font-size:3rem;line-height:1}
+#dice .dd span{display:inline-block}
+#dice .dd span.spin{animation:dspin .5s ease-out}
+@keyframes dspin{from{transform:rotate(-540deg) scale(.3)}to{transform:none}}
+#dice .dt{margin-top:6px;font-size:1.05rem}#dice .dt b{font-size:1.4rem}
+#dice .ok{color:#8dffb0}#dice .bad{color:#ff8a8a}
+.flash{animation:flash .6s}
+@keyframes flash{0%{background:rgba(255,255,255,.6)}100%{background:transparent}}
+.boom{position:fixed;inset:0;pointer-events:none;z-index:790;background:radial-gradient(circle,rgba(255,120,40,.5),transparent 60%);animation:boom .6s forwards}
+@keyframes boom{from{opacity:1}to{opacity:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="board" id="board">
+          <div><div class="sec" id="secM"></div><div class="mons" id="mons"></div></div>
+          <div class="limbo" id="limbo"></div>
+          <div class="players" id="opps"></div>
+          <div class="pl mine" id="mine"></div>
+          <div class="actbar" id="actbar"></div>
+          <div class="hand" id="hand"></div>
+        </div>
+      </div>
+      <div class="hk-side">
+        <div class="panel" id="deckInfo" style="font-size:.88rem"></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="dice" hidden></div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const {CL,CARDS:C,LEADERS,MONS,RW,FX}=HG;
+document.title=T('Heldengilde','Hero Guild');$('ttl').textContent=T('Heldengilde','Hero Guild');
+const RULES=()=>`<ul>
+<li>${T('Jeder hat einen <b>Anführer</b> (eine Klasse) und baut eine Gruppe aus Helden auf. Es gibt 6 Klassen: ⚔️ Krieger, 🎵 Barde, 🛡️ Wächter, 🏹 Waldläufer, 🗝️ Dieb, 🔮 Magier.','Everyone has a <b>party leader</b> (a class) and builds a party of heroes. There are 6 classes: ⚔️ Fighter, 🎵 Bard, 🛡️ Guardian, 🏹 Ranger, 🗝️ Thief, 🔮 Wizard.')}</li>
+<li>${T('<b>Sieg:</b> 3 Monster besiegen <b>oder</b> alle 6 Klassen in der Gruppe haben (der Anführer zählt mit).','<b>Victory:</b> slay 3 monsters <b>or</b> have all 6 classes in your party (the leader counts).')}</li>
+<li>${T('Pro Zug hast du <b>3 Aktionspunkte</b>: Karte ziehen (1), Held/Gegenstand/Zauber spielen (1), Fähigkeit eines Helden würfeln (1, einmal pro Held und Zug), Monster angreifen (2), Hand abwerfen und 5 neu ziehen (3).','Each turn you have <b>3 action points</b>: draw a card (1), play a hero/item/spell (1), roll a hero’s ability (1, once per hero per turn), attack a monster (2), discard your hand and draw 5 (3).')}</li>
+<li>${T('<b>Fähigkeiten:</b> Würfle mit 2 Würfeln mindestens den Wert des Helden. Wenn du einen Helden spielst, darfst du sofort kostenlos würfeln.','<b>Abilities:</b> roll at least the hero’s value with 2 dice. When you play a hero you may roll right away for free.')}</li>
+<li>${T('<b>Monster:</b> Du brauchst die angegebenen Helden. Würfelst du den Wert, ist es besiegt und gibt dir eine dauerhafte Belohnung. Würfelst du zu niedrig, gibt es eine Strafe.','<b>Monsters:</b> you need the listed heroes. Roll the value and it is slain and gives you a permanent reward. Roll too low and you take a penalty.')}</li>
+<li>${T('<b>Modifikatoren</b> darf jeder jederzeit auf jeden Wurf spielen (ohne Aktionspunkt). <b>Herausforderungen</b> stoppen gespielte Helden, Gegenstände oder Zauber, wenn der Herausforderer höher würfelt.','Anyone may play <b>modifiers</b> on any roll at any time (no action point). <b>Challenges</b> stop a played hero, item or spell if the challenger rolls higher.')}</li>
+<li>${T('<b>Gegenstände</b> legst du an einen Helden: Wappen ändern die Klasse, Glücksbringer helfen beim Würfeln, Flüche legst du an Helden der Gegner.','<b>Items</b> are equipped on a hero: crests change the class, charms help with rolls, curses go on opponents’ heroes.')}</li>
+<li>${T('Am Zugende darfst du höchstens 7 Karten haben.','At the end of your turn you may hold at most 7 cards.')}</li></ul>`;
+$('setup').innerHTML=`<h2>⚔️ ${T('Heldengilde: das Helden-Kartenspiel','Hero Guild: the hero card game')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Stelle eine Gruppe aus Helden zusammen, würfle für ihre Fähigkeiten, besiege Monster und funke den anderen mit Flüchen, Modifikatoren und Herausforderungen dazwischen. 2 bis 6 Spieler.','Build a party of heroes, roll for their abilities, slay monsters and mess with the others using curses, modifiers and challenges. 2 to 6 players.')}</p>
+<div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
+<div class="hk-opts"><label><input type="checkbox" id="oQuick"><span><b>${T('Schnelles Spiel','Quick game')}</b><small>${T('Sieg schon mit 2 Monstern oder 5 Klassen.','Win with just 2 monsters or 5 classes.')}</small></span></label></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');$('secM').textContent=T('Monster','Monsters');
+const readOpts=()=>({quick:$('oQuick').checked});
+try{$('oQuick').checked=localStorage.getItem('hg-quick')==='1';}catch(e){}
+$('oQuick').onchange=()=>{try{localStorage.setItem('hg-quick',$('oQuick').checked?'1':'0');}catch(e){}};
+
+let K;
+// ---------- Sicht ----------
+function view(g,s){
+  return {me:s,n:g.seats.length,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),hand:g.hands[s].slice(),counts:g.hands.map(h=>h.length),party:g.party,slain:g.slain,lead:g.lead,
+    mons:g.mons,mdeckN:g.mdeck.length,deckN:g.deck.length,discN:g.disc.length,discTop:g.disc.length?g.disc[g.disc.length-1]:null,cur:g.cur,ap:g.ap,freeDraw:g.freeDraw,over:g.over,roll:g.roll,atk:g.atk,limbo:g.limbo,
+    goalM:g.goalM,goalC:g.goalC,cls:g.seats.map((_,p)=>HGE.classes(g,p)),clsSet:g.seats.map((_,p)=>{const s={};s[LEADERS[g.lead[p]].cl]=1;g.party[p].forEach(e=>{const c=HGE.heroCl(e);if(c>=0)s[c]=1;});return Object.keys(s).map(Number);}),
+    log:K.logFor(s)};
+}
+// ---------- Darstellung ----------
+let V=null,inp=null,hintTxt='',diceT=0;
+const nameOf=i=>i===V.me?T('Du','You'):esc(V.names[i]);
+function heroCard(e,owner,cls=''){
+  const c=C[e.h],hc=HGE.heroCl(e),col=hc>=0?CL[hc]:{i:'❔',c:'#777',n:L2('keine Klasse','no class')},it=e.it!=null?C[e.it]:null;
+  return `<div class="hc ${cls}${e.u?' used':''}" style="--cc:${col.c}" data-owner="${owner}" title="${esc(c.name+' · '+tx(col.n)+' · '+c.rq+'+ · '+tx(FX(c.fx,c.n))+(it?' · '+tx(it.name)+': '+tx(HG.itemText(it)):''))}">
+    <span class="hr">${c.rq}+</span><div class="hn">${col.i} ${esc(c.name)}</div><div class="tx">${esc(tx(FX(c.fx,c.n)))}</div>${it?`<div class="it${it.sub==='curse'?' cu':''}">${it.sub==='curse'?'☠ ':'🧰 '}${esc(tx(it.name))}</div>`:''}</div>`;
+}
+function leaderCard(p,cls=''){const L=LEADERS[V.lead[p]],col=CL[L.cl];return `<div class="hc lead ${cls}" style="--cc:${col.c}" title="${esc(L.name+': '+tx(RW[L.rw]))}"><div class="hn">👑 ${col.i} ${esc(L.name)}</div><div class="tx">${esc(tx(RW[L.rw]))}</div></div>`;}
+function handCard(id,cls=''){
+  const c=C[id];
+  if(c.t==='hero'){const col=CL[c.cl];return `<div class="card ${cls}" data-id="${id}" style="--cc:${col.c}"><span class="rqb">${c.rq}+</span><span class="ty">${col.i} ${esc(tx(col.n))}</span><span class="ti">${esc(c.name)}</span><span>${esc(tx(FX(c.fx,c.n)))}</span></div>`;}
+  if(c.t==='item')return `<div class="card t-item ${cls}" data-id="${id}"><span class="ty">${c.sub==='curse'?'☠ '+T('Fluch','Curse'):'🧰 '+T('Gegenstand','Item')}</span><span class="ti">${esc(tx(c.name))}</span><span>${esc(tx(HG.itemText(c)))}</span></div>`;
+  if(c.t==='magic')return `<div class="card t-magic ${cls}" data-id="${id}"><span class="ty">✨ ${T('Zauber','Spell')}</span><span class="ti">${esc(tx(c.name))}</span><span>${esc(tx(FX(c.fx,c.n)))}</span></div>`;
+  if(c.t==='mod')return `<div class="card t-mod ${cls}" data-id="${id}"><span class="ty">🎲 ${T('Modifikator','Modifier')}</span><span class="bigv">${c.v.map(HGE.sg).join(' / ')}</span><span>${T('Auf jeden Wurf spielbar, ohne Aktionspunkt.','Play on any roll, no action point.')}</span></div>`;
+  return `<div class="card t-chal ${cls}" data-id="${id}"><span class="ty">⚡ ${T('Herausforderung','Challenge')}</span><span class="bigv">⚡</span><span>${T('Stoppt einen gespielten Helden, Gegenstand oder Zauber, wenn du höher würfelst.','Stops a played hero, item or spell if you roll higher.')}</span></div>`;
+}
+function penText(M){return M.pen[0]==='sac'?T('opfere '+M.pen[1]+' Helden','sacrifice '+M.pen[1]+' hero'):T('wirf '+M.pen[1]+' Karte(n) ab','discard '+M.pen[1]+' card(s)');}
+function rqText(M){return T(`${M.rq.n} Helden`,`${M.rq.n} heroes`)+(M.rq.cl.length?', '+T('davon ','incl. ')+M.rq.cl.map(c=>CL[c].i+' '+tx(CL[c].n)).join(' + '):'');}
+function optOf(pred){return inp?inp.opts.find(pred):null;}
+function render(v,prev){
+  V=v;$('setup').hidden=true;$('game').hidden=false;
+  const mine=!!inp&&V.cur===V.me&&!V.over;
+  // Monster
+  $('mons').innerHTML=V.mons.map((m,i)=>{
+    if(m==null)return `<div class="mon empty">${T('kein Monster mehr','no monster left')}</div>`;
+    const M=MONS[m],o=mine&&optOf(x=>x.t==='atk'&&x.m===i);
+    return `<div class="mon${o?' can':''}${V.atk&&V.atk.m===i?' atk':''}" data-m="${i}" data-go="${T('Angreifen (2)','Attack (2)')}"><div class="mt"><span class="ic">${M.ico}</span>${esc(tx(M.name))}</div>
+      <div class="rq">👥 ${esc(rqText(M))}</div><div class="th"><span class="ok">🎲 ${M.slay}+ ${T('besiegt','slays')}</span><span class="bad">≤${M.fail}: ${esc(penText(M))}</span></div><div class="rw">🏆 ${esc(tx(RW[M.rw]))}</div></div>`;}).join('');
+  // Gegner
+  const oppHtml=[];for(let k=1;k<V.n;k++){const p=(V.me+k)%V.n;oppHtml.push(playerBox(p,false));}
+  $('opps').innerHTML=oppHtml.join('');
+  $('mine').innerHTML=playerBox(V.me,true);$('mine').classList.toggle('turn',V.cur===V.me&&!V.over);
+  // Karte, die gerade gespielt wird
+  $('limbo').innerHTML=V.limbo?`<span>${nameOf(V.limbo.p)} ${T('spielt','plays')}:</span>${handCard(V.limbo.id)}`:'';
+  // Aktionsleiste
+  let ab='';
+  if(V.cur===V.me&&!V.over){
+    ab+=`<span class="ap">${T('Aktionen','Actions')}: ${Array.from({length:Math.max(3,V.ap)},(_,i)=>`<i class="${i<V.ap?'on':''}"></i>`).join('')}</span>`;
+    const d=optOf(x=>x.t==='draw');ab+=`<button class="btn" data-a="draw" ${d?'':'disabled'}>🂠 ${T('Karte ziehen','Draw')} (${V.freeDraw?T('gratis','free'):'1'})</button>`;
+    if(optOf(x=>x.t==='thief'))ab+=`<button class="btn alt" data-a="thief">🗝️ ${T('Karte stibitzen','Snatch a card')} (1)</button>`;
+    ab+=`<button class="btn alt" data-a="redraw" ${optOf(x=>x.t==='redraw')?'':'disabled'}>♻ ${T('Neue Hand','New hand')} (3)</button>`;
+    ab+=`<button class="btn alt" data-a="end" ${mine?'':'disabled'}>✔ ${T('Zug beenden','End turn')}</button>`;
+  }
+  $('actbar').innerHTML=ab;
+  // Hand
+  $('hand').innerHTML=V.hand.map(id=>{const o=mine&&optOf(x=>x.t==='play'&&x.c===id);return handCard(id,o?'can':(mine?'dim':''));}).join('');
+  // Seitenleiste
+  $('deckInfo').innerHTML=`🂠 ${T('Nachziehstapel','Draw pile')}: <b>${V.deckN}</b><br>🗑 ${T('Ablage','Discard')}: <b>${V.discN}</b><br>👹 ${T('Monster im Stapel','Monsters in deck')}: <b>${V.mdeckN}</b><br><br>${T('Ziel','Goal')}: <b>${V.goalM}</b> ${T('Monster oder','monsters or')} <b>${V.goalC}</b> ${T('Klassen','classes')}`;
+  // Banner
+  const b=$('hkBanner');
+  if(V.over){b.className='';b.textContent=(V.over.w===V.me?T('🏆 Du gewinnst!','🏆 You win!'):`🏆 ${V.names[V.over.w]} ${T('gewinnt!','wins!')}`)+' '+(V.over.why==='m'?T('(Monster)','(monsters)'):T('(alle Klassen)','(all classes)'));}
+  else if(V.cur===V.me){b.className='me';b.textContent=T(`▶ DU BIST DRAN · ${V.ap} Aktionspunkte`,`▶ YOUR TURN · ${V.ap} action points`);}
+  else{b.className='';b.textContent=T(`⏳ ${V.names[V.cur]} ist dran`,`⏳ ${V.names[V.cur]}'s turn`);}
+  $('board').classList.toggle('myturn',V.cur===V.me&&!V.over);
+  document.title=V.cur===V.me&&!V.over?T('▶ Du bist dran! – Heldengilde','▶ Your turn! – Hero Guild'):T('Heldengilde','Hero Guild');
+  if(V.cur===V.me&&!V.over&&!(prev&&prev.cur===V.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(V.log[0]?tx(V.log[0]):'');
+  $('hkLog').innerHTML=V.log.slice(1,50).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+  renderDice(prev);
+}
+function playerBox(p,isMe){
+  const cs=V.clsSet[p],mine=isMe&&!!inp&&V.cur===V.me&&!V.over;
+  const heroes=V.party[p].map((e,i)=>{const o=mine&&optOf(x=>x.t==='use'&&x.i===i);return heroCard(e,p,(o?'can ':'')+(isMe?'':'small ')).replace('<div class="hc','<div data-i="'+i+'" class="hc');}).join('');
+  return `<div class="pl${V.cur===p&&!V.over&&!isMe?' turn':''}"><div class="ph">${isMe?'⭐ ':''}${nameOf(p)}${V.types[p]==='cpu'?' 🤖':''}<span class="cnt">🂠 ${V.counts[p]}</span></div>
+    <div class="goal"><span class="cls">${CL.map((c,i)=>`<i class="${cs.includes(i)?'on':''}" title="${esc(tx(c.n))}">${c.i}</i>`).join('')}</span><span>${cs.length}/${V.goalC} ${T('Klassen','classes')}</span><span>· 👹 ${V.slain[p].length}/${V.goalM} ${V.slain[p].map(m=>`<span title="${esc(tx(MONS[m].name)+': '+tx(RW[MONS[m].rw]))}">${MONS[m].ico}</span>`).join('')}</span></div>
+    <div class="party">${leaderCard(p,isMe?'':'small')}${heroes}</div></div>`;
+}
+const DF=['','⚀','⚁','⚂','⚃','⚄','⚅'];
+let lastDiceSeq=0;
+function renderDice(prev){
+  const r=V.roll,box=$('dice');
+  if(!r){box.hidden=true;return;}
+  const fresh=r.seq!==lastDiceSeq;lastDiceSeq=r.seq;
+  if(!fresh&&box.hidden)return;
+  let h=`<div class="dl">${nameOf(r.p)} · ${esc(tx(r.label))}</div>`;
+  if(r.chal)h+=`<div class="dt">⚡ ${nameOf(r.chal.q)}: <b>${r.chal.rq}</b> &nbsp;vs&nbsp; ${nameOf(r.chal.p)}: <b>${r.chal.rp}</b></div><div class="dt ${r.chal.rq>r.chal.rp?'bad':'ok'}">${r.chal.rq>r.chal.rp?T('Herausforderung gelingt!','Challenge succeeds!'):T('Herausforderung scheitert!','Challenge fails!')}</div>`;
+  else{
+    h+=`<div class="dd"><span class="${fresh?'spin':''}">${DF[r.a]}</span><span class="${fresh?'spin':''}">${DF[r.b]}</span></div>`;
+    const parts=[r.a+r.b];if(r.bonus)parts.push(HGE.sg(r.bonus));r.mods.forEach(m=>parts.push(HGE.sg(m.v)));
+    const ok=r.total>=r.need,bad=r.fail!=null&&r.total<=r.fail;
+    h+=`<div class="dt">${parts.join(' ')} = <b>${r.total}</b> · ${T('nötig','needed')} ${r.need}+</div>`;
+    if(r.done)h+=`<div class="dt ${ok?'ok':'bad'}">${ok?T('✔ Erfolg!','✔ Success!'):bad?T('✖ Fehlschlag mit Strafe!','✖ Failure with penalty!'):T('✖ Nicht geschafft','✖ Not enough')}</div>`;
+  }
+  box.innerHTML=h;box.hidden=false;
+  clearTimeout(diceT);if(r.done)diceT=setTimeout(()=>{box.hidden=true;},2600);
+}
+function fx(d){
+  if(d.k==='boom'){const e=document.createElement('div');e.className='boom';document.body.appendChild(e);setTimeout(()=>e.remove(),700);}
+  if(d.k==='slay')K.toast(T('🏆 Monster besiegt!','🏆 Monster slain!'),1800);
+}
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='act'){inp={res,opts:spec.opts};hintTxt='';K.apply();}else res(null);});}
+function answer(o){if(!inp||!o)return;const r=inp.res;inp=null;hintTxt='';K.apply();r(o);}
+$('hand').addEventListener('click',e=>{
+  const el=e.target.closest('.card');if(!el||!inp)return;const id=+el.dataset.id,o=optOf(x=>x.t==='play'&&x.c===id);
+  if(o)answer(o);else{const c=C[id];hintTxt=c.t==='mod'?T('Modifikatoren spielst du, wenn gewürfelt wird.','Modifiers are played when someone rolls.'):c.t==='chal'?T('Herausforderungen spielst du, wenn jemand anderes eine Karte spielt.','Challenges are played when someone else plays a card.'):c.t==='item'?T('Für diesen Gegenstand gibt es gerade keinen passenden Helden.','There is no suitable hero for this item right now.'):V.ap<1?T('Keine Aktionspunkte mehr.','No action points left.'):T('Diese Karte kannst du gerade nicht spielen.','You cannot play this card right now.');K.apply();}
+});
+$('mine').addEventListener('click',e=>{const el=e.target.closest('.hc[data-i]');if(!el||!inp)return;const o=optOf(x=>x.t==='use'&&x.i===+el.dataset.i);if(o)answer(o);else{hintTxt=T('Dieser Held hat seine Fähigkeit in diesem Zug schon genutzt (oder ist verflucht).','This hero already used its ability this turn (or is cursed).');K.apply();}});
+$('mons').addEventListener('click',e=>{const el=e.target.closest('.mon[data-m]');if(!el||!inp)return;const o=optOf(x=>x.t==='atk'&&x.m===+el.dataset.m);if(o)answer(o);else{hintTxt=T('Für dieses Monster fehlen dir passende Helden oder 2 Aktionspunkte.','You lack the required heroes or 2 action points for this monster.');K.apply();}});
+$('actbar').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||!inp)return;answer(optOf(x=>x.t===b.dataset.a));});
+
+async function main(){
+  await HGE.main();
+  const g=K.G,w=g.over.w;
+  K.sfx('win');
+  const again=await K.vote(q=>({ico:'🏆',title:q===w?L2('Du hast gewonnen!','You won!'):L2(g.seats[w].name+' hat gewonnen!',g.seats[w].name+' won!'),html:L2((g.over.why==='m'?'Durch besiegte Monster.':'Mit allen Klassen in der Gruppe.')+'<br><br><b>Abstimmung:</b> Noch eine Partie?',(g.over.why==='m'?'By slaying monsters.':'With every class in the party.')+'<br><br><b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function startGame(seats,opts){
+  K.reset();
+  K.G=HGE.setup(seats,opts||readOpts());
+  K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' beginnt.','New game. '+K.nm(K.G.cur)+' starts.'));
+  K.push();K.run(main);
+}
+K=HK.init({
+  prefix:'hgl-v1-',title:L2('Heldengilde','Hero Guild'),minPlayers:2,
+  seats:[{name:'1',color:'#e53935'},{name:'2',color:'#f9a825'},{name:'3',color:'#1e88e5'},{name:'4',color:'#43a047'},{name:'5',color:'#8e24aa'},{name:'6',color:'#00acc1'}],
+  cpuNames:['Kira','Bolt','Nova','Pixel','Juno','Rook'],
+  view,valid:HGE.valid,render,ui,fx,
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;$('game').hidden=true;$('setup').hidden=false;$('dice').hidden=true;document.title=T('Heldengilde','Hero Guild');}
+});
+HGE.bind(K);
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nopp').value);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>

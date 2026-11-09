@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Höllen-Tycoon</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<style>
+.wrap{max-width:1500px}
+.hk-layout{grid-template-columns:minmax(0,1fr) 320px}
+.bwrap{position:relative;width:min(100%,calc(100vh - 170px));min-width:300px;margin:0 auto;aspect-ratio:1}
+.board{position:absolute;inset:0;display:grid;grid-template-columns:1.55fr repeat(9,1fr) 1.55fr;grid-template-rows:1.55fr repeat(9,1fr) 1.55fr;gap:2px;background:#1a0606;border:4px solid #4a0d0d;border-radius:14px;padding:2px;box-shadow:0 0 40px rgba(255,60,0,.25)}
+.board.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.35),0 0 40px rgba(255,210,63,.3)}
+html[data-style="cyber"] .board{background:#05030a;border-color:#ff2a5588;box-shadow:0 0 30px rgba(255,42,85,.35)}
+.fld{background:linear-gradient(170deg,#3a1212,#230909);border-radius:4px;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;color:#ffe8d8;font-size:clamp(6px,.85vw,11px);line-height:1.1;text-align:center;cursor:pointer;padding:1px}
+html[data-style="cyber"] .fld{background:linear-gradient(170deg,#0f0a1c,#07050e);color:#e6f2ff;border:1px solid #ff2a5533}
+.fld:hover{outline:2px solid #ffd23f;z-index:2}
+.fld .cb{width:100%;height:22%;flex:none;border-radius:2px;display:flex;align-items:center;justify-content:center;gap:1px;font-size:1.05em}
+.fld .nm{padding:1px 2px;font-weight:700;overflow:hidden;flex:1;display:flex;align-items:center;justify-content:center;word-break:break-word;hyphens:auto}
+.fld .pr{font-weight:800;opacity:.85;flex:none;padding-bottom:1px}
+.fld .ic{font-size:1.9em;line-height:1}
+.fld.corner{background:radial-gradient(circle,#5a1a0a,#2a0808);font-weight:900;justify-content:center}
+.fld.corner .ic{font-size:2.6em}
+.fld .own{position:absolute;left:0;right:0;bottom:0;height:4px}
+.fld.mort::after{content:'HYP';position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.6);color:#ff8a8a;font-weight:900;font-size:1.1em;letter-spacing:.1em}
+.fld.left,.fld.right{flex-direction:row}.fld.left .cb,.fld.right .cb{height:100%;width:20%;flex-direction:column}
+.fld.left{flex-direction:row-reverse}
+.fld.left .nm,.fld.right .nm{flex-direction:column}
+.fld.top{flex-direction:column-reverse}
+.fld.hl{animation:hl 1s ease-in-out 2}
+@keyframes hl{50%{box-shadow:inset 0 0 0 3px #ffd23f}}
+.center{grid-column:2/11;grid-row:2/11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#ffd9c0;text-align:center;padding:8px;background:radial-gradient(circle,#3a0d0d,#160404);border-radius:8px}
+html[data-style="cyber"] .center{background:radial-gradient(circle,#1a0d2e,#05030a)}
+.logo{font-size:clamp(1.1rem,3.2vw,2.4rem);font-weight:900;letter-spacing:.06em;color:#ff5a2a;text-shadow:0 0 18px rgba(255,90,0,.7);transform:rotate(-8deg)}
+.dice{display:flex;gap:10px;font-size:clamp(2rem,5vw,3.6rem);line-height:1}
+.dice span.spin{animation:dspin .6s ease-out}
+@keyframes dspin{from{transform:rotate(-540deg) scale(.3)}to{transform:none}}
+.cardv{background:#fff4e0;color:#3a1406;border:3px solid #b71c1c;border-radius:10px;padding:8px 12px;max-width:80%;font-size:clamp(.7rem,1.2vw,.95rem);font-weight:600;animation:pop .5s ease-out}
+.cardv b{display:block;font-size:.8em;letter-spacing:.08em;text-transform:uppercase;color:#b71c1c}
+@keyframes pop{from{transform:scale(.3) rotate(-15deg);opacity:0}to{transform:none;opacity:1}}
+.pot{font-size:.85rem;opacity:.85}
+.tokens{position:absolute;inset:0;pointer-events:none}
+.tok{position:absolute;width:6%;height:6%;display:grid;place-items:center;font-size:clamp(14px,2.4vw,28px);border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.35),rgba(0,0,0,.2));border:2px solid var(--tc);box-shadow:0 2px 8px rgba(0,0,0,.6),0 0 10px var(--tc);transition:left .16s ease-out,top .16s ease-out;transform:translate(-50%,-50%);z-index:5}
+.tok.hop{animation:hop .16s ease-out}
+@keyframes hop{50%{transform:translate(-50%,-80%) scale(1.15)}}
+.tok.out{display:none}
+.hs{font-size:.95em;letter-spacing:-2px}
+.plist{display:flex;flex-direction:column;gap:6px}
+.pr2{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:2px solid transparent;background:rgba(255,255,255,.04)}
+.pr2.turn{border-color:#ffd23f;background:rgba(255,210,63,.1)}
+.pr2.out{opacity:.4;text-decoration:line-through}
+.pr2 .tk{font-size:1.4rem}.pr2 .cash{margin-left:auto;font-weight:900}
+.pr2 small{display:block;color:var(--muted);font-weight:600}
+.acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.acts .btn{flex:1;min-width:130px}
+.debt{background:#5a1010;color:#fff;border-radius:10px;padding:8px 12px;text-align:center;font-weight:800}
+.ov2{position:fixed;inset:0;z-index:850;background:rgba(5,4,12,.72);display:grid;place-items:center;padding:12px}
+.ov2 .box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:min(640px,96vw);max-height:90vh;overflow:auto;color:var(--text)}
+.ov2 h2{margin:0 0 10px}
+.mrow{display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+.mrow .sw{width:14px;height:14px;border-radius:3px;flex:none}
+.mrow .n{flex:1;min-width:140px;font-weight:700}
+.mrow .btn{padding:5px 10px;font-size:.82rem}
+.tcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.tcols{grid-template-columns:1fr}}
+.tcols label{display:flex;gap:6px;align-items:center;padding:3px 0;font-size:.88rem}
+.tcols input[type=number]{width:100%;font:inherit;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+.fi .rt{width:100%;border-collapse:collapse;font-size:.88rem}.fi .rt td{padding:3px 6px;border-top:1px solid rgba(255,255,255,.08)}.fi .rt td:last-child{text-align:right;font-weight:800}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="bwrap"><div class="board" id="board"></div><div class="tokens" id="tokens"></div></div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="debt"></div><div class="acts" id="acts"></div></div>
+        <div class="panel"><div class="plist" id="plist"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="ov2" id="mg" hidden><div class="box"><h2 id="mgT"></h2><div id="mgB"></div><div class="row" style="margin-top:12px"><button class="btn alt" id="mgClose"></button></div></div></div>
+<div class="ov2" id="tr" hidden><div class="box"><h2 id="trT"></h2><div id="trB"></div><div class="row" style="margin-top:12px"><button class="btn" id="trSend"></button><button class="btn alt" id="trClose"></button></div></div></div>
+<div class="ov2" id="fi" hidden><div class="box fi" id="fiB"></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const {F,GROUPS,TOKENS,COLORS}=HT;
+const TT=T('Höllen-Tycoon','Hell Tycoon');document.title=TT;$('ttl').textContent=TT;
+const RULES=()=>`<ul>
+<li>${T('Würfle und ziehe um das Spielfeld. Unbesessene Straßen, Fähren und Werke darfst du kaufen. Wer auf deinem Feld landet, zahlt dir Miete in Seelen 💀.','Roll and move around the board. You may buy unowned streets, ferries and works. Whoever lands on your field pays you rent in souls 💀.')}</li>
+<li>${T('Besitzt du eine ganze Farbgruppe, verdoppelt sich die Grundmiete und du darfst <b>Häuser</b> bauen (gleichmäßig), nach 4 Häusern einen <b>Palast</b>.','Own a whole colour set and the base rent doubles and you may build <b>houses</b> (evenly), after 4 houses a <b>palace</b>.')}</li>
+<li>${T('Über das Höllentor gibt es 200. Pasch: nochmal würfeln. Drei Pasch hintereinander: ab in den Seelenkerker.','Passing Hell Gate pays 200. Doubles: roll again. Three doubles in a row: off to the Soul Prison.')}</li>
+<li>${T('Im Kerker: 50 zahlen, Freikarte nutzen oder auf einen Pasch hoffen (höchstens 3 Versuche).','In prison: pay 50, use a free pass or try for doubles (at most 3 tries).')}</li>
+<li>${T('Fehlt Geld, kannst du Häuser zum halben Preis verkaufen oder Hypotheken aufnehmen. Wer nicht zahlen kann, ist bankrott.','If you are short of money, sell houses at half price or take mortgages. Whoever cannot pay is bankrupt.')}</li>
+<li>${T('<b>Handeln:</b> Biete anderen Straßen und Geld an. <b>Versteigerung:</b> Kauft jemand ein Feld nicht, wird es versteigert (abschaltbar).','<b>Trading:</b> offer streets and money to others. <b>Auction:</b> if someone doesn’t buy a field, it is auctioned (optional).')}</li>
+<li>${T('Wer als Letzter übrig ist, gewinnt. Mit Rundenlimit gewinnt das größte Vermögen.','The last player standing wins. With a round limit the greatest fortune wins.')}</li></ul>`;
+$('setup').innerHTML=`<h2>😈 ${T('Höllen-Tycoon: Immobilien in der Unterwelt','Hell Tycoon: real estate in the underworld')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Kaufe Straßen der Unterwelt, baue Häuser und Paläste, handle mit den anderen und treibe sie in den Ruin. 2 bis 6 Spieler.','Buy streets of the underworld, build houses and palaces, trade with the others and drive them into ruin. 2 to 6 players.')}</p>
+<div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
+<div class="row"><label for="rounds">${T('Spieldauer','Game length')}</label><select id="rounds"><option value="0">${T('Bis zum Bankrott (klassisch)','Until bankruptcy (classic)')}</option><option value="40">${T('40 Runden, dann zählt das Vermögen','40 rounds, then fortune counts')}</option><option value="25" selected>${T('25 Runden, dann zählt das Vermögen','25 rounds, then fortune counts')}</option><option value="15">${T('15 Runden (kurz)','15 rounds (short)')}</option></select></div>
+<div class="row"><label for="cash">${T('Startkapital','Starting money')}</label><select id="cash"><option value="1500" selected>1500 💀</option><option value="2000">2000 💀</option><option value="1000">1000 💀</option></select></div>
+<div class="hk-opts"><label><input type="checkbox" id="oAuc" checked><span><b>${T('Versteigerungen','Auctions')}</b><small>${T('Kauft jemand ein Feld nicht, wird es an alle versteigert.','If a player doesn’t buy a field, it is auctioned to everyone.')}</small></span></label>
+<label><input type="checkbox" id="oPot"><span><b>${T('Höllentopf (Hausregel)','Hell pot (house rule)')}</b><small>${T('Steuern und Strafen kommen in einen Topf. Wer auf dem Ruhelosen Feld landet, bekommt ihn.','Taxes and fines go into a pot. Whoever lands on Restless Rest gets it.')}</small></span></label></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+$('mgClose').textContent=T('Schließen','Close');$('trClose').textContent=T('Abbrechen','Cancel');$('trSend').textContent=T('🤝 Angebot senden','🤝 Send offer');
+function readOpts(){return {rounds:+$('rounds').value,cash:+$('cash').value,auction:$('oAuc').checked,pot:$('oPot').checked};}
+try{const o=JSON.parse(localStorage.getItem('ht-opts')||'null');if(o){$('rounds').value=o.rounds;$('cash').value=o.cash;$('oAuc').checked=o.auction;$('oPot').checked=o.pot;}}catch(e){}
+['rounds','cash','oAuc','oPot'].forEach(id=>$(id).addEventListener('change',()=>{try{localStorage.setItem('ht-opts',JSON.stringify(readOpts()));}catch(e){}}));
+
+let K;
+// ---------- Feldpositionen ----------
+function cellOf(i){if(i<=10)return {r:11,c:11-i};if(i<=20)return {r:11-(i-10),c:1};if(i<=30)return {r:1,c:1+(i-20)};return {r:1+(i-30),c:11};}
+function sideOf(i){return i%10===0?'corner':i<10?'bottom':i<20?'left':i<30?'top':'right';}
+function buildBoard(){
+  let h='';
+  F.forEach((f,i)=>{const c=cellOf(i),sd=sideOf(i);h+=`<div class="fld ${sd}" data-f="${i}" style="grid-row:${c.r};grid-column:${c.c}"></div>`;});
+  h+=`<div class="center" id="center"></div>`;
+  $('board').innerHTML=h;
+}
+buildBoard();
+// ---------- Sicht ----------
+function view(g,s){
+  return {me:s,n:g.seats.length,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),cash:g.cash,pos:g.pos,jail:g.jail,free:g.free,out:g.out,own:g.own,houses:g.houses,mort:g.mort,cur:g.cur,phase:g.phase,round:g.round,pot:g.pot,
+    over:g.over,dice:g.dice,move:g.move,card:g.card,auc:g.auc,opts:g.opts,worth:g.seats.map((_,p)=>HTE.worth(g,p)),log:K.logFor(s),tradesN:g.tradesN||0};
+}
+let V=null,inp=null,hintTxt='',lastDice=0,lastCard=0,shownPos=null,animT=0;
+const nameOf=i=>i===V.me?T('Du','You'):esc(V.names[i]);
+const DF=['','⚀','⚁','⚂','⚃','⚄','⚅'];
+function fieldHtml(i){
+  const f=F[i],o=V.own[i],h=V.houses[i];
+  let s='';
+  if(f.t==='st')s+=`<div class="cb" style="background:${GROUPS[f.g].c}">${h===5?'<span class="hs">🏰</span>':h?'<span class="hs">'+'🏠'.repeat(h)+'</span>':''}</div><div class="nm">${esc(tx(f.n))}</div><div class="pr">${o>=0?'':f.price}</div>`;
+  else if(f.t==='go'||f.t==='jail'||f.t==='free'||f.t==='gojail')s+=`<div class="ic">${f.ico}</div><div class="nm">${esc(tx(f.n))}</div>`;
+  else s+=`<div class="nm"><span class="ic">${f.ico}</span>${esc(tx(f.n))}</div>${f.price?`<div class="pr">${o>=0?'':f.price}</div>`:f.amt?`<div class="pr">−${f.amt}</div>`:''}`;
+  if(o>=0)s+=`<div class="own" style="background:${COLORS[o]}"></div>`;
+  return s;
+}
+function render(v,prev){
+  V=v;$('setup').hidden=true;$('game').hidden=false;
+  document.querySelectorAll('.fld').forEach(e=>{const i=+e.dataset.f;const k=V.own[i]+'|'+V.houses[i]+'|'+V.mort[i];if(e._k!==k||!e._l||e._l!==SITE.lang){e.innerHTML=fieldHtml(i);e._k=k;e._l=SITE.lang;}e.classList.toggle('mort',!!V.mort[i]);e.classList.toggle('corner',i%10===0);});
+  // Mitte: Würfel, Karte, Topf
+  let c=`<div class="logo">😈 ${TT.toUpperCase()}</div>`;
+  if(V.dice){const fresh=V.dice.seq!==lastDice;c+=`<div class="dice"><span class="${fresh?'spin':''}">${DF[V.dice.a]}</span><span class="${fresh?'spin':''}">${DF[V.dice.b]}</span></div><div style="font-size:.85rem">${nameOf(V.dice.p)}: ${V.dice.a+V.dice.b}${V.dice.a===V.dice.b?' · '+T('Pasch!','Doubles!'):''}</div>`;if(fresh){lastDice=V.dice.seq;}}
+  if(V.card&&Date.now()-(V.card._t||0)<1e9){const cd=(V.card.kind==='fate'?HT.FATE:HT.PACT)[V.card.idx];c+=`<div class="cardv" ${V.card.seq!==lastCard?'':'style="animation:none"'}><b>${V.card.kind==='fate'?'🎡 '+T('Schicksalsrad','Wheel of Fate'):'📜 '+T('Teufelspakt','Devil’s Pact')}</b>${esc(tx(cd.d))}</div>`;lastCard=V.card.seq;}
+  if(V.auc){c+=`<div class="cardv" style="border-color:#ffd23f">🔨 ${T('Versteigerung','Auction')}: <b style="display:inline;color:inherit">${esc(tx(F[V.auc.f].n))}</b><br>${T('Höchstgebot','Highest bid')}: ${V.auc.bid}${V.auc.lead>=0?' ('+nameOf(V.auc.lead)+')':''}</div>`;}
+  if(V.opts.pot)c+=`<div class="pot">🪦 ${T('Höllentopf','Hell pot')}: ${V.pot} 💀</div>`;
+  if(V.opts.rounds)c+=`<div class="pot">${T('Runde','Round')} ${Math.min(V.round+1,V.opts.rounds)} / ${V.opts.rounds}</div>`;
+  $('center').innerHTML=c;
+  renderTokens(prev);
+  // Spieler
+  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk">${TOKENS[i]}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b><small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Kerker','in prison'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small></div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
+  renderActs();
+  // Banner
+  const b=$('hkBanner'),my=V.cur===V.me&&!V.over;
+  if(V.over){b.className='';b.textContent=V.over.w===V.me?T('🏆 Du hast gewonnen!','🏆 You won!'):`🏆 ${V.names[V.over.w]} ${T('gewinnt!','wins!')}`;}
+  else if(inp&&inp.phase==='debt'){b.className='me';b.textContent=T('💸 Du musst Geld beschaffen!','💸 You must raise money!');}
+  else if(my){b.className='me';b.textContent=V.phase==='pre'?T('▶ DU BIST DRAN: Würfeln!','▶ YOUR TURN: roll!'):T('▶ DU BIST DRAN: Bauen, handeln oder Zug beenden','▶ YOUR TURN: build, trade or end your turn');}
+  else{b.className='';b.textContent=T(`⏳ ${V.names[V.cur]} ist dran`,`⏳ ${V.names[V.cur]}'s turn`);}
+  $('board').classList.toggle('myturn',my);
+  document.title=my?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if(my&&!(prev&&prev.cur===V.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(V.log[0]?tx(V.log[0]):'');
+  $('hkLog').innerHTML=V.log.slice(1,60).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+  if(!$('mg').hidden)renderManage();
+}
+function tokPos(p,i){
+  const c=cellOf(i),cw=100/(9+2*1.55),big=1.55*cw;
+  const colX=c.c===1?big/2:c.c===11?100-big/2:big+(c.c-2+.5)*cw, rowY=c.r===1?big/2:c.r===11?100-big/2:big+(c.r-2+.5)*cw;
+  const k=p,off=[[-1,-1],[1,-1],[-1,1],[1,1],[0,-1.6],[0,1.6]][k%6];
+  return {x:colX+off[0]*1.9,y:rowY+off[1]*1.9};
+}
+function renderTokens(prev){
+  const box=$('tokens');
+  if(box.children.length!==V.n){box.innerHTML=V.names.map((_,i)=>`<div class="tok" data-p="${i}" style="--tc:${COLORS[i]}">${TOKENS[i]}</div>`).join('');shownPos=V.pos.slice();}
+  if(!shownPos)shownPos=V.pos.slice();
+  const place=(p,i)=>{const e=box.children[p],q=tokPos(p,i);e.style.left=q.x+'%';e.style.top=q.y+'%';};
+  V.names.forEach((_,p)=>{box.children[p].classList.toggle('out',!!V.out[p]);});
+  // Schrittweise Bewegung für die zuletzt gezogene Figur
+  const m=V.move;
+  V.names.forEach((_,p)=>{
+    if(m&&m.p===p&&(!prev||!prev.move||prev.move.seq!==m.seq)&&!m.jump&&shownPos[p]!==V.pos[p]){
+      const steps=m.back?-Math.abs(m.steps):((V.pos[p]-shownPos[p]+40)%40);let k=0,cur=shownPos[p];const dir=steps<0?-1:1,n=Math.abs(steps);
+      clearInterval(animT);const e=box.children[p];
+      animT=setInterval(()=>{if(k>=n){clearInterval(animT);shownPos[p]=V.pos[p];place(p,V.pos[p]);const fe=document.querySelector(`.fld[data-f="${V.pos[p]}"]`);if(fe){fe.classList.remove('hl');void fe.offsetWidth;fe.classList.add('hl');}return;}
+        cur=(cur+dir+40)%40;k++;place(p,cur);e.classList.remove('hop');void e.offsetWidth;e.classList.add('hop');K.sfx('take');},170);
+    }else if(!(m&&m.p===p&&animT&&shownPos[p]!==V.pos[p])){shownPos[p]=V.pos[p];place(p,V.pos[p]);}
+  });
+}
+function renderActs(){
+  const my=inp&&!V.over;let h='';
+  $('debt').innerHTML=inp&&inp.phase==='debt'?`<div class="debt">${T('Du musst','You must pay')} ${inp.need} 💀 ${T('zahlen und hast','and have')} ${V.cash[V.me]} 💀.<br><small>${T('Verkaufe Häuser, nimm Hypotheken auf oder handle.','Sell houses, take mortgages or trade.')}</small></div>`:'';
+  if(my){
+    if(inp.opts.includes('roll'))h+=`<button class="btn" data-a="roll">🎲 ${T('Würfeln','Roll')}</button>`;
+    if(inp.opts.includes('payjail'))h+=`<button class="btn alt" data-a="payjail">⛓️ ${T('50 zahlen und raus','Pay 50 to leave')}</button>`;
+    if(inp.opts.includes('cardjail'))h+=`<button class="btn alt" data-a="cardjail">🎫 ${T('Freikarte nutzen','Use free pass')}</button>`;
+    if(inp.opts.includes('end'))h+=`<button class="btn" data-a="end">✔ ${T('Zug beenden','End turn')}</button>`;
+    h+=`<button class="btn alt" data-a="mg">🏗 ${T('Verwalten','Manage')}</button><button class="btn alt" data-a="tr">🤝 ${T('Handeln','Trade')}</button>`;
+    if(inp.phase==='debt')h+=`<button class="btn alt" data-a="bankrupt" style="background:#7a1010;color:#fff">💀 ${T('Bankrott erklären','Declare bankruptcy')}</button>`;
+  }else if(!V.over)h=`<span style="color:var(--muted)">${T('Warte auf die anderen …','Waiting for the others …')}</span>`;
+  $('acts').innerHTML=h;
+}
+// ---------- Verwalten ----------
+function renderManage(){
+  $('mgT').textContent='🏗 '+T('Deine Felder','Your fields');
+  const mine=F.filter(f=>V.own[f.i]===V.me),ok=!!inp&&!V.over;
+  if(!mine.length){$('mgB').innerHTML=`<p>${T('Du besitzt noch keine Felder.','You don’t own any fields yet.')}</p>`;return;}
+  const g={own:V.own,houses:V.houses,mort:V.mort,cash:V.cash};
+  $('mgB').innerHTML=`<p style="margin:0 0 6px;color:var(--muted)">${T('Bargeld','Cash')}: <b>${V.cash[V.me]} 💀</b></p>`+mine.map(f=>{
+    const h=V.houses[f.i];
+    const btn=(t,lbl,on)=>`<button class="btn ${t==='build'?'':'alt'}" data-m="${t}" data-f="${f.i}" ${ok&&on?'':'disabled'}>${lbl}</button>`;
+    return `<div class="mrow"><span class="sw" style="background:${f.t==='st'?GROUPS[f.g].c:'#777'}"></span><span class="n">${f.t!=='st'?f.ico+' ':''}${esc(tx(f.n))}${h===5?' 🏰':h?' '+'🏠'.repeat(h):''}${V.mort[f.i]?' · <span style="color:#ff8a8a">'+T('Hypothek','mortgaged')+'</span>':''}</span>
+      ${f.t==='st'?btn('build','+🏠 '+f.hc,HTE.canBuild(g,V.me,f.i))+btn('sell','−🏠 +'+f.hc/2,HTE.canSell(g,V.me,f.i)):''}
+      ${V.mort[f.i]?btn('unmort',T('Ablösen','Lift')+' −'+HTE.unmortCost(f.i),HTE.canUnmort(g,V.me,f.i)):btn('mort',T('Hypothek','Mortgage')+' +'+f.price/2,HTE.canMort(g,V.me,f.i))}</div>`;}).join('');
+}
+$('mgB').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||!inp)return;answer({t:b.dataset.m,f:+b.dataset.f});});
+$('mgClose').onclick=()=>{$('mg').hidden=true;};
+// ---------- Handeln ----------
+let trTo=-1;
+function openTrade(){
+  const g={own:V.own,houses:V.houses,mort:V.mort,cash:V.cash};
+  const opps=V.names.map((_,i)=>i).filter(i=>i!==V.me&&!V.out[i]);
+  if(!opps.length)return;
+  if(!opps.includes(trTo))trTo=opps[0];
+  const list=(p,cls)=>F.filter(f=>HTE.tradable(g,p,f.i)).map(f=>`<label><input type="checkbox" class="${cls}" value="${f.i}"><span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${f.t==='st'?GROUPS[f.g].c:'#777'}"></span>${esc(tx(f.n))}${V.mort[f.i]?' ('+T('Hyp.','mortg.')+')':''}</label>`).join('')||`<small style="color:var(--muted)">${T('keine handelbaren Felder','no tradable fields')}</small>`;
+  $('trT').textContent='🤝 '+T('Handelsangebot','Trade offer');
+  $('trB').innerHTML=`<div class="row"><label>${T('Mit','With')}</label><select id="trWho">${opps.map(i=>`<option value="${i}" ${i===trTo?'selected':''}>${TOKENS[i]} ${esc(V.names[i])}</option>`).join('')}</select></div>
+  <div class="tcols"><div><b>${T('Du gibst','You give')}</b>${list(V.me,'tg')}<label>💀 <input type="number" id="trGm" min="0" max="${V.cash[V.me]}" step="10" value="0"></label></div>
+  <div><b>${T('Du bekommst','You get')}</b>${list(trTo,'tt')}<label>💀 <input type="number" id="trTm" min="0" max="${V.cash[trTo]}" step="10" value="0"></label></div></div>
+  <p style="color:var(--muted);font-size:.82rem;margin:8px 0 0">${T('Felder einer Farbgruppe mit Häusern sind nicht handelbar. Höchstens 4 Angebote pro Zug.','Fields of a colour set with houses cannot be traded. At most 4 offers per turn.')}</p>`;
+  $('trWho').onchange=()=>{trTo=+$('trWho').value;openTrade();};
+  $('tr').hidden=false;
+}
+$('trSend').onclick=()=>{
+  if(!inp){$('tr').hidden=true;return;}
+  const a={t:'trade',to:trTo,give:[...document.querySelectorAll('.tg:checked')].map(x=>+x.value),get:[...document.querySelectorAll('.tt:checked')].map(x=>+x.value),gm:Math.max(0,Math.floor(+$('trGm').value||0)),tm:Math.max(0,Math.floor(+$('trTm').value||0))};
+  if(!a.give.length&&!a.get.length&&!a.gm&&!a.tm){K.toast(T('Wähle etwas zum Handeln aus.','Select something to trade.'));return;}
+  if(a.gm>V.cash[V.me]||a.tm>V.cash[trTo]){K.toast(T('So viel Geld ist nicht da.','There isn’t that much money.'));return;}
+  if(V.tradesN>=4){K.toast(T('In diesem Zug sind keine Angebote mehr möglich.','No more offers this turn.'));return;}
+  $('tr').hidden=true;answer(a);
+};
+$('trClose').onclick=()=>{$('tr').hidden=true;};
+// ---------- Feldinfo ----------
+$('board').addEventListener('click',e=>{
+  const el=e.target.closest('.fld');if(!el||!V)return;const f=F[+el.dataset.f],o=V.own[f.i];
+  let h=`<h2>${f.t==='st'?'<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:'+GROUPS[f.g].c+'"></span> ':f.ico+' '}${esc(tx(f.n))}</h2>`;
+  if(f.price){h+=`<p>${T('Preis','Price')}: <b>${f.price} 💀</b> · ${T('Besitzer','Owner')}: <b>${o>=0?TOKENS[o]+' '+nameOf(o):T('niemand','nobody')}</b>${V.mort[f.i]?' · '+T('Hypothek','mortgaged'):''}</p>`;
+    if(f.t==='st')h+=`<table class="rt"><tr><td>${T('Grundmiete','Base rent')}</td><td>${f.rent[0]}</td></tr><tr><td>${T('mit ganzer Farbgruppe','with full colour set')}</td><td>${f.rent[0]*2}</td></tr>${[1,2,3,4].map(k=>`<tr><td>${'🏠'.repeat(k)}</td><td>${f.rent[k]}</td></tr>`).join('')}<tr><td>🏰 ${T('Palast','Palace')}</td><td>${f.rent[5]}</td></tr><tr><td>${T('Hauspreis','House price')}</td><td>${f.hc}</td></tr><tr><td>${T('Hypothek','Mortgage')}</td><td>${f.price/2}</td></tr></table>`;
+    else h+=`<p>${tx(L2(HTE.rentInfo(f,'de'),HTE.rentInfo(f,'en')))}</p>`;}
+  else h+=`<p>${f.t==='tax'?T('Zahle ','Pay ')+f.amt+' 💀':f.t==='fate'||f.t==='pact'?T('Ziehe eine Karte.','Draw a card.'):f.t==='go'?T('Wer hier vorbeikommt, kassiert 200.','Passing here pays 200.'):f.t==='gojail'?T('Ab in den Seelenkerker!','Off to the Soul Prison!'):f.t==='jail'?T('Nur zu Besuch, wenn du nicht eingesperrt bist.','Just visiting unless you are locked up.'):V.opts.pot?T('Hier gibt es den Höllentopf.','The hell pot is paid out here.'):T('Hier passiert nichts.','Nothing happens here.')}</p>`;
+  h+=`<div class="row"><button class="btn alt" onclick="document.getElementById('fi').hidden=true">${T('Schließen','Close')}</button></div>`;
+  $('fiB').innerHTML=h;$('fi').hidden=false;
+});
+$('fi').addEventListener('click',e=>{if(e.target.id==='fi')$('fi').hidden=true;});
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,phase:spec.phase,opts:spec.opts,need:spec.need};hintTxt='';K.apply();}else res(null);});}
+function answer(a){if(!inp)return;const r=inp.res;inp=null;hintTxt='';K.apply();r(a);}
+$('acts').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||!inp)return;const t=b.dataset.a;
+  if(t==='mg'){renderManage();$('mg').hidden=false;return;}
+  if(t==='tr'){openTrade();return;}
+  if(t==='bankrupt'){K.dlg({ico:'💀',title:L2('Wirklich Bankrott erklären?','Really declare bankruptcy?'),html:L2('Du scheidest aus dem Spiel aus.','You will be out of the game.'),btns:[L2('Ja, Bankrott','Yes, bankrupt'),L2('Abbrechen','Cancel')]}).then(i=>{if(i===0)answer({t:'bankrupt'});else K.apply();});return;}
+  answer({t});
+});
+function fx(d){if(d.k==='cash'&&d.n>0&&V&&d.p===V.me)K.toast('+'+d.n+' 💀',1200);}
+async function main(){
+  await HTE.main();
+  const g=K.G,w=g.over.w;K.sfx('win');
+  const again=await K.vote(q=>({ico:'🏆',title:q===w?L2('Du hast gewonnen!','You won!'):L2(g.seats[w].name+' gewinnt!',g.seats[w].name+' wins!'),html:L2((g.over.why==='rounds'?'Das größte Vermögen nach '+g.round+' Runden.':'Alle anderen sind bankrott.')+'<br><br><b>Abstimmung:</b> Noch eine Partie?',(g.over.why==='rounds'?'The greatest fortune after '+g.round+' rounds.':'Everyone else is bankrupt.')+'<br><br><b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function startGame(seats,opts){
+  K.reset();shownPos=null;$('tokens').innerHTML='';
+  K.G=HTE.setup(seats,opts||readOpts());
+  K.say(-1,L2('Willkommen in der Unterwelt! '+K.nm(K.G.cur)+' beginnt.','Welcome to the underworld! '+K.nm(K.G.cur)+' starts.'));
+  K.push();K.run(main);
+}
+K=HK.init({
+  prefix:'htc-v1-',title:L2('Höllen-Tycoon','Hell Tycoon'),minPlayers:2,
+  seats:TOKENS.map((t,i)=>({name:t,color:COLORS[i]})),
+  cpuNames:['Asmo','Bael','Lilith','Mammon','Belial','Azazel'],
+  view,valid:HTE.valid,render,ui,fx,
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;$('game').hidden=true;$('setup').hidden=false;['mg','tr','fi'].forEach(id=>$(id).hidden=true);document.title=TT;}
+});
+HTE.bind(K);
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nopp').value);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>
