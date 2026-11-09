@@ -284,8 +284,8 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
             <button class="btn alt" id="camIso3">Schräg</button>
             <button class="btn alt" id="camTop3">Von oben</button>
             <button class="btn alt" id="follow3">Kamera folgt: aus</button>
-            <button class="btn alt" id="diceCam" title="Kamera zum Würfel-Tablett fahren und wieder zurück">🎲 Würfel-Cam</button>
-            <button class="btn alt" id="autoCam" title="Fährt die Kamera bei deinem Wurf automatisch zum Tablett">Wurf-Kamera: auto</button>
+            <button class="btn alt" id="diceCam" title="Kamera nah ans Tablett fahren und wieder zurück">🔍 Tablett heranzoomen</button>
+            <button class="btn alt" id="autoCam" title="An: Die Kamera fährt bei deinem Wurf automatisch zum Tablett. Aus: Die Kamera bleibt, wie du sie eingestellt hast (das Tablett steht immer rechts neben dem Brett)">🎲 Würfel-Cam: aus</button>
           </span>
         </div>
         <button class="btn alt" id="again">Neues Spiel</button>
@@ -362,8 +362,8 @@ const isLocal=p=>cfg[p]==='human';
 const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
 let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe=null,lastPhys=false;
 // Würfel-Tablett: in der 3D-Ansicht steht es als echtes Objekt neben dem Brett auf dem Tisch (Kamera fährt beim eigenen Wurf hin), in 2D als Dock
-const TRAY3={pos:[12,-.25,0],scale:.9};
-let camSave3=null,manual3=false,autoDice3=(()=>{try{return localStorage.getItem('mdn-autodice')!=='0';}catch(e){return true;}})();
+const TRAY3={pos:[0,-.25,0],r:10.8,scale:.78};      // Das Tablett steht immer rechts neben dem Brett, vom Blickwinkel der Kamera aus gesehen
+let camSave3=null,manual3=false,autoDice3=(()=>{try{return localStorage.getItem('mdn-autodice')==='1';}catch(e){return false;}})();      // Standard: Kamera wird nicht erzwungen
 function focusTray3(on,manual){
   if(!T3)return;
   if(!manual){            // automatische Fahrten: nur wenn erlaubt, und nie die manuelle Würfel-Cam überstimmen
@@ -375,7 +375,8 @@ function focusTray3(on,manual){
   const p0=cam.position.clone(),t0=ctl.target.clone();
   if(on){
     camSave3={pos:p0.clone(),target:t0.clone()};
-    const c=new THREE.Vector3(TRAY3.pos[0],TRAY3.pos[1],TRAY3.pos[2]),to={pos:c.clone().add(new THREE.Vector3(3.5,17.5,9.5)),target:c.clone().add(new THREE.Vector3(3.5,0,.3))};
+    const th=T3.trayTheta||0,off=(lx,ly,lz)=>new THREE.Vector3(lx*Math.cos(th)+lz*Math.sin(th),ly,-lx*Math.sin(th)+lz*Math.cos(th));
+    const gp=DVe&&DVe.R?DVe.R.group.position:new THREE.Vector3(TRAY3.pos[0],TRAY3.pos[1],TRAY3.pos[2]),c=new THREE.Vector3(gp.x,gp.y,gp.z),to={pos:c.clone().add(off(0,17.5,9.5)),target:c.clone().add(off(0,0,.3))};
     ctl.enabled=false;
     tw3(900,k=>{const e=k*k*(3-2*k);cam.position.lerpVectors(p0,to.pos,e);ctl.target.lerpVectors(t0,to.target,e);},'dicecam');
   }else if(camSave3){
@@ -387,8 +388,19 @@ const DICEV=()=>{
   if(v3&&T3&&T3.scene)return DVe||(DVe=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:TRAY3.pos,scale:TRAY3.scale,focus:focusTray3}));
   return DVd||(DVd=Dice3D.view($('diceDock')));
 };
+function placeTray3(){
+  if(!DVe||!DVe.R||!T3)return;
+  const g=DVe.R.group;
+  if(!camSave3){      // nicht während der Kamerafahrt zum Tablett
+    const cam=T3.camera,target=Math.atan2(cam.position.x,cam.position.z);
+    let cu=T3.trayTheta;if(cu==null)cu=target;
+    cu+=Math.atan2(Math.sin(target-cu),Math.cos(target-cu))*.12;T3.trayTheta=cu;
+  }
+  const th=T3.trayTheta||0;
+  g.position.set(TRAY3.r*Math.cos(th),TRAY3.pos[1],-TRAY3.r*Math.sin(th));g.rotation.y=th;
+}
 const cancelDice=()=>{manual3=false;if(DVd)DVd.cancel();if(DVe)DVe.cancel();if(T3&&camSave3)focusTray3(false,true);syncCamBtns();};
-function syncCamBtns(){const d=$('diceCam'),a=$('autoCam');if(d)d.textContent=manual3?'🎲 Würfel-Cam: an':'🎲 Würfel-Cam';if(a)a.textContent='Wurf-Kamera: '+(autoDice3?'auto':'manuell');}
+function syncCamBtns(){const d=$('diceCam'),a=$('autoCam');if(d)d.textContent=manual3?'🔍 Tablett: nah':'🔍 Tablett heranzoomen';if(a)a.textContent='🎲 Würfel-Cam: '+(autoDice3?'an':'aus');}
 async function toggleDiceCam(){
   if(!T3||!v3)return;
   await DICEV().show();
@@ -1402,7 +1414,11 @@ function resize3(){
   if(!T3)return;
   const el3=$('stage3d'),w=el3.clientWidth||600,h=el3.clientHeight||w;
   T3.r.setSize(w,h,false);if(T3.composer)T3.composer.setSize(w,h);
-  T3.camera.aspect=w/h;T3.camera.updateProjectionMatrix();
+  T3.camera.aspect=w/h;
+  // Das Bedienfeld liegt rechts über dem Bild: Die Szene wird in den freien Bereich daneben gerückt, damit Brett und Würfel-Tablett nicht verdeckt sind
+  const sh=(document.body.classList.contains('full3d')&&innerWidth>760)?150:0;
+  if(sh)T3.camera.setViewOffset(w,h,sh,0,w,h);else T3.camera.clearViewOffset();
+  T3.camera.updateProjectionMatrix();
 }
 function tw3(dur,fn,key){
   if(key)T3.tw=T3.tw.filter(t=>t.key!==key);
@@ -1578,7 +1594,7 @@ function tick3(now){
   if(!v3||!T3)return;
   if(T3.perf)T3.perf.frame(now);
   const dt=Math.min(.05,(now-last3)/1000);last3=now;
-  runTw3(now);
+  runTw3(now);placeTray3();
   const t=now/1000;
   for(const k in T3.pm){
     const pm=T3.pm[k],pulse=.5+.5*Math.sin(t*6+pm.i);
