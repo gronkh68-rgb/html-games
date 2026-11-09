@@ -31,6 +31,27 @@
     lines.slice(0, maxLines || 3).forEach(function (l, i) { x.fillText(l, cx, y + i * lh); });
     return lines.length;
   }
+  // Text so lange verkleinern, bis er in den Kasten passt (Zeilenumbruch auch nach Bindestrichen); Rückgabe: Zeilen und Schriftgröße
+  function fitText(x, text, maxW, maxH, size0, minSize, weight) {
+    var tokens = String(text).match(/[^\s-]+-?|-/g) || [String(text)], size, lines, ok;
+    for (size = size0; size >= minSize; size -= 1) {
+      x.font = weight + ' ' + Math.round(size) + 'px system-ui,sans-serif'; lines = []; var line = '', prev = '', fits = true;
+      for (var i = 0; i < tokens.length; i++) {
+        var tk = tokens[i], cand = line ? (prev.slice(-1) === '-' ? line + tk : line + ' ' + tk) : tk;
+        if (x.measureText(cand).width <= maxW) { line = cand; }
+        else { if (line) lines.push(line); line = tk; if (x.measureText(tk).width > maxW) fits = false; }
+        prev = tk;
+      }
+      if (line) lines.push(line);
+      ok = fits && lines.length * size * 1.12 <= maxH; if (ok) break;
+    }
+    return { lines: lines, size: Math.round(size), lh: Math.round(size * 1.12) };
+  }
+  function drawFit(x, text, cx, y0, maxW, maxH, size0, minSize, weight, color) {
+    var r = fitText(x, text, maxW, maxH, size0, minSize, weight); x.font = weight + ' ' + r.size + 'px system-ui,sans-serif'; x.fillStyle = color; x.textBaseline = 'alphabetic';
+    var top = y0 + (maxH - r.lines.length * r.lh) / 2 + r.size * .86;
+    r.lines.forEach(function (l, i) { x.fillText(l, cx, top + i * r.lh); });
+  }
   function flames(x, w, h, col, seed) {       // Flammenzungen am unteren Rand (eigene Zeichnung)
     x.fillStyle = col; x.beginPath(); x.moveTo(0, h);
     var n = Math.max(4, Math.round(w / 34));
@@ -51,13 +72,15 @@
       var bg = x.createLinearGradient(0, 0, 0, bh); bg.addColorStop(0, gc); bg.addColorStop(1, 'rgba(0,0,0,.35)'); x.fillStyle = bg; x.fillRect(0, 0, w, bh);
       x.fillStyle = 'rgba(255,255,255,.25)';   // zwei kleine Hörner im Farbband
       x.beginPath(); x.moveTo(w * .3, bh); x.lineTo(w * .36, bh * .25); x.lineTo(w * .42, bh); x.fill(); x.beginPath(); x.moveTo(w * .58, bh); x.lineTo(w * .64, bh * .25); x.lineTo(w * .7, bh); x.fill();
-      x.fillStyle = '#fff'; x.font = '800 ' + Math.round(w * .13) + 'px system-ui,sans-serif'; wrap(x, tr(f.n), w * .9, w * .15, w / 2, bh + w * .2, 4);
-      x.fillStyle = '#ffc857'; x.font = '900 ' + Math.round(w * .17) + 'px system-ui,sans-serif'; x.fillText(f.price, w / 2, h - 12);
+      var ph = Math.round(w * .2);
+      drawFit(x, tr(f.n), w / 2, bh + 8, w * .88, h - bh - ph - 18, w * .17, w * .07, 800, '#ffffff');
+      drawFit(x, String(f.price), w / 2, h - ph - 4, w * .8, ph, w * .19, w * .1, 900, '#ffc857');
     } else {
       glyph(x, f.t, w / 2, h * (p.corner ? .36 : .27), Math.min(w, h) * (p.corner ? .2 : .17));
-      x.font = '800 ' + Math.round((p.corner ? .11 : .125) * w) + 'px system-ui,sans-serif'; x.fillStyle = '#ffe3ea'; wrap(x, tr(f.n), w * .92, w * (p.corner ? .13 : .15), w / 2, h * (p.corner ? .62 : .56), 3);
-      if (f.price) { x.fillStyle = '#ffc857'; x.font = '900 ' + Math.round(w * .16) + 'px system-ui,sans-serif'; x.fillText(f.price, w / 2, h - 12); }
-      if (f.amt) { x.fillStyle = '#ff8a9a'; x.font = '900 ' + Math.round(w * .16) + 'px system-ui,sans-serif'; x.fillText('−' + f.amt, w / 2, h - 12); }
+      var hasP = !!(f.price || f.amt), ph2 = hasP ? Math.round(w * .2) : 0, ty = h * (p.corner ? .56 : .42);
+      drawFit(x, tr(f.n), w / 2, ty, w * .88, h - ty - ph2 - 12, w * (p.corner ? .13 : .16), w * .07, 800, '#ffe3ea');
+      if (f.price) drawFit(x, String(f.price), w / 2, h - ph2 - 4, w * .8, ph2, w * .19, w * .1, 900, '#ffc857');
+      if (f.amt) drawFit(x, '\u2212' + f.amt, w / 2, h - ph2 - 4, w * .8, ph2, w * .19, w * .1, 900, '#ff8a9a');
     }
     x.strokeStyle = 'rgba(255,120,150,.55)'; x.lineWidth = 3; x.strokeRect(1.5, 1.5, w - 3, h - 3);
     return tex(c);
@@ -72,17 +95,29 @@
     }
     var t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
   }
-  function centerTexture() {
-    var S = 1024, c = canvas(S, S), x = c.getContext('2d'), g = x.createRadialGradient(S / 2, S / 2, 40, S / 2, S / 2, S * .7);
+  var centerCv = null, centerTex = null;
+  function drawCenter() {
+    var S = 1024, x = centerCv.getContext('2d'), g = x.createRadialGradient(S / 2, S / 2, 40, S / 2, S / 2, S * .7);
     g.addColorStop(0, '#3a0d18'); g.addColorStop(1, '#0b0408'); x.fillStyle = g; x.fillRect(0, 0, S, S);
     x.strokeStyle = 'rgba(255,60,90,.5)'; x.lineWidth = 4;
-    [420, 330, 240].forEach(function (rad, n) { x.beginPath(); x.arc(S / 2, S / 2, rad, 0, 7); x.stroke(); });
-    x.beginPath(); for (var k = 0; k < 6; k++) { var a = k * Math.PI / 3 - Math.PI / 2, px = S / 2 + 330 * Math.cos(a), py = S / 2 + 330 * Math.sin(a); k ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); x.stroke();
-    x.save(); x.translate(S / 2, S / 2); x.rotate(-Math.PI / 8); x.textAlign = 'center'; x.fillStyle = '#ff3355'; x.shadowColor = '#ff2a55'; x.shadowBlur = 24;
-    x.font = '900 120px system-ui,sans-serif'; x.fillText('HELLUVA', 0, -10); x.fillText('TYCOON', 0, 120);
-    x.shadowBlur = 0; x.font = '600 34px system-ui,sans-serif'; x.fillStyle = 'rgba(255,255,255,.55)'; x.fillText('Fan-Spiel, nicht kommerziell', 0, 190); x.font = '500 26px system-ui,sans-serif'; x.fillText('Helluva Boss © Vivienne Medrano / SpindleHorse Toons', 0, 240); x.restore();
-    return tex(c);
+    [470, 440].forEach(function (rad) { x.beginPath(); x.arc(S / 2, S / 2, rad, 0, 7); x.stroke(); });
+    x.beginPath(); for (var k = 0; k < 6; k++) { var a = k * Math.PI / 3 - Math.PI / 2, px = S / 2 + 470 * Math.cos(a), py = S / 2 + 470 * Math.sin(a); k ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); x.stroke();
+    x.textAlign = 'center';
+    if (H.logo) {      // helle Fläche, damit die schwarze Schrift des Logos lesbar bleibt
+      var px0 = 120, py0 = 120, pw = S - 240, ph = S - 240, rr = 70;
+      x.fillStyle = '#f4ebe8'; x.beginPath(); x.moveTo(px0 + rr, py0); x.arcTo(px0 + pw, py0, px0 + pw, py0 + ph, rr); x.arcTo(px0 + pw, py0 + ph, px0, py0 + ph, rr); x.arcTo(px0, py0 + ph, px0, py0, rr); x.arcTo(px0, py0, px0 + pw, py0, rr); x.closePath(); x.fill();
+      x.strokeStyle = '#d40221'; x.lineWidth = 8; x.stroke();
+      var lw = pw * .86, lh = lw * 2100 / 2263; x.drawImage(H.logo, S / 2 - lw / 2, py0 + 28, lw, lh);
+      x.fillStyle = '#d40221'; x.font = '900 92px system-ui,sans-serif'; x.fillText('TYCOON', S / 2, py0 + 28 + lh + 82);
+      drawFit(x, 'Fan-Spiel, nicht kommerziell. Helluva Boss © Vivienne Medrano / SpindleHorse Toons', S / 2, py0 + ph - 78, pw - 80, 66, 28, 14, 500, '#5a4044');
+    } else {
+      x.fillStyle = '#ff3355'; x.shadowColor = '#ff2a55'; x.shadowBlur = 24; x.font = '900 120px system-ui,sans-serif'; x.fillText('HELLUVA', S / 2, S / 2 - 10); x.fillText('TYCOON', S / 2, S / 2 + 120);
+      x.shadowBlur = 0; x.font = '600 34px system-ui,sans-serif'; x.fillStyle = 'rgba(255,255,255,.55)'; x.fillText('Fan-Spiel, nicht kommerziell', S / 2, S / 2 + 190);
+      x.font = '500 26px system-ui,sans-serif'; x.fillText('Helluva Boss © Vivienne Medrano / SpindleHorse Toons', S / 2, S / 2 + 240);
+    }
+    if (centerTex) centerTex.needsUpdate = true;
   }
+  function centerTexture() { centerCv = canvas(1024, 1024); drawCenter(); centerTex = tex(centerCv); return centerTex; }
   // Einfache gezeichnete Symbole statt Emojis
   function glyph(x, t, cx, cy, s) {
     x.save(); x.translate(cx, cy); x.strokeStyle = '#ffe3ea'; x.fillStyle = '#ffe3ea'; x.lineWidth = Math.max(3, s * .13); x.lineJoin = 'round'; x.lineCap = 'round';
@@ -149,12 +184,14 @@
     addEventListener('resize', function () { if (active) H.resize(); });
     if (window.ResizeObserver) new ResizeObserver(function () { if (active) H.resize(); }).observe(host);
     requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (active) { if (perf) perf.frame(now); tick(now); } });
+    var li = new Image(); li.onload = function () { H.logo = li; if (centerCv) drawCenter(); }; li.src = 'img/logo.svg';
     H.ready = true; H.resize();
     H.loadFolder();
   };
   H.setActive = function (a) { active = !!a; if (a) H.resize(); };
   H.resize = function () { var w = host.clientWidth || 800, h = host.clientHeight || 600; r.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
   H.camReset = function () { tw = tw.filter(function (t) { return t.key !== 'cam'; }); var p0 = camera.position.clone(), t0 = controls.target.clone(), p1 = new THREE.Vector3(0, 25, 22); tween(800, function (k) { var e = k * k * (3 - 2 * k); camera.position.lerpVectors(p0, p1, e); controls.target.lerpVectors(t0, new THREE.Vector3(0, 0, 0), e); }, 'cam'); };
+  H.debug = function () { return { camera: camera, controls: controls }; };
   H.camTop = function () { var p0 = camera.position.clone(), p1 = new THREE.Vector3(0, 44, 1); tween(800, function (k) { camera.position.lerpVectors(p0, p1, k * k * (3 - 2 * k)); }, 'cam'); };
 
   // ---------- Tweens ----------

@@ -19,22 +19,22 @@
   sp('ferry', 'Portal zur Erde', 'Portal to Earth', '🌀', { price: 200 });
   st('Harvest-Moon-Festival', 'Harvest Moon Festival', 1, 100); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Millies Familienfarm', 'Millie’s Family Farm', 1, 100); st('Zorn-Ring-Rodeo', 'Wrath Ring Rodeo', 1, 120);
   sp('jail', 'Imp-City-Knast', 'Imp City Jail', '⛓️');
-  st('Ozzie’s', 'Ozzie’s', 2, 140); sp('util', 'Höllenfeuer-Werk', 'Hellfire Works', '🌋', { price: 150 }); st('Asmodeus’ Palast', 'Asmodeus’ Palace', 2, 140); st('Fizzarollis Bühne', 'Fizzarolli’s Stage', 2, 160);
+  st('Ozzie’s', 'Ozzie’s', 2, 140); sp('util', 'Höllenfeuer-Werk', 'Hellfire Works', '🌋', { price: 150 }); st('Lust-Ring-Promenade', 'Lust Ring Promenade', 2, 140); st('Fizzarollis Bühne', 'Fizzarolli’s Stage', 2, 160);
   sp('ferry', 'Höllen-Taxi', 'Hell Taxi', '🚕', { price: 200 });
   st('Mammons Studio', 'Mammon’s Studio', 3, 180); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Crimsons Casino', 'Crimson’s Casino', 3, 180); st('Cash Buckzos Zirkus', 'Cash Buckzo’s Circus', 3, 200);
   sp('free', 'Loonas Couch', 'Loona’s Couch', '🛋️');
   st('Beelzebubs Party-Villa', 'Beelzebub’s Party Villa', 4, 220); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Völlerei-Buffet', 'Gluttony Buffet', 4, 220); st('Neid-Ring-Basar', 'Envy Ring Bazaar', 4, 240);
   sp('ferry', 'Grimoire-Portal', 'Grimoire Portal', '🌀', { price: 200 });
   st('Loo Loo Land', 'Loo Loo Land', 5, 260); st('Verosikas Konzert', 'Verosika’s Concert', 5, 260); sp('util', 'Seelen-Kraftwerk', 'Soul Power Plant', '⚡', { price: 150 }); st('Pride-Ring-Mall', 'Pride Ring Mall', 5, 280);
-  sp('gojail', 'Ausrottungstag!', 'Extermination Day!', '👼');
+  sp('gojail', 'Exorzisten-Razzia!', 'Exorcist Raid!', '👼');
   st('Goetia-Akademie', 'Goetia Academy', 6, 300); st('Stolas’ Sternwarte', 'Stolas’ Observatory', 6, 300); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Paimons Anwesen', 'Paimon’s Estate', 6, 320);
   sp('ferry', 'Stolas’ Kutsche', 'Stolas’ Carriage', '🦉', { price: 200 });
-  sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Stolas’ Herrenhaus', 'Stolas’ Mansion', 7, 350); sp('tax', 'Mammons Gebühr', 'Mammon’s Fee', '💸', { amt: 100 }); st('Luzifers Palast', 'Lucifer’s Palace', 7, 400);
+  sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Stolas’ Herrenhaus', 'Stolas’ Mansion', 7, 350); sp('tax', 'Mammons Gebühr', 'Mammon’s Fee', '💸', { amt: 100 }); st('Goetia-Thronsaal', 'Goetia Throne Room', 7, 400);
   F.forEach(function (f, i) { f.i = i; if (f.t === 'st') { f.hc = GROUPS[f.g].hc; } });
   // Grimoire (Ereigniskarten)
   var FATE = [
     { a: 'to', f: 0, d: L2('Zurück nach Imp City! Kassiere 200.', 'Back to Imp City! Collect 200.') },
-    { a: 'to', f: 39, d: L2('Eine Einladung zu Luzifers Palast. Rücke vor.', 'An invitation to Lucifer’s Palace. Advance.') },
+    { a: 'to', f: 39, d: L2('Eine Einladung in den Goetia-Thronsaal. Rücke vor.', 'An invitation to the Goetia throne room. Advance.') },
     { a: 'to', f: 21, d: L2('Beelzebub schmeißt eine Party: Rücke vor zu ihrer Villa. Über Imp City kassierst du 200.', 'Beelzebub is throwing a party: advance to her villa. Passing Imp City pays 200.') },
     { a: 'to', f: 11, d: L2('Ozzie’s hat noch einen Tisch frei. Rücke vor.', 'Ozzie’s has a table free. Advance.') },
     { a: 'ferry', d: L2('Das Grimoire öffnet ein Portal: Rücke zum nächsten Portal oder Fahrzeug vor. Gehört es jemandem, zahle doppelt.', 'The grimoire opens a portal: advance to the nearest portal or ride. If owned, pay double.') },
@@ -57,7 +57,7 @@
     { a: 'money', n: -50, d: L2('Arztrechnung nach dem letzten Auftrag: Zahle 50.', 'Doctor’s bill after the last job: pay 50.') },
     { a: 'money', n: 50, d: L2('Du verkaufst Blitzøs alte Pferde-Poster: Kassiere 50.', 'You sell Blitzø’s old horse posters: collect 50.') },
     { a: 'free', d: L2('Loona kennt den Wärter: Du kommst aus dem Knast frei. Behalte die Karte.', 'Loona knows the guard: get out of jail free. Keep this card.') },
-    { a: 'jail', d: L2('Der Ausrottungstag erwischt dich: Ab in den Knast, ohne über Imp City zu gehen.', 'Extermination Day catches you: go straight to jail without passing Imp City.') },
+    { a: 'jail', d: L2('Die Exorzisten erwischen dich: Ab in den Knast, ohne über Imp City zu gehen.', 'The exorcists catch you: go straight to jail without passing Imp City.') },
     { a: 'money', n: 100, d: L2('Ein Auftrag für Stolas wird bezahlt: Kassiere 100.', 'A job for Stolas gets paid: collect 100.') },
     { a: 'money', n: 20, d: L2('Steuerrückzahlung aus Imp City: Kassiere 20.', 'Imp City tax refund: collect 20.') },
     { a: 'each', n: 10, d: L2('Du hast Geburtstag, Loona hat sogar daran gedacht: Jeder Spieler zahlt dir 10.', 'It’s your birthday and Loona even remembered: every player pays you 10.') },
