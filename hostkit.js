@@ -92,7 +92,7 @@
         btn.textContent = '🎲 ' + T('Für mich werfen', 'Throw for me');
         btn.onclick = function () { btn.remove(); V.stopDrag(); res(null); };
         V.wrap.appendChild(btn);
-        V.drag(spec.n, { color: spec.col, hint: spec.hint ? HK.tx(spec.hint) : T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') }).then(function (p) { btn.remove(); res(p); }, function () { btn.remove(); });
+        V.drag(spec.n, { color: spec.col, zoom: cfg.diceZoom !== false, hint: spec.hint ? HK.tx(spec.hint) : T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') }).then(function (p) { btn.remove(); res(p); }, function () { btn.remove(); });
       });
     };
     // Wirft n Würfel für Spieler p und gibt die Augen zurück (Host). Das Ergebnis kommt aus der Physik.

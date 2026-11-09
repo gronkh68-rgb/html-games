@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mädn Teams</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<script src="../dice3d.js"></script>
+<script src="engine.js"></script>
+<style>
+.wrap{max-width:1400px}
+.hk-layout{grid-template-columns:minmax(0,1fr) 310px}
+.bw{width:min(100%,calc(100vh - 170px));min-width:320px;margin:0 auto}
+#svg{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 45%,#2b3a55,#141c2e);border:3px solid #0b1424;border-radius:18px;transition:border-color .3s,box-shadow .3s}
+#svg.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.3),0 0 40px rgba(255,210,63,.25)}
+html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1a2e,#04070d);border-color:#00f0ff55}
+.pcg{transition:transform .3s cubic-bezier(.3,.8,.3,1)}
+.pc{stroke:#fff;stroke-width:2.2;cursor:default}
+.pc.can{cursor:pointer;animation:pcp .7s ease-in-out infinite alternate}
+@keyframes pcp{from{stroke-width:2.2;filter:drop-shadow(0 0 0 #fff)}to{stroke-width:4.5;filter:drop-shadow(0 0 6px #ffd23f)}}
+.tgt{fill:rgba(255,210,63,.35);stroke:#ffd23f;stroke-width:2.5;cursor:pointer}
+.lastring{fill:none;stroke:#fff;stroke-width:2.5;stroke-dasharray:4 3}
+.fld{stroke:rgba(255,255,255,.25);stroke-width:1.5}
+.lbl{font:700 13px system-ui,sans-serif;fill:#fff;text-anchor:middle;pointer-events:none}
+.tm{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:2px solid transparent;font-size:.9rem}
+.tm.turn{border-color:#ffd23f;background:rgba(255,210,63,.1)}
+.tm .dot{width:16px;height:16px;border-radius:50%;flex:none;border:2px solid #fff}
+.tm small{color:var(--muted)}
+.tm b{margin-left:auto}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:3px}.bar i{display:block;height:100%;background:#3ddc84}
+#diceDock{height:300px;width:225px;margin:0 auto;position:relative}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="bw"><svg id="svg" viewBox="0 0 800 800"></svg></div>
+      </div>
+      <div class="hk-side">
+        <div id="diceDock"></div>
+        <div class="panel"><div id="teams"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const TT=T('Mädn Teams','Ludo Teams');document.title=TT;$('ttl').textContent=TT;
+const RULES=()=>`<ul>
+<li>${T('Wie „Mensch ärgere dich nicht“, aber auf einem doppelt so großen Ring (80 Felder) und im Team: Wer gegenüber sitzt, ist dein Partner.','Like Ludo, but on a ring twice as big (80 fields) and in teams: the player opposite you is your partner.')}</li>
+<li>${T('Mit einer <b>6</b> kommt eine Figur raus, nach einer 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du 3 Versuche.','A <b>6</b> brings a piece out, and after a 6 you roll again. With no piece on the field you get 3 tries.')}</li>
+<li>${T('Wer auf eine fremde Figur zieht, wirft sie raus. Figuren deines <b>Teams</b> blockieren sich, man kann sie nicht schlagen.','Landing on an opponent’s piece sends it home. Pieces of your <b>team</b> block each other and cannot be captured.')}</li>
+<li>${T('Alle Figuren müssen in die eigene <b>Zielgasse</b> (man darf dort nicht überspringen). Mit <b>Teamzügen</b> darfst du mit jedem Wurf auch Figuren deines Partners ziehen.','All pieces must reach your own <b>goal lane</b> (no jumping there). With <b>team moves</b> you may move your partner’s pieces with any roll.')}</li>
+<li>${T('Ein Team gewinnt, wenn alle Figuren beider Partner im Ziel sind.','A team wins when all pieces of both partners are home.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🎲 ${T('Mädn Teams: das große Brett','Ludo Teams: the big board')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Mensch ärgere dich nicht im Team auf dem doppelt so großen Brett. Gegen den Computer oder online.','Ludo in teams on a board twice as big. Against the computer or online.')}</p>
+<div class="row"><label for="mode">${T('Spielart','Mode')}</label><select id="mode">
+<option value="4-4">${T('4 Spieler, 2 Teams à 2, je 4 Figuren (8 pro Team)','4 players, 2 teams of 2, 4 pieces each (8 per team)')}</option>
+<option value="8-4">${T('8 Spieler, 4 Teams à 2, je 4 Figuren (8 pro Team), sehr lang','8 players, 4 teams of 2, 4 pieces each (8 per team), very long')}</option>
+<option value="4-8">${T('4 Spieler, 2 Teams à 2, je 8 Figuren (16 pro Team), sehr lang','4 players, 2 teams of 2, 8 pieces each (16 per team), very long')}</option></select></div>
+<div class="hk-opts"><label><input type="checkbox" id="oShare" checked><span><b>${T('Teamzüge','Team moves')}</b><small>${T('Mit jedem Wurf darfst du auch die Figuren deines Partners ziehen. Ohne diese Regel zieht man nur eigene Figuren (der Partner hilft erst, wenn du fertig bist). Das Spiel dauert dann deutlich länger.','With every roll you may also move your partner’s pieces. Without it you only move your own (your partner helps once you are done). The game then takes much longer.')}</small></span></label></div>
+<p style="margin:4px 0 10px;color:var(--muted);font-size:.85rem">${T('Du spielst mit Computern, die die übrigen Plätze besetzen. Online: Freunde belegen Plätze, der Rest sind Computer.','You play with computers filling the other seats. Online: friends take seats, the rest are computers.')}</p>
+<div class="row"><button class="btn" id="start">${T('Gegen den Computer','Against the computer')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+const readOpts=()=>{const [n,P]=$('mode').value.split('-').map(Number);return {n,P,share:$('oShare').checked};};
+try{const m=localStorage.getItem('mt-mode');if(m)$('mode').value=m;if(localStorage.getItem('mt-share')==='0')$('oShare').checked=false;}catch(e){}
+$('oShare').onchange=()=>{try{localStorage.setItem('mt-share',$('oShare').checked?'1':'0');}catch(e){}};
+$('mode').onchange=()=>{try{localStorage.setItem('mt-mode',$('mode').value);}catch(e){}};
+
+let K,V=null,inp=null,hintTxt='';
+// ---------- Farben und Brett ----------
+const TEAMC=['#e53935','#1e88e5','#43a047','#f9a825'],TEAMN=[L2('Rot','Red'),L2('Blau','Blue'),L2('Grün','Green'),L2('Gelb','Yellow')];
+const lighten=(hex,f)=>{const n=parseInt(hex.slice(1),16),r=n>>16&255,g=n>>8&255,b=n&255,m=c=>Math.round(c+(255-c)*f);return `rgb(${m(r)},${m(g)},${m(b)})`;};
+const teamOf=(p,n)=>p%(n/2);
+const seatColor=(p,n)=>{const c=TEAMC[teamOf(p,n)];return p<n/2?c:lighten(c,.45);};
+const D=26,X0=140,Y0=140,SIDE=20*D,CEN=[X0+SIDE/2,Y0+SIDE/2];
+const rotV=(v,k)=>{let x=v[0],y=v[1];for(let i=0;i<k;i++){const t=x;x=-y;y=t;}return [x,y];};
+const LAY={};
+function layout(n,P){
+  const key=n+'-'+P;if(LAY[key])return LAY[key];
+  const ring=[];
+  for(let i=0;i<80;i++){const k=Math.floor(i/20),t=i%20,r=rotV([X0+t*D-CEN[0],Y0-CEN[1]],k);ring.push([CEN[0]+r[0],CEN[1]+r[1]]);}
+  const per=n/4,start=[],lane=[],house=[];
+  for(let p=0;p<n;p++){
+    const k=Math.floor(p/per),j=p%per,t=per===1?10:5+10*j,si=20*k+t;start.push(si);
+    const ent=ring[si-1],inward=rotV([0,1],k),outward=rotV([0,-1],k),tang=rotV([1,0],k),sp=ring[si],cols=P===8?4:2;
+    lane.push(Array.from({length:P},(_,q)=>[ent[0]+inward[0]*(q+1)*D,ent[1]+inward[1]*(q+1)*D]));
+    house.push(Array.from({length:P},(_,q)=>{const a=(q%cols)-(cols-1)/2,b=Math.floor(q/cols);return [sp[0]+tang[0]*a*D*1.1+outward[0]*(2.5+b*1.1)*D,sp[1]+tang[1]*a*D*1.1+outward[1]*(2.5+b*1.1)*D];}));
+  }
+  return LAY[key]={ring,start,lane,house};
+}
+const pcPt=(L,p,pos,i)=>pos<0?L.house[p][i]:pos<80?L.ring[(L.start[p]+pos)%80]:L.lane[p][pos-80];
+let builtKey='';
+function build(v){
+  const key=v.n+'-'+v.P;if(builtKey===key)return;builtKey=key;
+  const L=layout(v.n,v.P);let h='<g id="bg">';
+  L.ring.forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="rgba(255,255,255,.12)"/>`;});
+  for(let p=0;p<v.n;p++){
+    const c=seatColor(p,v.n);
+    h+=`<circle class="fld" cx="${L.ring[L.start[p]][0]}" cy="${L.ring[L.start[p]][1]}" r="12.5" fill="${c}" stroke="#fff" stroke-width="2"/>`;
+    L.lane[p].forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="10.5" fill="${c}" fill-opacity=".38" stroke="${c}"/>`;});
+    L.house[p].forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="${c}" fill-opacity=".22" stroke="${c}"/>`;});
+  }
+  h+='</g><g id="mid"></g><g id="tg"></g><g id="pcs">';
+  for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++)h+=`<g class="pcg" id="pg-${p}-${i}"><circle class="pc" data-p="${p}" data-i="${i}" r="10" fill="${seatColor(p,v.n)}"/><circle r="3.4" fill="${TEAMC[teamOf(p,v.n)]}" stroke="#fff" stroke-width="1" pointer-events="none"/></g>`;
+  h+='</g><g id="lbls"></g>';
+  $('svg').innerHTML=h;
+}
+const nameOf=i=>i===V.me?T('Du','You'):esc(V.names[i]);
+function render(v,prev){
+  V=v;$('setup').hidden=true;$('game').hidden=false;build(v);
+  const L=layout(v.n,v.P),mine=!!inp&&!v.over;
+  const movable=new Set(mine?inp.opts.map(o=>o.q+'-'+o.i):[]);
+  // Figuren
+  for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++){
+    const g=$('pg-'+p+'-'+i),pt=pcPt(L,p,v.pos[p][i],i);
+    g.style.transform=`translate(${pt[0]}px,${pt[1]}px)`;
+    const c=g.firstChild;c.classList.toggle('can',mine&&movable.has(p+'-'+i));
+  }
+  // Ziele der erlaubten Züge
+  let tg='';
+  if(mine)inp.opts.forEach((o,k)=>{const pt=pcPt(L,o.q,o.to,o.i);tg+=`<circle class="tgt" data-k="${k}" cx="${pt[0]}" cy="${pt[1]}" r="12"/>`;});
+  $('tg').innerHTML=tg;
+  // Namen an den Häusern, Mitte
+  let lb='';
+  for(let p=0;p<v.n;p++){const h=L.house[p],cx=h.reduce((a,x)=>a+x[0],0)/h.length,cy=h.reduce((a,x)=>a+x[1],0)/h.length,k=Math.floor(p/(v.n/4)),o=rotV([0,-1],k);lb+=`<text class="lbl" x="${cx+o[0]*36}" y="${cy+o[1]*36+4}" style="fill:${seatColor(p,v.n)};${v.cur===p?'font-size:15px':''}">${v.cur===p?'▶ ':''}${p===v.me?T('Du','You'):esc(v.names[p])}</text>`;}
+  $('lbls').innerHTML=lb;
+  const mid=[];const total=v.n/2;
+  let m=`<text class="lbl" x="${CEN[0]}" y="${CEN[1]-70}" style="font-size:24px;letter-spacing:.06em">${esc(TT.toUpperCase())}</text>`;
+  if(v.die){m+=`<text class="lbl" x="${CEN[0]}" y="${CEN[1]-20}" style="font-size:54px">${['','⚀','⚁','⚂','⚃','⚄','⚅'][v.die]}</text>`;}
+  for(let t=0;t<total;t++){const pcs=v.teamPieces[t],y=CEN[1]+20+t*22;m+=`<circle cx="${CEN[0]-70}" cy="${y-4}" r="7" fill="${TEAMC[t]}" stroke="#fff"/><text class="lbl" x="${CEN[0]-55}" y="${y}" style="text-anchor:start;font-size:14px">${pcs.home}/${pcs.total}</text>`;}
+  $('mid').innerHTML=m;
+  if(v.last&&(!prev||!prev.last||prev.last.seq!==v.last.seq)){K.sfx(v.last.cap?'bad':'lay');}
+  // Teams
+  $('teams').innerHTML=Array.from({length:total},(_,t)=>{const mem=v.names.map((n,i)=>i).filter(i=>teamOf(i,v.n)===t),pc=v.teamPieces[t];
+    return `<div class="tm${mem.includes(v.cur)&&!v.over?' turn':''}"><span class="dot" style="background:${TEAMC[t]}"></span><div style="flex:1"><b style="margin:0;color:${TEAMC[t]}">${tx(TEAMN[t])}</b><br><small>${mem.map(i=>(i===v.me?T('Du','You'):esc(v.names[i]))+(v.types[i]==='cpu'?' 🤖':'')).join(' + ')}</small><div class="bar"><i style="width:${Math.round(pc.home/pc.total*100)}%"></i></div></div><b>${pc.home}/${pc.total}</b></div>`;}).join('');
+  const b=$('hkBanner');
+  if(v.over){b.className=v.over.team===teamOf(v.me,v.n)?'me':'';b.textContent=(v.over.team===teamOf(v.me,v.n)?T('🏆 Dein Team gewinnt!','🏆 Your team wins!'):T('🏆 Team ','🏆 Team ')+tx(TEAMN[v.over.team])+T(' gewinnt!',' wins!'));}
+  else if(mine){b.className='me';b.textContent=T(`▶ DU BIST DRAN: Wähle eine Figur (Wurf ${inp.v})`,`▶ YOUR TURN: pick a piece (roll ${inp.v})`);}
+  else if(v.cur===v.me){b.className='me';b.textContent=T('▶ DU BIST DRAN: Würfeln','▶ YOUR TURN: roll');}
+  else{b.className='';b.textContent=T(`⏳ ${v.names[v.cur]} ist dran`,`⏳ ${v.names[v.cur]}'s turn`);}
+  $('svg').classList.toggle('myturn',mine||(v.cur===v.me&&!v.over));
+  document.title=(mine||v.cur===v.me)&&!v.over?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if((mine||v.cur===v.me)&&!(prev&&prev.cur===v.me&&!prev._m)&&!v.over)K.sfx('ping');
+  v._m=mine;
+  $('hkStatus').textContent=hintTxt||(v.log[0]?tx(v.log[0]):'');
+  $('hkLog').innerHTML=v.log.slice(1,60).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+}
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,v:spec.v,opts:spec.opts};hintTxt='';K.apply();}else res(null);});}
+function answer(k){if(!inp)return;const r=inp.res;inp=null;hintTxt='';K.apply();r(k);}
+$('svg').addEventListener('click',e=>{
+  if(!inp)return;
+  const t=e.target.closest('.tgt');if(t){answer(+t.dataset.k);return;}
+  const c=e.target.closest('.pc');if(!c)return;
+  const k=inp.opts.findIndex(o=>o.q===+c.dataset.p&&o.i===+c.dataset.i);
+  if(k>=0)answer(k);else{hintTxt=T('Diese Figur kann gerade nicht ziehen.','This piece cannot move right now.');K.apply();}
+});
+// ---------- Sicht und Start ----------
+function view(g,s){
+  const tp=[];for(let t=0;t<g.n/2;t++){let home=0,total=0;for(let p=0;p<g.n;p++)if(MTE.teamOf(g,p)===t){total+=g.P;g.pos[p].forEach(x=>{if(x>=80)home++;});}tp.push({home,total});}
+  return {me:s,n:g.n,P:g.P,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),pos:g.pos,cur:g.cur,die:g.die,dieP:g.dieP,last:g.last,over:g.over,teamPieces:tp,log:K.logFor(s)};
+}
+function startGame(seats,opts){
+  K.reset();
+  let n=opts.n,P=opts.P;if(seats.length>n){n=8;P=4;}
+  const names=['Kira','Bolt','Nova','Pixel','Juno','Rook','Echo','Zed'];let k=0;
+  const full=seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away}));
+  while(full.length<n)full.push({type:'cpu',name:names[k++%names.length],seat:-1});
+  K.G=MTE.setup(full,{n,P});
+  K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' beginnt.','New game. '+K.nm(K.G.cur)+' starts.'));
+  K.push();K.run(main);
+}
+async function main(){
+  await MTE.main();
+  const g=K.G,w=g.over.team;K.sfx('win');
+  const again=await K.vote(q=>({ico:'🏆',title:teamOf(q,g.n)===w?L2('Dein Team hat gewonnen!','Your team won!'):L2('Team '+TEAMN[w].de+' hat gewonnen!','Team '+TEAMN[w].en+' won!'),html:L2('<b>Abstimmung:</b> Noch eine Partie?','<b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+K=HK.init({
+  prefix:'mtm-v1-',title:L2('Mädn Teams','Ludo Teams'),minPlayers:2,diceZoom:false,diceDock:'diceDock',
+  seats:Array.from({length:8},(_,i)=>({name:T('Sitz ','Seat ')+(i+1),color:seatColor(i,8)})),
+  cpuNames:['Kira','Bolt','Nova','Pixel','Juno','Rook','Echo','Zed'],
+  dieColor:(p,g)=>seatColor(p,g.n),
+  view,valid:MTE.valid,render,ui,
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;builtKey='';$('game').hidden=true;$('setup').hidden=false;document.title=TT;}
+});
+MTE.bind(K);
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(readOpts().n-1);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>

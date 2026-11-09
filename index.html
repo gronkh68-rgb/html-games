@@ -100,6 +100,12 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
       <p>Ein Kreuzworträtsel rund um den Zoll.</p>
       <span class="play">Spielen →</span>
     </a>
+    <a class="game" href="mensch-teams/">
+      <div class="icon">🎲</div>
+      <h2>Mädn Teams</h2>
+      <p>Mensch ärgere dich nicht im Team auf dem doppelt so großen Brett (80 Felder): Wer gegenüber sitzt, ist dein Partner, ein Team muss 8 Figuren ins Ziel bringen. 4 oder 8 Spieler, gegen Computer oder online.</p>
+      <span class="play">Spielen →</span>
+    </a>
     <a class="game" href="mensch-aergere-dich-nicht/">
       <div class="icon">😤</div>
       <h2>Mensch ärgere dich nicht</h2>
@@ -187,6 +193,7 @@ SITE.addDict({'Meine HTML-Spiele':'My HTML Games','Direkt im Browser spielen. Ke
 'Heldengilde':'Hero Guild','Strategisches Kartenspiel: Stelle eine Gruppe aus Helden zusammen, würfle für ihre Fähigkeiten, besiege Monster und funke den anderen dazwischen. 2 bis 6 Spieler, gegen Computer oder online.':'Strategic card game: build a party of heroes, roll for their abilities, slay monsters and mess with the others. 2 to 6 players, against the computer or online.',
 'Neon-Labyrinth für bis zu 4 Spieler: zusammen gegen die Geister (mit Kristall-Sync) oder gegeneinander mit eigenen Räumen und Arena-Kampf.':'Neon maze for up to 4 players: together against the ghosts (with crystal sync) or against each other with your own rooms and arena fights.',
 'Wortgitter':'Word Grid','Das Buchstaben-Legespiel nach Scrabble-Regeln: Wörter auf das 15×15-Brett legen, Prämienfelder nutzen, mit Wörterbuch auf Deutsch oder Englisch. 2 bis 4 Spieler, gegen Computer oder online.':'The letter tile game with Scrabble rules: lay words on the 15×15 board, use premium squares, with a German or English dictionary. 2 to 4 players, against the computer or online.',
+'Mädn Teams':'Ludo Teams','Mensch ärgere dich nicht im Team auf dem doppelt so großen Brett (80 Felder): Wer gegenüber sitzt, ist dein Partner, ein Team muss 8 Figuren ins Ziel bringen. 4 oder 8 Spieler, gegen Computer oder online.':'Ludo in teams on a board twice as big (80 fields): the player opposite you is your partner, and a team must bring 8 pieces home. 4 or 8 players, against the computer or online.',
 'Auf & Ab':'Up & Down','Kooperatives Kartenspiel: Legt gemeinsam alle Zahlen von 2 bis 99 auf zwei aufsteigende und zwei absteigende Reihen, ohne Zahlen zu verraten. 1 bis 5 Spieler, mit Computer-Teamkollegen oder online.':'Cooperative card game: together, play all numbers from 2 to 99 onto two rising and two falling rows without revealing numbers. 1 to 5 players, with computer teammates or online.'});
 function paintMenu(){const n=SITE.name();document.getElementById('hello').textContent=n?SITE.T('Hallo, ','Hello, ')+n+'!':'';
   document.querySelectorAll('.menu .lang button').forEach(b=>b.classList.toggle('on',b.dataset.l===SITE.lang));}
