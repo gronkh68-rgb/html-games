@@ -101,7 +101,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.1.3';
+  var VERSION = '3.2.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -240,4 +240,26 @@
       document.body.appendChild(d);
     }).catch(function () {});
   }
+})();
+
+/* Abfragen und Fenster, die das Spiel nicht mehr blockieren: Sie sind unten rechts angedockt (auf dem Handy unten), das Spielfeld bleibt sichtbar und bedienbar.
+   Ein Klick auf die Überschrift klappt das Fenster ein oder aus. Verwendung: Klasse "dock" am Fenster (.overlay oder .ov2). */
+(function () {
+  var css = document.createElement('style');
+  css.textContent =
+    '.overlay.dock,.ov2.dock{position:fixed;inset:auto;right:12px;bottom:12px;top:auto;left:auto;display:block;background:transparent;padding:0;width:min(360px,calc(100vw - 24px));max-height:calc(100vh - 110px);pointer-events:none;z-index:900}' +
+    '.overlay.dock[hidden],.ov2.dock[hidden]{display:none}' +
+    '.overlay.dock>.box,.ov2.dock>.box{pointer-events:auto;width:100%;max-width:none;max-height:calc(100vh - 120px);overflow:auto;padding:14px 16px;text-align:left;box-shadow:0 10px 40px rgba(0,0,0,.65);border-radius:16px}' +
+    '.overlay.dock>.box>h2,.ov2.dock>.box>h2{cursor:pointer;user-select:none;font-size:1.15rem;margin:0 0 8px}' +
+    '.overlay.dock>.box>h2::after,.ov2.dock>.box>h2::after{content:" \\25BE";font-size:.7em;opacity:.6}' +
+    '.overlay.dock>.box.min>*:not(h2),.ov2.dock>.box.min>*:not(h2){display:none}' +
+    '.overlay.dock>.box.min>h2,.ov2.dock>.box.min>h2{margin:0}' +
+    '.overlay.dock>.box.min>h2::after,.ov2.dock>.box.min>h2::after{content:" \\25B8"}' +
+    '.overlay.dock .ico{font-size:1.8rem;line-height:1;margin-bottom:2px}' +
+    '@media (max-width:900px){.overlay.dock,.ov2.dock{left:8px;right:8px;bottom:8px;width:auto;max-height:52vh}.overlay.dock>.box,.ov2.dock>.box{max-height:50vh}}';
+  document.head.appendChild(css);
+  document.addEventListener('click', function (e) {
+    var h = e.target.closest && e.target.closest('.overlay.dock>.box>h2,.ov2.dock>.box>h2');
+    if (h) h.parentElement.classList.toggle('min');
+  });
 })();

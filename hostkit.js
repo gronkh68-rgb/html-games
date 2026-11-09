@@ -43,7 +43,7 @@
     try { K.snd = localStorage.getItem('hk-snd') !== '0'; } catch (e) {}
     function domReady(f) { if (document.readyState !== 'loading') f(); else addEventListener('DOMContentLoaded', f); }
     domReady(function () {
-      var m = document.createElement('div'); m.className = 'overlay'; m.id = 'hkModal'; m.hidden = true; m.setAttribute('data-noi18n', '');
+      var m = document.createElement('div'); m.className = 'overlay dock'; m.id = 'hkModal'; m.hidden = true; m.setAttribute('data-noi18n', '');
       m.innerHTML = '<div class="box"><div class="ico" id="hkIco"></div><h2 id="hkTitle"></h2><div class="tx" id="hkText"></div><div class="hk-btns" id="hkBtns"></div></div>';
       document.body.appendChild(m);
       var t = document.createElement('div'); t.id = 'hkToast'; t.style.opacity = 0; document.body.appendChild(t);
