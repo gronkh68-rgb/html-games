@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="../common.css">
 <script>window.RAIN_OPTION=1;</script>
 <script src="../theme.js"></script>
+<script src="../perf3d.js"></script>
 <script src="../room3d.js"></script>
 <script src="../dice.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
@@ -286,10 +287,11 @@ let renderer,scene,camera,controls,composer,bloom,stage=$('stage');
 const tweens=[];
 let boardG=null,pieceMeshes={},baseSpots={},baseGlow={},startBeams={},rain,tower;
 
+let perf=null;
 function initThree(){
   try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}
   catch(e){$('nogl').hidden=false;$('setup').hidden=true;return false;}
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
   renderer.setClearColor(0x05060b);
   stage.appendChild(renderer.domElement);
   scene=new THREE.Scene();
@@ -306,6 +308,7 @@ function initThree(){
     bloom=new THREE.UnrealBloomPass(new THREE.Vector2(512,512),.5,.45,.55);
     composer.addPass(bloom);
   }catch(e){composer=null;}
+  perf=window.Perf3D?Perf3D.create({r:renderer,resize:resize}):null;
   addEventListener('resize',resize);resize();
   new MutationObserver(()=>{buildEnvironment();if(boardG){buildBoard();for(const k in pieceMeshes)pieceMeshes[k].mine=pieceMeshes[k].p===cur;}}).observe(document.documentElement,{attributes:true,attributeFilter:['data-style']});
   setupPicking();
@@ -558,6 +561,7 @@ setInterval(()=>runTweens(performance.now()),50);
 let lastT=performance.now();
 function tick(now){
   requestAnimationFrame(tick);
+  if(perf)perf.frame(now);
   const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
   runTweens(now);
   const t=now/1000;

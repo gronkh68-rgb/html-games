@@ -17,6 +17,7 @@
 <script src="engine.js"></script>
 <style>
 .wrap{max-width:1500px}
+#diceDock{height:300px;width:225px;margin:0 auto;position:relative}
 .hk-layout{grid-template-columns:minmax(0,1fr) 320px}
 .bwrap{position:relative;width:min(100%,calc(100vh - 170px));min-width:300px;margin:0 auto;aspect-ratio:1}
 .board{position:absolute;inset:0;display:grid;grid-template-columns:1.55fr repeat(9,1fr) 1.55fr;grid-template-rows:1.55fr repeat(9,1fr) 1.55fr;gap:2px;background:#1a0606;border:4px solid #4a0d0d;border-radius:14px;padding:2px;box-shadow:0 0 40px rgba(255,60,0,.25)}
@@ -90,6 +91,7 @@ html[data-style="cyber"] .center{background:radial-gradient(circle,#1a0d2e,#0503
         <div class="bwrap" id="bwrap"><div class="board" id="board"></div><div class="tokens" id="tokens"></div></div>
       </div>
       <div class="hk-side">
+        <div id="diceDock"></div>
         <div class="panel"><div id="debt"></div><div class="acts" id="acts"></div></div>
         <div class="panel"><div class="plist" id="plist"></div></div>
         <div class="panel"><div id="hkLog"></div></div>
@@ -297,7 +299,7 @@ function startGame(seats,opts){
   K.push();K.run(main);
 }
 K=HK.init({
-  diceBox:'bwrap',prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
+  diceDock:'diceDock',prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
   seats:TOKENS.map((t,i)=>({name:t+' '+CHARS[i],color:COLORS[i]})),
   cpuNames:CHARS,cpuNameFor:i=>CHARS[i],
   view,valid:HTE.valid,render,ui,fx,

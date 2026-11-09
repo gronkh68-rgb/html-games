@@ -83,7 +83,7 @@
     if (F.ready) return;
     host = hostEl; api = apiObj;
     r = new THREE.WebGLRenderer({ antialias: true });
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); host.appendChild(r.domElement);
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); host.appendChild(r.domElement);
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(40, 1, .1, 500);
     controls = new THREE.OrbitControls(camera, r.domElement);
@@ -110,7 +110,8 @@
     });
     addEventListener('resize', function () { if (active) F.resize(); });
     if (window.ResizeObserver) new ResizeObserver(function () { if (active) F.resize(); }).observe(host);
-    requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (active) tick(now); });
+    var perf = window.Perf3D ? Perf3D.create({ r: r, resize: function () { F.resize(); } }) : null;
+    requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (active) { if (perf) perf.frame(now); tick(now); } });
     setInterval(function () { var n = performance.now(); if (active && n - lastR > 400) tick(n); else runTw(n); }, 100);
     F.ready = true; F.resize();
   };

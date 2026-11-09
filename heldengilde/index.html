@@ -17,6 +17,7 @@
 <script src="engine.js"></script>
 <style>
 .wrap{max-width:1500px}
+#diceDock{height:300px;width:225px;margin:0 auto;position:relative}
 .board{background:radial-gradient(ellipse at 50% 30%,#3b2a4f,#17111f);border:3px solid #120c18;border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:14px;transition:border-color .3s,box-shadow .3s}
 .board.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.35),0 0 40px rgba(255,210,63,.2)}
 html[data-style="cyber"] .board{background:radial-gradient(ellipse at 50% 30%,#1a0d2e,#05030a);border-color:#ff2a5555}
@@ -102,6 +103,7 @@ html[data-style="cyber"] .card{background:linear-gradient(160deg,#0d1424,#05070d
         </div>
       </div>
       <div class="hk-side">
+        <div id="diceDock"></div>
         <div class="panel" id="deckInfo" style="font-size:.88rem"></div>
         <div class="panel"><div id="hkLog"></div></div>
         <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
@@ -260,7 +262,7 @@ function startGame(seats,opts){
   K.push();K.run(main);
 }
 K=HK.init({
-  diceBox:'board',prefix:'hgl-v1-',title:L2('Heldengilde','Hero Guild'),minPlayers:2,
+  diceDock:'diceDock',prefix:'hgl-v1-',title:L2('Heldengilde','Hero Guild'),minPlayers:2,
   seats:[{name:'1',color:'#e53935'},{name:'2',color:'#f9a825'},{name:'3',color:'#1e88e5'},{name:'4',color:'#43a047'},{name:'5',color:'#8e24aa'},{name:'6',color:'#00acc1'}],
   cpuNames:['Kira','Bolt','Nova','Pixel','Juno','Rook'],
   view,valid:HGE.valid,render,ui,fx,

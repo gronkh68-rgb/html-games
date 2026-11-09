@@ -9,6 +9,7 @@
 <script src="../theme.js?v=dark1"></script>
 <script src="../room3d.js"></script>
 <script src="../dice.js"></script>
+<script src="../perf3d.js"></script>
 <script src="../dice3d.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
@@ -16,6 +17,8 @@
 <script src="../net.js"></script>
 <style>
 .wrap{max-width:1500px}
+#diceDock.floatdock{position:fixed;left:12px;bottom:12px;height:min(28vh,240px);width:calc(min(28vh,240px)*.75);z-index:25}
+@media (max-width:760px){#diceDock.floatdock{height:min(20vh,170px);width:calc(min(20vh,170px)*.75);bottom:calc(var(--bar,0px) + 8px)}}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
 #boardWrap{width:min(100%,calc(100vh - 150px));margin:0 auto;position:relative}
 /* physischer Würfel (optional): CSS-3D-Würfel über dem Brett */
@@ -195,6 +198,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
 </style>
 </head>
 <body>
+<div id="diceDock" class="floatdock" hidden></div>
 <div class="wrap">
   <div class="top"><a class="back" href="../">← Spiele</a><h1>Mensch ärgere dich nicht</h1></div>
 
@@ -355,7 +359,8 @@ const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():
 const isLocal=p=>cfg[p]==='human';
 const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
 let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DV=null;
-const DICEV=()=>DV||(DV=Dice3D.view($('boardWrap')));
+const DICEV=()=>DV||(DV=Dice3D.view($('diceDock')));
+const syncDock=on=>{const d=$('diceDock');if(d.hidden!==!on){d.hidden=!on;if(on)DICEV().show();}};
 const physOn=()=>($('diceMode')||{}).value==='phys';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pname=p=>names[p]?` (${esc(names[p])})`:'';
@@ -643,7 +648,7 @@ async function doRoll(p){
     netPhase={k:'idle'};netPush();
     if(phys){
       tp=await new Promise(res=>{rollWait=()=>res(null);DICEV().drag(1).then(res,()=>{});});
-      if(!tp)DICEV().cancel();
+      if(!tp)DICEV().stopDrag();
       rollWait=null;btn.disabled=true;setMine(false);
     }else{
       await new Promise(res=>{rollWait=res;});
@@ -813,21 +818,21 @@ function startGame(){
 }
 function launch(){            // startet das Spiel mit den Werten in cfg und names
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
-  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);if(DV)DV.cancel();if(physOn())Dice3D.ready();bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);if(DV)DV.cancel();syncDock(physOn());bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
   pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
   gameLoop();
 }
 function backToSetup(){
-  token++;pick=null;rollWait=null;setMine(false);if(DV)DV.cancel();buildSetup();
+  token++;pick=null;rollWait=null;setMine(false);if(DV)DV.cancel();syncDock(false);buildSetup();
   $('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;
 }
 $('start').onclick=startGame;
 $('again').onclick=backToSetup;
 $('winBtn').onclick=backToSetup;
 const rollClick=()=>{
-  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;if(clientDrag){clientDrag=false;DICEV().cancel();}sendHost({t:'roll'});}}
+  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;if(clientDrag){clientDrag=false;DICEV().stopDrag();}sendHost({t:'roll'});}}
   else if(rollWait)rollWait();
 };
 $('rollBtn').onclick=rollClick;$('die').onclick=rollClick;
@@ -1095,7 +1100,7 @@ function onClientMsg(m){
   if(m.t==='welcome'){if(m.tok)setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();$('joinForm').hidden=true;$('joinLobby').hidden=false;}
   else if(m.t==='lobby'){
     mySlot=m.you;if(m.cols)m.cols.forEach((k,i)=>setSeatColor(i,k));
-    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
+    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;if(DV)DV.cancel();syncDock(false);$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
     $('joinForm').hidden=true;$('joinLobby').hidden=false;
     $('joinSlots').innerHTML=m.slots.map((s,i)=>{
       const me=i===m.you;
@@ -1116,7 +1121,7 @@ function onClientClose(){if(netRole==='client')goMenu('Die Verbindung zum Host i
 function goMenu(why){
   setMine(false);
   if(!why)setRejoin(null);   // freiwillig gegangen: kein Wiederbeitritt anbieten
-  leaveNet();token++;
+  leaveNet();token++;if(DV)DV.cancel();syncDock(false);
   $('game').hidden=true;$('setup').hidden=false;
   if(!$('winBox').hidden){$('winBox').hidden=true;}
   showMode('join');errMsg(why||'');
@@ -1136,6 +1141,7 @@ function applySnap(s,you){
   if(cur!==lastCur){lastCur=cur;showTurn(cur);}else showScores();
   $('msg').innerHTML=safeHtml(s.msg);
   const ph=s.phase||{k:'idle'};
+  syncDock(!!s.phys);
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'&&ph.track){
     if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV().play(ph.track).then(()=>dieDone(v));}
@@ -1325,7 +1331,7 @@ new MutationObserver(()=>{if(T3){buildEnv3();build3();if(typeof cur==='number'&&
 function init3(){
   const el3=$('stage3d');
   const r=new THREE.WebGLRenderer({antialias:true});
-  r.setPixelRatio(Math.min(devicePixelRatio||1,2));r.setClearColor(0x05060b);
+  r.setPixelRatio(Math.min(devicePixelRatio||1,1.5));r.setClearColor(0x05060b);
   el3.appendChild(r.domElement);
   const scene=new THREE.Scene();
   const camera=new THREE.PerspectiveCamera(55,1,.1,200);camera.position.set(0,14,15);
@@ -1336,7 +1342,7 @@ function init3(){
     composer=new THREE.EffectComposer(r);composer.addPass(new THREE.RenderPass(scene,camera));
     composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512,512),.5,.45,.55));
   }catch(e){composer=null;}
-  T3={r,scene,camera,controls,composer,rain:null,room:null,env:[],group:null,pm:{},bases:{},follow:true,tw:[]};buildEnv3();
+  T3={r,scene,camera,controls,composer,rain:null,room:null,env:[],group:null,pm:{},bases:{},follow:true,tw:[]};T3.perf=window.Perf3D?Perf3D.create({r,resize:resize3}):null;buildEnv3();
   // Figuren anklicken
   const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down=null;
   r.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,t:performance.now()};});
@@ -1528,6 +1534,7 @@ let last3=performance.now();
 function tick3(now){
   requestAnimationFrame(tick3);
   if(!v3||!T3)return;
+  if(T3.perf)T3.perf.frame(now);
   const dt=Math.min(.05,(now-last3)/1000);last3=now;
   runTw3(now);
   const t=now/1000;

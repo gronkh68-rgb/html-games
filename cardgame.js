@@ -35,7 +35,7 @@
     var self = this, THREEx = window.THREE;
     this.host = host; this.cards = {}; this.chips = {}; this.labels = {}; this.tw = []; this.style = null; this.view = null; this.markers = {}; this.texCache = {}; this.matCache = {};
     var r = this.r = new THREE.WebGLRenderer({ antialias: true });
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); host.appendChild(r.domElement);
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); host.appendChild(r.domElement);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, 1, .1, 400); this.camera.position.set(0, 21, 27);
     var c = this.controls = new THREE.OrbitControls(this.camera, r.domElement);
@@ -43,7 +43,8 @@
     this.env = [];
     this.build();
     addEventListener('resize', function () { self.resize(); }); this.resize();
-    requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); self.tick(now); });
+    this.perf = window.Perf3D ? Perf3D.create({ r: r, resize: function () { self.resize(); } }) : null;
+    requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (self.perf) self.perf.frame(now); self.tick(now); });
     setInterval(function () { self.runTw(performance.now()); }, 50);
     new MutationObserver(function () { self.build(); if (self.view) self.update(self.view, true); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
   }

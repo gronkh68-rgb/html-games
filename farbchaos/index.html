@@ -13,6 +13,7 @@
 <script src="../net.js"></script>
 <script src="../mplobby.js"></script>
 <script src="../room3d.js"></script>
+<script src="../perf3d.js"></script>
 <script src="view3d.js"></script>
 <style>
 .wrap{max-width:1560px}
@@ -583,7 +584,7 @@ function fullOff(){
   try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
 }
 function toggleFs(){
-  try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen();}catch(e){}
+  try{if(document.fullscreenElement)document.exitFullscreen();else Promise.resolve(document.documentElement.requestFullscreen()).catch(function(){});}catch(e){}
 }
 document.addEventListener('fullscreenchange',()=>{const f=!!document.fullscreenElement;$('fsBtn').textContent=f?'⛶ Vollbild beenden':'⛶ Vollbild';if(window.H3D&&H3D.ready)H3D.resize();if(window.FC3D&&FC3D.ready)FC3D.resize();});
 $('fsBtn').onclick=toggleFs;
@@ -595,7 +596,7 @@ async function set3d(on,gesture){
       $('board').hidden=true;$('stage3d').hidden=false;fullOn();
       FC3D.init($('stage3d'),{CARDS,COLN,sym,spinMode:()=>!!(V&&V.opts&&V.opts.spin),cyber:()=>document.documentElement.getAttribute('data-style')==='cyber',sfx,onCard:id=>clickHand(id),onDraw:()=>{if(inp&&inp.mode==='turn')answerTurn({c:null});}});
       FC3D.setActive(true);use3d=true;FC3D.resize();
-      if(gesture){try{document.documentElement.requestFullscreen();}catch(e){}}
+      if(gesture){try{Promise.resolve(document.documentElement.requestFullscreen()).catch(function(){});}catch(e){}}
       if(V)FC3D.update(V,inp,true);
     }catch(e){fullOff();$('board').hidden=false;$('stage3d').hidden=true;use3d=false;hint('3D konnte nicht geladen werden (keine Verbindung zu three.js?).');}
     $('v3d').disabled=false;

@@ -14,7 +14,7 @@
   var CANNON_URL = 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
   var THREE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
   var C = null, loadP = null;
-  var HALF = 0.5, TX = 5.4, TZ = 3.3, G = -42, DT = 1 / 60, EVERY = 2;      // Würfelkante 1, Tablett 10,8 x 6,6
+  var HALF = 0.5, TX = 4.3, TZ = 6.2, G = -42, DT = 1 / 60, EVERY = 2;      // Würfelkante 1, Tablett 8,6 x 12,4 (Schuss von unten nach oben)
   var FACE_N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]], FACE_V = [3, 4, 1, 6, 2, 5];   // Reihenfolge der BoxGeometry-Seiten
   function load(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load ' + src)); }; document.head.appendChild(s); }); }
   D.ready = function () {
@@ -44,8 +44,8 @@
   D.autoParams = function (n) {
     var d = [];
     for (var i = 0; i < n; i++) {
-      var ang = rnd(-.5, .5), sp = rnd(12, 32), x = -TX + 1.7, z = rnd(-.4, .4) + i * 1.3 - (n - 1) * .65;
-      d.push({ p: [x, .9, z], q: randQ(), v: [Math.cos(ang) * sp, rnd(-2, 2), Math.sin(ang) * sp], w: [rnd(-20, 20), rnd(-20, 20), rnd(-20, 20)] });
+      var ang = rnd(-.45, .45), sp = rnd(14, 38), x = (i - (n - 1) / 2) * 1.55 + rnd(-.3, .3), z = TZ - 1.7;
+      d.push({ p: [x, .9, z], q: randQ(), v: [Math.sin(ang) * sp, rnd(-2, 2), -Math.cos(ang) * sp], w: [rnd(-20, 20), rnd(-20, 20), rnd(-20, 20)] });
     }
     return { dice: d };
   };
@@ -111,46 +111,63 @@
     P[v].forEach(function (p) { x.beginPath(); x.arc(p[0] * size, p[1] * size, size * (v === 1 ? .12 : .085), 0, 7); if (cyber) { x.fillStyle = '#fcee09'; x.shadowColor = '#fcee09'; x.shadowBlur = size * .05; } else { x.fillStyle = v === 1 ? '#c62828' : '#16161c'; } x.fill(); x.shadowBlur = 0; });
     var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
-  D.view = function (container) {
-    var V = { dice: [], busy: false }, T = null;
-    var cs = getComputedStyle(container); if (cs.position === 'static') container.style.position = 'relative';
-    var cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:60;touch-action:none';
-    var hint = document.createElement('div'); hint.style.cssText = 'position:absolute;left:50%;bottom:6%;transform:translateX(-50%);z-index:61;pointer-events:none;background:rgba(10,14,30,.88);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:12px;padding:8px 14px;font:700 14px system-ui,sans-serif;text-align:center;display:none;max-width:92%';
-    container.appendChild(cv); container.appendChild(hint);
-    var renderer, scene, cam, ray, plane, trayG, aimG, band, handle, pad, dots = [], floorMat, rimMat, padMat, shadowPlane, lastStyle = '', mats = null, geo = null, raf = 0, hideT = 0, MAXP = 4.2;
+  // ---------- Darstellung: Tablett als Dock neben dem Spielfeld, Kamerafahrt nur beim eigenen Wurf ----------
+  var ASP = (TX * 2 + 2.8) / (TZ * 2 + 2.8), MAXP = 4.6, ANCH_Z = TZ - 1.7;
+  var cssDone = false;
+  function addCss() {
+    if (cssDone) return; cssDone = true;
+    var st = document.createElement('style');
+    st.textContent = '.dice-wrap{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:rgba(8,12,22,.55);border:2px solid rgba(255,255,255,.18);box-shadow:0 6px 20px rgba(0,0,0,.45)}' +
+      '.dice-wrap canvas{display:block;width:100%;height:100%;touch-action:none}' +
+      '.dice-wrap .dh{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:3;pointer-events:none;background:rgba(10,14,30,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 10px;font:700 12px system-ui,sans-serif;text-align:center;display:none;width:88%}' +
+      '.dice-wrap.big .dh{font-size:15px;padding:8px 14px;width:auto;max-width:92%}' +
+      '.dice-wrap .dbtn{position:absolute;left:50%;bottom:54px;transform:translateX(-50%);z-index:4;font:600 13px system-ui,sans-serif;color:#fff;background:rgba(40,46,70,.95);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:7px 14px;cursor:pointer}' +
+      '#diceBackdrop{position:fixed;inset:0;z-index:899;background:rgba(5,8,18,.6);opacity:0;transition:opacity .35s;pointer-events:auto}';
+    document.head.appendChild(st);
+  }
+  D.view = function (host) {
+    addCss();
+    var V = { dice: [], busy: false, zoomed: false };
+    var cs = getComputedStyle(host); if (cs.position === 'static') host.style.position = 'relative';
+    var wrap = document.createElement('div'); wrap.className = 'dice-wrap'; wrap.setAttribute('data-noi18n', '');
+    var cv = document.createElement('canvas'), hint = document.createElement('div'); hint.className = 'dh';
+    wrap.appendChild(cv); wrap.appendChild(hint); host.appendChild(wrap); V.wrap = wrap; V.host = host;
+    var renderer, scene, cam, ray, plane, trayG, aimG, band, handle, pad, dots = [], floorMat, rimMat, padMat, shadowPlane, mats = null, geo = null, raf = 0, hideT = 0, backdrop = null, unzoomT = 0, visible = true;
     function cyber() { return document.documentElement.getAttribute('data-style') === 'cyber'; }
     function build() {
       if (renderer) return;
-      renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); renderer.setClearColor(0, 0); renderer.shadowMap.enabled = true;
+      renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, powerPreference: 'high-performance' }); renderer.setClearColor(0, 0); renderer.shadowMap.enabled = true;
       scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, 1, .1, 100); ray = new THREE.Raycaster(); plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.5);
       scene.add(new THREE.AmbientLight(0xffffff, .72));
       var dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(-4, 14, 6); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024);
-      var sc = dl.shadow.camera; sc.left = -9; sc.right = 9; sc.top = 7; sc.bottom = -7; sc.near = 1; sc.far = 40; scene.add(dl);
-      shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), new THREE.ShadowMaterial({ opacity: .38 })); shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.position.y = .03; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
+      var sc = dl.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 10; sc.bottom = -10; sc.near = 1; sc.far = 40; scene.add(dl);
+      shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: .38 })); shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.position.y = .03; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
       geo = new THREE.BoxGeometry(1, 1, 1);
       // Tablett: Filzboden, Holzrand, Abschussfeld
-      trayG = new THREE.Group(); trayG.visible = false; scene.add(trayG);
-      floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95, transparent: true, opacity: .93 });
+      trayG = new THREE.Group(); scene.add(trayG);
+      floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95 });
       var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; trayG.add(floor);
       rimMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: .55 });
       var RT = .8, RH = 1.15;
       function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; trayG.add(m); }
       rim(TX * 2 + RT * 2, RT, 0, -TZ - RT / 2); rim(TX * 2 + RT * 2, RT, 0, TZ + RT / 2); rim(RT, TZ * 2, -TX - RT / 2, 0); rim(RT, TZ * 2, TX + RT / 2, 0);
       padMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide });
-      pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); pad.rotation.x = -Math.PI / 2; pad.position.y = .04; pad.visible = false; trayG.add(pad);
+      pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); pad.rotation.x = -Math.PI / 2; pad.position.set(0, .04, ANCH_Z); pad.visible = false; trayG.add(pad);
       // Zielhilfe: Gummiband, Griff und Punktreihe in Schussrichtung
       aimG = new THREE.Group(); aimG.visible = false; scene.add(aimG);
       var am = function () { return new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthTest: false }); };
       band = new THREE.Mesh(geo, am()); band.renderOrder = 10; aimG.add(band);
       handle = new THREE.Mesh(new THREE.RingGeometry(.3, .45, 28), am()); handle.rotation.x = -Math.PI / 2; handle.renderOrder = 11; aimG.add(handle);
       for (var di = 0; di < 9; di++) { var dm = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), am()); dm.renderOrder = 10; aimG.add(dm); dots.push(dm); }
-      resize();
+      skin(); resize();
     }
     function skin() {
       var cy = cyber();
       floorMat.color.set(cy ? 0x0b1626 : 0x1f6b4d); floorMat.emissive.set(cy ? 0x001a24 : 0x000000);
-      rimMat.color.set(cy ? 0x12304a : 0x6b4a2b); rimMat.emissive.set(cy ? 0x0a3a55 : 0x000000); padMat.color.set(cy ? 0x00f0ff : 0xffe08a);
+      rimMat.color.set(cy ? 0x0e2a45 : 0x6b4a2b); rimMat.emissive.set(cy ? 0x06202f : 0x000000); padMat.color.set(cy ? 0x00f0ff : 0xffe08a);
+      wrap.style.borderColor = cy ? 'rgba(0,240,255,.45)' : 'rgba(255,255,255,.18)';
     }
+    new MutationObserver(function () { if (renderer) { skin(); mk(); once(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
     function updateAim(ax, az, pull) {      // Gummiband, Griff und Zielpunkte; Rückgabe: Kraft 0..1
       var len = Math.hypot(pull.x, pull.z), power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), col = new THREE.Color().setHSL(.33 * (1 - power), .9, .55);
       aimG.visible = len > .2;
@@ -160,7 +177,7 @@
       handle.position.set(ex, .6, ez); handle.material.color.copy(col);
       var dx = -pull.x / len, dz = -pull.z / len;
       dots.forEach(function (m, i) {
-        var d = 1.1 + i * (.62 + power * .55), x = ax + dx * d, z = az + dz * d;
+        var d = 1.1 + i * (.7 + power * .6), x = ax + dx * d, z = az + dz * d;
         m.visible = len > .7 && Math.abs(x) < TX - .3 && Math.abs(z) < TZ - .3;
         m.position.set(x, .55, z); m.scale.setScalar(1.15 - i * .09); m.material.color.copy(col);
       });
@@ -175,34 +192,73 @@
     }
     function resize() {
       if (!renderer) return;
-      var w = container.clientWidth || 400, h = container.clientHeight || 300; renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(w, h, false);
+      var w = wrap.clientWidth || 200, h = wrap.clientHeight || 280;
+      renderer.setPixelRatio(Math.min(V.zoomed ? 2 : 1.5, window.devicePixelRatio || 1)); renderer.setSize(w, h, false);
       cam.aspect = w / h; var vf = cam.fov * Math.PI / 180, needH = (TZ + 1.4) * 2, needW = (TX + 1.4) * 2;
       var dist = Math.max(needH / (2 * Math.tan(vf / 2)), needW / (2 * Math.tan(vf / 2) * cam.aspect));
-      cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
+      cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
     }
-    var ro = window.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe(container);
+    var ro = window.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe(wrap);
     function ensure(n) {
       while (V.dice.length < n) { var m = new THREE.Mesh(geo, mk().list); m.castShadow = true; scene.add(m); V.dice.push({ mesh: m }); }
-      V.dice.forEach(function (d, i) { d.mesh.visible = i < n; });
+      V.dice.forEach(function (d, i) { d.mesh.visible = i < n || (d.mesh.visible && i < V.shown); });
     }
-    function loop() { raf = 0; if (renderer) { renderer.render(scene, cam); } if (V._anim) raf = requestAnimationFrame(loop); }
+    // Es wird nur gezeichnet, wenn sich etwas bewegt (spart Leistung); sonst genau ein Bild pro Änderung
+    function loop() { raf = 0; if (renderer && visible) renderer.render(scene, cam); if (V._anim) raf = requestAnimationFrame(loop); }
     function kick() { if (!raf) raf = requestAnimationFrame(loop); }
-    V.show = function (on) { cv.style.display = on ? '' : 'none'; };
-    V.hide = function () { clearTimeout(hideT); V._anim = 0; hint.style.display = 'none'; if (renderer) { trayG.visible = false; aimG.visible = false; pad.visible = false; V.dice.forEach(function (d) { d.mesh.visible = false; }); renderer.render(scene, cam); } };
-    V.hint = function (t) { hint.textContent = t || ''; hint.style.display = t ? '' : 'none'; };
+    function once() { if (renderer && visible && !V._anim) renderer.render(scene, cam); }
+    // Dock ein-/ausblenden (z. B. wenn kein Spiel läuft)
+    V.show = function (on) {
+      if (on === false) { visible = false; host.style.display = 'none'; V._anim = 0; return; }
+      visible = true; host.style.display = ''; return D.ready().then(function () { build(); mk(); resize(); once(); });
+    };
+    V.hint = function (t) { hint.textContent = t || ''; hint.style.display = t ? 'block' : 'none'; };
     function setDie(d, p, q) { d.mesh.position.set(p[0], p[1], p[2]); d.mesh.quaternion.set(q[0], q[1], q[2], q[3]); }
-    // Schleuder: Würfel nach hinten ziehen, zielen, loslassen -> Wurfdaten. opts.hint = Text. Mit V.cancel() abbrechbar.
+    // ----- Kamerafahrt: das Tablett fährt groß in die Mitte (nur wenn man selbst wirft), danach zurück ins Dock -----
+    function bigRect() {
+      var iw = window.innerWidth, ih = window.innerHeight, h = Math.min(ih * .92, 940), w = h * ASP;
+      if (w > iw * .96) { w = iw * .96; h = w / ASP; }
+      return { left: (iw - w) / 2, top: (ih - h) / 2, width: w, height: h };
+    }
+    function applyBig() { var b = bigRect(); wrap.style.cssText = 'position:fixed;z-index:900;left:' + b.left + 'px;top:' + b.top + 'px;width:' + b.width + 'px;height:' + b.height + 'px;inset:auto'; wrap.style.left = b.left + 'px'; wrap.style.top = b.top + 'px'; }
+    V.zoom = function (on) {
+      if (on === V.zoomed || !renderer) return;
+      clearTimeout(unzoomT);
+      var first = wrap.getBoundingClientRect();
+      V.zoomed = on;
+      if (on) {
+        if (!backdrop) { backdrop = document.createElement('div'); backdrop.id = 'diceBackdrop'; }
+        document.body.appendChild(backdrop); void backdrop.offsetWidth; backdrop.style.opacity = '1';
+        document.body.appendChild(wrap); applyBig(); wrap.classList.add('big');
+      } else {
+        if (backdrop) { backdrop.style.opacity = '0'; var bd = backdrop; setTimeout(function () { if (!V.zoomed && bd.parentNode) bd.remove(); }, 380); }
+        host.appendChild(wrap); wrap.style.cssText = ''; wrap.classList.remove('big');
+      }
+      resize();
+      var last = wrap.getBoundingClientRect();
+      if (wrap.animate && last.width && first.width) {
+        wrap.animate([{ transformOrigin: '0 0', transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px) scale(' + (first.width / last.width) + ',' + (first.height / last.height) + ')' }, { transformOrigin: '0 0', transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        V._anim = 1; kick(); setTimeout(function () { if (!V._tick && !V._playing) { V._anim = 0; once(); } }, 480);
+      }
+    };
+    addEventListener('resize', function () { if (V.zoomed) { applyBig(); resize(); } });
+    V.hide = function () {      // Würfel wegräumen und aus der Kamerafahrt zurück
+      clearTimeout(hideT); V._anim = 0; V._playing = 0; V.hint('');
+      if (V.zoomed) V.zoom(false);
+      if (renderer) { aimG.visible = false; pad.visible = false; V.dice.forEach(function (d) { d.mesh.visible = false; }); V.shown = 0; once(); }
+    };
+    // Schleuder: Würfel nach hinten (nach unten) ziehen, zielen, loslassen -> Wurfdaten. Mit V.cancel()/V.stopDrag() abbrechbar.
     V.drag = function (n, opts) {
       opts = opts || {};
-      return D.ready().then(function () {
-        build(); mk(); skin(); clearTimeout(hideT); ensure(n); trayG.visible = true; V.busy = true; V._anim = 1; resize();
-        var ax = -TX + 1.7, az = 0, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = V.dice.map(function () { return randQ(); }), spin = V.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), tmp = new THREE.Vector3(), t0 = performance.now(), last = t0;
-        var base = opts.hint || (window.SITE ? SITE.T('Würfel nach hinten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice back, aim and release to shoot') : 'Pull back, aim, release');
+      return V.show().then(function () {
+        mk(); skin(); clearTimeout(hideT); clearTimeout(unzoomT); ensure(n); V.shown = n; V.busy = true; V._anim = 1;
+        if (opts.zoom !== false) V.zoom(true);
+        var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = V.dice.map(function () { return randQ(); }), spin = V.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), tmp = new THREE.Vector3(), t0 = performance.now(), last = t0;
+        var base = opts.hint || (window.SITE ? SITE.T('Würfel nach unten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice down, aim and release to shoot') : 'Pull down, aim, release');
         var off = function (i) { return (i - (n - 1) / 2) * 1.55; };
-        pad.visible = true; pad.position.set(ax, .04, az); aimG.visible = false;
-        V.dice.slice(0, n).forEach(function (d, i) { setDie(d, [ax, .5, az + off(i)], q0[i]); });
-        V.hint(base);
-        container.style.cursor = 'grab'; container.style.touchAction = 'none';
+        pad.visible = true; aimG.visible = false;
+        V.dice.slice(0, n).forEach(function (d, i) { d.mesh.visible = true; setDie(d, [ax + off(i), .5, az], q0[i]); });
+        V.hint(base); wrap.style.cursor = 'grab';
         function pt(e) { var r = cv.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam); return ray.ray.intersectPlane(plane, tmp) ? [tmp.x, tmp.z] : null; }
         function tick(now) {
           var dt = Math.min(.05, (now - last) / 1000); last = now;
@@ -210,7 +266,7 @@
             var s = held ? 1.6 : .35, ax2 = new THREE.Vector3(spin[i][0], spin[i][1], spin[i][2]), a = ax2.length() * dt * s;
             if (a > 0) { var dq = new THREE.Quaternion().setFromAxisAngle(ax2.normalize(), a); var cq = new THREE.Quaternion(q0[i][0], q0[i][1], q0[i][2], q0[i][3]).premultiply(dq); q0[i] = [cq.x, cq.y, cq.z, cq.w]; }
             var py = held ? .9 : .5 + .12 * Math.abs(Math.sin((now - t0) / 500));
-            d.mesh.position.set(ax + pull.x * .22, py, az + off(i) + pull.z * .22); d.mesh.quaternion.set(q0[i][0], q0[i][1], q0[i][2], q0[i][3]);
+            d.mesh.position.set(ax + off(i) + pull.x * .22, py, az + pull.z * .22); d.mesh.quaternion.set(q0[i][0], q0[i][1], q0[i][2], q0[i][3]);
           });
           if (V._tick) requestAnimationFrame(tick);
         }
@@ -218,10 +274,9 @@
         return new Promise(function (res, rej) {
           function down(e) {
             var p = pt(e); if (!p) return;
-            var hit = V.dice.slice(0, n).some(function (d) { return ray.ray.distanceToPoint(d.mesh.position) < 1.6; });      // nur ein Griff auf den Würfel startet den Schuss, der Rest des Bretts bleibt bedienbar
+            var hit = V.dice.slice(0, n).some(function (d) { return ray.ray.distanceToPoint(d.mesh.position) < 1.9; });      // nur ein Griff auf den Würfel startet den Schuss
             if (!hit) return;
-            held = true; gp = p.slice();      // gezogen wird relativ zum Griffpunkt
-            try { container.setPointerCapture(e.pointerId); } catch (er) {} container.style.cursor = 'grabbing'; e.preventDefault(); e.stopPropagation(); move(e);
+            held = true; gp = p.slice(); try { wrap.setPointerCapture(e.pointerId); } catch (er) {} wrap.style.cursor = 'grabbing'; e.preventDefault(); e.stopPropagation(); move(e);
           }
           function move(e) {
             if (!held) return; var p = pt(e); if (!p) return;
@@ -233,36 +288,42 @@
             if (e.cancelable) e.preventDefault(); e.stopPropagation();
           }
           function up(e) {
-            if (!held) return; held = false; container.style.cursor = 'grab'; e.stopPropagation(); try { container.releasePointerCapture(e.pointerId); } catch (er) {}
+            if (!held) return; held = false; wrap.style.cursor = 'grab'; e.stopPropagation(); try { wrap.releasePointerCapture(e.pointerId); } catch (er) {}
             var len = Math.hypot(pull.x, pull.z);
             if (len < .7) { pull = { x: 0, z: 0 }; aimG.visible = false; V.hint(base); return; }      // zu wenig gezogen: nichts passiert, nochmal versuchen
-            var power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), speed = 9 + power * 31, dice = [], base0 = Math.atan2(-pull.z, -pull.x);
+            var power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), speed = 10 + power * 34, dice = [], base0 = Math.atan2(-pull.z, -pull.x);
             cleanup(); aimG.visible = false; pad.visible = false;
             for (var i = 0; i < n; i++) {
-              var ang = base0 + rnd(-.04, .04), vx = Math.cos(ang) * speed, vz = Math.sin(ang) * speed;
+              var ang = base0 + rnd(-.04, .04), vx2 = Math.cos(ang) * speed, vz2 = Math.sin(ang) * speed;
               // Drehung: Rollen in Schussrichtung plus zufälliges Taumeln aus der Hand
-              var w = [vz * 1.0 + rnd(-9, 9) + spin[i][0] * 1.5, rnd(-8, 8) + spin[i][1] * 1.5, -vx * 1.0 + rnd(-9, 9) + spin[i][2] * 1.5];
-              dice.push({ p: [ax + pull.x * .22, .9, az + off(i) + pull.z * .22], q: q0[i].slice(), v: [vx, rnd(-1.5, .5), vz], w: w });
+              var w = [vz2 * 1.0 + rnd(-9, 9) + spin[i][0] * 1.5, rnd(-8, 8) + spin[i][1] * 1.5, -vx2 * 1.0 + rnd(-9, 9) + spin[i][2] * 1.5];
+              dice.push({ p: [ax + off(i) + pull.x * .22, .9, az + pull.z * .22], q: q0[i].slice(), v: [vx2, rnd(-1.5, .5), vz2], w: w });
             }
             res({ dice: dice });
           }
-          function cleanup() { container.removeEventListener('pointerdown', down, true); container.removeEventListener('pointermove', move, true); container.removeEventListener('pointerup', up, true); container.removeEventListener('pointercancel', up, true); container.style.cursor = ''; container.style.touchAction = ''; V._tick = 0; V.hint(''); V._cleanup = null; }
+          function cleanup() { wrap.removeEventListener('pointerdown', down, true); wrap.removeEventListener('pointermove', move, true); wrap.removeEventListener('pointerup', up, true); wrap.removeEventListener('pointercancel', up, true); wrap.style.cursor = ''; V._tick = 0; V.hint(''); V._cleanup = null; }
           V._cleanup = function () { cleanup(); rej(new Error('cancel')); };
-          container.addEventListener('pointerdown', down, true); container.addEventListener('pointermove', move, true); container.addEventListener('pointerup', up, true); container.addEventListener('pointercancel', up, true);
+          wrap.addEventListener('pointerdown', down, true); wrap.addEventListener('pointermove', move, true); wrap.addEventListener('pointerup', up, true); wrap.addEventListener('pointercancel', up, true);
         });
       });
     };
-    V.cancel = function () { if (V._cleanup) V._cleanup(); V.busy = false; V.hide(); };
-    // Gerechnete Bahn abspielen. Rückgabe: Promise (Würfel liegen)
+    V.stopDrag = function () { if (V._cleanup) V._cleanup(); };                       // Zieh-Eingabe beenden, Kamerafahrt bleibt (der Wurf folgt gleich)
+    V.cancel = function () { if (V._cleanup) V._cleanup(); V.busy = false; V.hide(); };    // alles zurücksetzen
+    // Gerechnete Bahn abspielen. Rückgabe: Promise (Würfel liegen). Beim Werfenden ist das Tablett groß, bei allen anderen im Dock.
     V.play = function (track, opts) {
       opts = opts || {};
-      return D.ready().then(function () {
-        build(); mk(); skin(); clearTimeout(hideT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
-        V._tick = 0; V.busy = true; V.hint(''); ensure(track.n); trayG.visible = true; aimG.visible = false; pad.visible = false; resize(); V._anim = 1; kick();
+      return V.show().then(function () {
+        mk(); skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); aimG.visible = false; pad.visible = false; ensure(track.n); V.shown = track.n; V.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); resize(); V._anim = 1; kick();
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {
           var done = false;
-          function fin() { if (done) return; done = true; V._anim = 1; setFrame(frames.length - 1, 0); kick(); if (opts.sound) opts.sound('end'); hideT = setTimeout(function () { V.busy = false; V.hide(); }, opts.hold == null ? 1600 : opts.hold); res(); }
+          function fin() {
+            if (done) return; done = true; V._playing = 0; setFrame(frames.length - 1, 0); V._anim = 1; kick(); V.busy = false;
+            setTimeout(function () { if (!V._playing && !V._tick) { V._anim = 0; once(); } }, 120);
+            if (V.zoomed) unzoomT = setTimeout(function () { if (!V._playing) V.zoom(false); }, opts.hold == null ? 1300 : opts.hold);      // zurück ins Dock; die Würfel bleiben dort liegen
+            res();
+          }
           function setFrame(i, u) {
             var a = frames[i], b = frames[Math.min(frames.length - 1, i + 1)];
             for (var k = 0; k < n; k++) {
@@ -275,7 +336,7 @@
           function step() {
             if (done) return;
             var el = (performance.now() - t0) / 1000 * hz, i = Math.floor(el);
-            if (i >= frames.length - 1) { fin(); requestAnimationFrame(function () {}); return; }
+            if (i >= frames.length - 1) { fin(); return; }
             setFrame(i, el - i);
             if (opts.sound) { var y = frames[i][1]; if (prevY != null && prevY > .62 && y <= .62) opts.sound('hit'); prevY = y; }
             requestAnimationFrame(step);
@@ -286,7 +347,7 @@
         });
       });
     };
-    V.destroy = function () { V.cancel(); if (ro) ro.disconnect(); cv.remove(); hint.remove(); };
+    V.destroy = function () { V.cancel(); if (ro) ro.disconnect(); wrap.remove(); };
     return V;
   };
 })();

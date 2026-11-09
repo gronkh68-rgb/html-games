@@ -60,6 +60,7 @@
     // ---------- Ansicht verteilen ----------
     K.push = function () {
       if (!K.G) return;
+      if (!K._dock && window.Dice3D && cfg.diceDock) { K._dock = 1; K.dview().show(); }      // Würfel-Tablett im Dock zeigen
       K.V = cfg.view(K.G, K.ME); K.apply();
       if (K.ROLE === 'host') K.G.seats.forEach(function (x, i) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'v', v: cfg.view(K.G, i) }); });
     };
@@ -83,15 +84,14 @@
     K.uiAsk = function (spec) { return spec.k === 'dlg' ? K.dlg(spec) : spec.k === 'throw' ? K.throwUi(spec) : cfg.ui(spec); };
     // ---------- Echte Würfelphysik (dice3d.js): Wurf per Maus ziehen, der Host rechnet, alle sehen dieselbe Bahn ----------
     var DV = null;
-    K.dview = function () { return DV || (DV = Dice3D.view(document.getElementById(cfg.diceBox || 'game'))); };
+    K.dview = function () { return DV || (DV = Dice3D.view(document.getElementById(cfg.diceDock))); };
     K.throwUi = function (spec) {
-      var V = K.dview(), box = document.getElementById(cfg.diceBox || 'game');
+      var V = K.dview();
       return new Promise(function (res) {
-        var btn = document.createElement('button'); btn.className = 'btn alt'; btn.setAttribute('data-noi18n', '');
-        btn.style.cssText = 'position:absolute;left:50%;bottom:calc(6% + 46px);transform:translateX(-50%);z-index:62;padding:7px 14px;font-size:.85rem';
+        var btn = document.createElement('button'); btn.className = 'dbtn'; btn.setAttribute('data-noi18n', '');
         btn.textContent = '🎲 ' + T('Für mich werfen', 'Throw for me');
-        btn.onclick = function () { btn.remove(); V.cancel(); res(null); };
-        box.appendChild(btn);
+        btn.onclick = function () { btn.remove(); V.stopDrag(); res(null); };
+        V.wrap.appendChild(btn);
         V.drag(spec.n, { hint: spec.hint ? HK.tx(spec.hint) : T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') }).then(function (p) { btn.remove(); res(p); }, function () { btn.remove(); });
       });
     };
@@ -165,7 +165,7 @@
       Promise.resolve().then(main).catch(function (e) { if (e !== K.CANCEL) { console.error(e); K.toast(T('Fehler: ', 'Error: ') + (e && e.message || e), 6000); } });
     };
     K.snap = function (phase) { if (K.ROLE === 'host' && K.L) K.L.snap({ phase: phase, G: JSON.parse(JSON.stringify(K.G)) }); };
-    K.reset = function () { K.token++; K.pend = {}; K.closeDlg(); K.V = null; K.prevV = null; };
+    K.reset = function () { K.token++; K.pend = {}; K.closeDlg(); K.V = null; K.prevV = null; if (DV) DV.cancel(); };
     K.myName = function () { return (window.SITE && SITE.name()) || T('Du', 'You'); };
     K.startLocal = function (nCpu) {
       K.ROLE = 'local'; K.ME = 0;
