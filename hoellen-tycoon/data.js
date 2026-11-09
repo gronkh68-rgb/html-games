@@ -15,26 +15,26 @@
   function st(de, en, g, price, k) { F.push({ t: 'st', n: L2(de, en), g: g, price: price, rent: price === 60 ? R[60][k] : R[price] }); }
   function sp(t, de, en, ico, extra) { var o = { t: t, n: L2(de, en), ico: ico }; for (var k in extra || {}) o[k] = extra[k]; F.push(o); }
   sp('go', 'Imp City', 'Imp City', '😈');
-  st('I.M.P.-Büro', 'I.M.P. Office', 0, 60, 0); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Blitzøs Wohnung', 'Blitzø’s Apartment', 0, 60, 1); sp('tax', 'Seelensteuer', 'Soul Tax', '💸', { amt: 200 });
+  st('Imp-City-Straße', 'Imp City Street', 0, 60, 0); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Blitzøs Wohnung', 'Blitzø’s Apartment', 0, 60, 1); sp('tax', 'Seelensteuer', 'Soul Tax', '💸', { amt: 200 });
   sp('ferry', 'Portal zur Erde', 'Portal to Earth', '🌀', { price: 200 });
-  st('Harvest-Moon-Festival', 'Harvest Moon Festival', 1, 100); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Millies Familienfarm', 'Millie’s Family Farm', 1, 100); st('Zorn-Ring-Rodeo', 'Wrath Ring Rodeo', 1, 120);
+  st('Harvest-Moon-Festival', 'Harvest Moon Festival', 1, 100); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Millies Familienfarm', 'Millie’s Family Farm', 1, 100); st('Zorn-Ring', 'Wrath Ring', 1, 120);
   sp('jail', 'Imp-City-Knast', 'Imp City Jail', '⛓️');
-  st('Ozzie’s', 'Ozzie’s', 2, 140); sp('util', 'Höllenfeuer-Werk', 'Hellfire Works', '🌋', { price: 150 }); st('Lust-Ring-Promenade', 'Lust Ring Promenade', 2, 140); st('Fizzarollis Bühne', 'Fizzarolli’s Stage', 2, 160);
+  st('Ozzie’s', 'Ozzie’s', 2, 140); sp('util', 'Höllenfeuer-Werk', 'Hellfire Works', '🌋', { price: 150 }); st('Wollust-Ring', 'Lust Ring', 2, 140); st('Fizzarollis Bühne', 'Fizzarolli’s Stage', 2, 160);
   sp('ferry', 'Höllen-Taxi', 'Hell Taxi', '🚕', { price: 200 });
-  st('Mammons Studio', 'Mammon’s Studio', 3, 180); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Crimsons Casino', 'Crimson’s Casino', 3, 180); st('Cash Buckzos Zirkus', 'Cash Buckzo’s Circus', 3, 200);
+  st('Gier-Ring', 'Greed Ring', 3, 180); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Trägheits-Ring', 'Sloth Ring', 3, 180); st('Cash Buckzos Zirkus', 'Cash Buckzo’s Circus', 3, 200);
   sp('free', 'Loonas Couch', 'Loona’s Couch', '🛋️');
-  st('Beelzebubs Party-Villa', 'Beelzebub’s Party Villa', 4, 220); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Völlerei-Buffet', 'Gluttony Buffet', 4, 220); st('Neid-Ring-Basar', 'Envy Ring Bazaar', 4, 240);
+  st('Beelzebubs Party-Villa', 'Beelzebub’s Party Villa', 4, 220); sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Völlerei-Ring', 'Gluttony Ring', 4, 220); st('Neid-Ring', 'Envy Ring', 4, 240);
   sp('ferry', 'Grimoire-Portal', 'Grimoire Portal', '🌀', { price: 200 });
-  st('Loo Loo Land', 'Loo Loo Land', 5, 260); st('Verosikas Konzert', 'Verosika’s Concert', 5, 260); sp('util', 'Seelen-Kraftwerk', 'Soul Power Plant', '⚡', { price: 150 }); st('Pride-Ring-Mall', 'Pride Ring Mall', 5, 280);
+  st('Loo Loo Land', 'Loo Loo Land', 5, 260); st('Verosikas Konzert', 'Verosika’s Concert', 5, 260); sp('util', 'Seelen-Kraftwerk', 'Soul Power Plant', '⚡', { price: 150 }); st('Stolz-Ring', 'Pride Ring', 5, 280);
   sp('gojail', 'Exorzisten-Razzia!', 'Exorcist Raid!', '👼');
   st('Goetia-Akademie', 'Goetia Academy', 6, 300); st('Stolas’ Sternwarte', 'Stolas’ Observatory', 6, 300); sp('pact', 'I.M.P.-Auftrag', 'I.M.P. Job', '📋'); st('Paimons Anwesen', 'Paimon’s Estate', 6, 320);
   sp('ferry', 'Stolas’ Kutsche', 'Stolas’ Carriage', '🦉', { price: 200 });
-  sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Stolas’ Herrenhaus', 'Stolas’ Mansion', 7, 350); sp('tax', 'Mammons Gebühr', 'Mammon’s Fee', '💸', { amt: 100 }); st('Goetia-Thronsaal', 'Goetia Throne Room', 7, 400);
+  sp('fate', 'Grimoire', 'Grimoire', '📖'); st('Stolas’ Herrenhaus', 'Stolas’ Mansion', 7, 350); sp('tax', 'Höllensteuer', 'Hell Tax', '💸', { amt: 100 }); st('I.M.P.-Büro', 'I.M.P. Office', 7, 400);
   F.forEach(function (f, i) { f.i = i; if (f.t === 'st') { f.hc = GROUPS[f.g].hc; } });
   // Grimoire (Ereigniskarten)
   var FATE = [
     { a: 'to', f: 0, d: L2('Zurück nach Imp City! Kassiere 200.', 'Back to Imp City! Collect 200.') },
-    { a: 'to', f: 39, d: L2('Eine Einladung in den Goetia-Thronsaal. Rücke vor.', 'An invitation to the Goetia throne room. Advance.') },
+    { a: 'to', f: 39, d: L2('Blitzø ruft dich ins Büro. Rücke vor zum I.M.P.-Büro.', 'Blitzø calls you into the office. Advance to the I.M.P. Office.') },
     { a: 'to', f: 21, d: L2('Beelzebub schmeißt eine Party: Rücke vor zu ihrer Villa. Über Imp City kassierst du 200.', 'Beelzebub is throwing a party: advance to her villa. Passing Imp City pays 200.') },
     { a: 'to', f: 11, d: L2('Ozzie’s hat noch einen Tisch frei. Rücke vor.', 'Ozzie’s has a table free. Advance.') },
     { a: 'ferry', d: L2('Das Grimoire öffnet ein Portal: Rücke zum nächsten Portal oder Fahrzeug vor. Gehört es jemandem, zahle doppelt.', 'The grimoire opens a portal: advance to the nearest portal or ride. If owned, pay double.') },
@@ -47,7 +47,7 @@
     { a: 'money', n: -15, d: L2('Moxxie hat sich in der Bestellung vertan: Zahle 15.', 'Moxxie got the order wrong: pay 15.') },
     { a: 'repair', h: 25, p: 100, d: L2('Millie war zu enthusiastisch: Zahle 25 je Haus und 100 je Palast für Reparaturen.', 'Millie got a bit too enthusiastic: pay 25 per house and 100 per palace for repairs.') },
     { a: 'each', n: -50, d: L2('Du gibst eine Runde bei Ozzie’s aus: Zahle jedem Spieler 50.', 'You buy a round at Ozzie’s: pay each player 50.') },
-    { a: 'money', n: 150, d: L2('Mammon zahlt dir Werbegeld: Kassiere 150.', 'Mammon pays you for an ad: collect 150.') },
+    { a: 'money', n: 150, d: L2('Ein Werbe-Auftrag kommt rein: Kassiere 150.', 'An ad job comes in: collect 150.') },
     { a: 'to', f: 5, d: L2('Ab durchs Portal zur Erde! Über Imp City kassierst du 200.', 'Through the portal to Earth! Passing Imp City pays 200.') }
   ];
   // I.M.P.-Aufträge (Gemeinschaftskarten)
