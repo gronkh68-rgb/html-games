@@ -60,13 +60,13 @@
     // ---------- Ansicht verteilen ----------
     K.push = function () {
       if (!K.G) return;
-      if (!K._dock && window.Dice3D && cfg.diceDock) { K._dock = 1; K.dview().show(); }      // Würfel-Tablett im Dock zeigen
+      if (!K._dock && window.Dice3D && cfg.diceDock) { K._dock = 1; if (!(cfg.dviewFor && cfg.dviewFor(0))) K.dview().show(); }      // Würfel-Tablett im Dock zeigen
       K.V = cfg.view(K.G, K.ME); K.apply();
       if (K.ROLE === 'host') K.G.seats.forEach(function (x, i) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'v', v: cfg.view(K.G, i) }); });
     };
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
     K.fxLocal = function (d) {
-      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview().play(d.track, { hold: 1300, color: d.col }); return; }
+      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col }); return; }
       if (cfg.fx) cfg.fx(d);
     };
     K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
@@ -84,9 +84,9 @@
     K.uiAsk = function (spec) { return spec.k === 'dlg' ? K.dlg(spec) : spec.k === 'throw' ? K.throwUi(spec) : cfg.ui(spec); };
     // ---------- Echte Würfelphysik (dice3d.js): Wurf per Maus ziehen, der Host rechnet, alle sehen dieselbe Bahn ----------
     var DV = null;
-    K.dview = function () { return DV || (DV = Dice3D.view(document.getElementById(cfg.diceDock))); };
+    K.dview = function (p) { var v = cfg.dviewFor ? cfg.dviewFor(p) : null; if (v) return v; return DV || (DV = Dice3D.view(document.getElementById(cfg.diceDock))); };      // dviewFor: Würfelfeld in einer 3D-Szene des Spiels
     K.throwUi = function (spec) {
-      var V = K.dview();
+      var V = K.dview(spec.p);
       return new Promise(function (res) {
         var btn = document.createElement('button'); btn.className = 'dbtn'; btn.setAttribute('data-noi18n', '');
         btn.textContent = '🎲 ' + T('Für mich werfen', 'Throw for me');
@@ -98,10 +98,10 @@
     // Wirft n Würfel für Spieler p und gibt die Augen zurück (Host). Das Ergebnis kommt aus der Physik.
     K.throwDice = async function (p, n, hint) {
       var col = cfg.dieColor ? cfg.dieColor(p, K.G) : null;
-      var par = await K.ask(p, { k: 'throw', n: n, hint: hint || null, col: col }, function () { return Dice3D.autoParams(n); });
+      var par = await K.ask(p, { k: 'throw', n: n, hint: hint || null, col: col, p: p }, function () { return Dice3D.autoParams(n); });
       par = Dice3D.clean(par, n) || Dice3D.autoParams(n);
       var r = await Dice3D.simulate(par);
-      K.fx({ k: 'dice3d', track: r.track, col: col }); K.sfx('dice');
+      K.fx({ k: 'dice3d', track: r.track, col: col, p: p }); K.sfx('dice');
       await K.sleep(Math.round(r.track.f.length / r.track.hz * 1000) + 900);
       return r.v;
     };
@@ -166,7 +166,7 @@
       Promise.resolve().then(main).catch(function (e) { if (e !== K.CANCEL) { console.error(e); K.toast(T('Fehler: ', 'Error: ') + (e && e.message || e), 6000); } });
     };
     K.snap = function (phase) { if (K.ROLE === 'host' && K.L) K.L.snap({ phase: phase, G: JSON.parse(JSON.stringify(K.G)) }); };
-    K.reset = function () { K.token++; K.pend = {}; K.closeDlg(); K.V = null; K.prevV = null; if (DV) DV.cancel(); };
+    K.reset = function () { K.token++; K.pend = {}; K.closeDlg(); K.V = null; K.prevV = null; if (DV) DV.cancel(); if (cfg.cancelDice) cfg.cancelDice(); };
     K.myName = function () { return (window.SITE && SITE.name()) || T('Du', 'You'); };
     K.startLocal = function (nCpu) {
       K.ROLE = 'local'; K.ME = 0;

@@ -13,11 +13,18 @@
 <script src="../mplobby.js"></script>
 <script src="../hostkit.js"></script>
 <script src="../dice3d.js"></script>
+<script src="../perf3d.js"></script>
 <script src="data.js"></script>
+<script src="view3d.js"></script>
 <script src="engine.js"></script>
 <style>
 .wrap{max-width:1500px}
 #diceDock{height:300px;width:225px;margin:0 auto;position:relative}
+#stage3d{position:relative;height:min(80vh,880px);min-height:440px;border-radius:14px;overflow:hidden;border:2px solid #4a0d1a;background:#07030a}
+#stage3d canvas{display:block;width:100%;height:100%}
+#c3d{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px;color:#ffd9c0;text-align:center;max-width:70%}
+#c3d .dice{font-size:2.2rem}#c3d .cardv{pointer-events:none;max-width:420px}#c3d .pot{background:rgba(0,0,0,.5);border-radius:8px;padding:2px 10px}
+.row3{display:flex;gap:6px;flex-wrap:wrap}.row3 .btn{padding:7px 10px;font-size:.82rem;flex:1;min-width:120px}
 .hk-layout{grid-template-columns:minmax(0,1fr) 320px}
 .bwrap{position:relative;width:min(100%,calc(100vh - 170px));min-width:300px;margin:0 auto;aspect-ratio:1}
 .board{position:absolute;inset:0;display:grid;grid-template-columns:1.55fr repeat(9,1fr) 1.55fr;grid-template-rows:1.55fr repeat(9,1fr) 1.55fr;gap:2px;background:#1a0606;border:4px solid #4a0d0d;border-radius:14px;padding:2px;box-shadow:0 0 40px rgba(255,60,0,.25)}
@@ -89,9 +96,12 @@ html[data-style="cyber"] .center{background:radial-gradient(circle,#1a0d2e,#0503
         <div id="hkBanner"></div>
         <div id="hkStatus"></div>
         <div class="bwrap" id="bwrap"><div class="board" id="board"></div><div class="tokens" id="tokens"></div></div>
+        <div id="stage3d" hidden><div id="c3d"></div></div>
+        <div id="credit3" style="font-size:.74rem;color:var(--muted);margin-top:4px">Inoffizielles, nicht kommerzielles Fan-Spiel. „Helluva Boss“ und alle zugehörigen Namen und Bilder: © Vivienne Medrano / SpindleHorse Toons. Eigene Bilder lassen sich über „Eigene Texturen“ laden oder in den Ordner <code>hoellen-tycoon/img/</code> legen.</div>
       </div>
       <div class="hk-side">
         <div id="diceDock"></div>
+        <div class="panel"><div class="row3"><button class="btn alt" id="v3d">🧊 3D-Ansicht</button></div><div class="row3 only3" id="cam3" style="margin-top:6px" hidden><button class="btn alt" id="camReset">⟲ Ansicht</button><button class="btn alt" id="camTop">⬇ Von oben</button><button class="btn alt" id="autoCam" title="An: Die Kamera fährt bei deinem Wurf zum Würfelfeld. Aus: Sie bleibt, wie du sie eingestellt hast.">🎲 Würfel-Cam: aus</button><button class="btn alt" id="diceCam">🔍 Tablett heranzoomen</button><button class="btn alt" id="ownTexBtn" title="Eigene Bilder nur in deinem Browser laden. Dateinamen: tisch, mitte, feld-0 bis feld-39 (png, jpg, webp)">🖼 Eigene Texturen</button><input type="file" id="ownTex" multiple accept="image/*" hidden></div></div>
         <div class="panel"><div id="debt"></div><div class="acts" id="acts"></div></div>
         <div class="panel"><div class="plist" id="plist"></div></div>
         <div class="panel"><div id="hkLog"></div></div>
@@ -164,16 +174,18 @@ function render(v,prev){
   V=v;$('setup').hidden=true;$('game').hidden=false;
   document.querySelectorAll('.fld').forEach(e=>{const i=+e.dataset.f;const k=V.own[i]+'|'+V.houses[i]+'|'+V.mort[i];if(e._k!==k||!e._l||e._l!==SITE.lang){e.innerHTML=fieldHtml(i);e._k=k;e._l=SITE.lang;}e.classList.toggle('mort',!!V.mort[i]);e.classList.toggle('corner',i%10===0);});
   // Mitte: Würfel, Karte, Topf
-  let c=`<div class="logo">😈 ${TT.toUpperCase()}</div>`;
+  let c='';
   if(V.dice){const fresh=V.dice.seq!==lastDice;c+=`<div class="dice"><span class="${fresh?'spin':''}">${DF[V.dice.a]}</span><span class="${fresh?'spin':''}">${DF[V.dice.b]}</span></div><div style="font-size:.85rem">${nameOf(V.dice.p)}: ${V.dice.a+V.dice.b}${V.dice.a===V.dice.b?' · '+T('Pasch!','Doubles!'):''}</div>`;if(fresh){lastDice=V.dice.seq;}}
   if(V.card&&Date.now()-(V.card._t||0)<1e9){const cd=(V.card.kind==='fate'?HT.FATE:HT.PACT)[V.card.idx];c+=`<div class="cardv" ${V.card.seq!==lastCard?'':'style="animation:none"'}><b>${V.card.kind==='fate'?'📖 '+tx(HT.DECKN.fate):'📋 '+tx(HT.DECKN.pact)}</b>${esc(tx(cd.d))}</div>`;lastCard=V.card.seq;}
   if(V.auc){c+=`<div class="cardv" style="border-color:#ffd23f">🔨 ${T('Versteigerung','Auction')}: <b style="display:inline;color:inherit">${esc(tx(F[V.auc.f].n))}</b><br>${T('Höchstgebot','Highest bid')}: ${V.auc.bid}${V.auc.lead>=0?' ('+nameOf(V.auc.lead)+')':''}</div>`;}
   if(V.opts.pot)c+=`<div class="pot">🐷 ${T('Spardose','Piggy bank')}: ${V.pot} 💀</div>`;
   if(V.opts.rounds)c+=`<div class="pot">${T('Runde','Round')} ${Math.min(V.round+1,V.opts.rounds)} / ${V.opts.rounds}</div>`;
-  $('center').innerHTML=c;
+  $('center').innerHTML=`<div class="logo">😈 ${TT.toUpperCase()}</div>`+c;
+  $('c3d').innerHTML=c;
   renderTokens(prev);
+  if(use3d&&window.HT3D&&HT3D.ready)HT3D.update(V,inp);
   // Spieler
-  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk">${TOKENS[i]}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b>${V.types[i]!=='cpu'?' <small style="display:inline">('+CHARS[i]+')</small>':''}<small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Knast','in jail'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small></div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
+  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk" style="background:${COLORS[i]};color:#16080c;border-radius:50%;width:28px;height:28px;display:inline-grid;place-items:center;font-weight:900;font-size:1rem">${CHARS[i].charAt(0)}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b>${V.types[i]!=='cpu'?' <small style="display:inline">('+CHARS[i]+')</small>':''}<small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Knast','in jail'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small></div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
   renderActs();
   // Banner
   const b=$('hkBanner'),my=V.cur===V.me&&!V.over;
@@ -265,8 +277,8 @@ $('trSend').onclick=()=>{
 };
 $('trClose').onclick=()=>{$('tr').hidden=true;};
 // ---------- Feldinfo ----------
-$('board').addEventListener('click',e=>{
-  const el=e.target.closest('.fld');if(!el||!V)return;const f=F[+el.dataset.f],o=V.own[f.i];
+function showField(fi){
+  if(!V)return;const f=F[fi],o=V.own[f.i];
   let h=`<h2>${f.t==='st'?'<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:'+GROUPS[f.g].c+'"></span> ':f.ico+' '}${esc(tx(f.n))}</h2>`;
   if(f.price){h+=`<p>${T('Preis','Price')}: <b>${f.price} 💀</b> · ${T('Besitzer','Owner')}: <b>${o>=0?TOKENS[o]+' '+nameOf(o):T('niemand','nobody')}</b>${V.mort[f.i]?' · '+T('Hypothek','mortgaged'):''}</p>`;
     if(f.t==='st')h+=`<table class="rt"><tr><td>${T('Grundmiete','Base rent')}</td><td>${f.rent[0]}</td></tr><tr><td>${T('mit ganzer Farbgruppe','with full colour set')}</td><td>${f.rent[0]*2}</td></tr>${[1,2,3,4].map(k=>`<tr><td>${'🏠'.repeat(k)}</td><td>${f.rent[k]}</td></tr>`).join('')}<tr><td>🏰 ${T('Palast','Palace')}</td><td>${f.rent[5]}</td></tr><tr><td>${T('Hauspreis','House price')}</td><td>${f.hc}</td></tr><tr><td>${T('Hypothek','Mortgage')}</td><td>${f.price/2}</td></tr></table>`;
@@ -274,7 +286,8 @@ $('board').addEventListener('click',e=>{
   else h+=`<p>${f.t==='tax'?T('Zahle ','Pay ')+f.amt+' 💀':f.t==='fate'||f.t==='pact'?T('Ziehe eine Karte.','Draw a card.'):f.t==='go'?T('Wer hier vorbeikommt, kassiert 200.','Passing here pays 200.'):f.t==='gojail'?T('Ab in den Knast!','Off to jail!'):f.t==='jail'?T('Nur zu Besuch, wenn du nicht eingesperrt bist.','Just visiting unless you are locked up.'):V.opts.pot?T('Hier gibt es Loonas Spardose.','Loona’s piggy bank is paid out here.'):T('Hier passiert nichts.','Nothing happens here.')}</p>`;
   h+=`<div class="row"><button class="btn alt" onclick="document.getElementById('fi').hidden=true">${T('Schließen','Close')}</button></div>`;
   $('fiB').innerHTML=h;$('fi').hidden=false;
-});
+}
+$('board').addEventListener('click',e=>{const el=e.target.closest('.fld');if(el)showField(+el.dataset.f);});
 $('fi').addEventListener('click',e=>{if(e.target.id==='fi')$('fi').hidden=true;});
 // ---------- Eingabe ----------
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,phase:spec.phase,opts:spec.opts,need:spec.need};hintTxt='';K.apply();}else res(null);});}
@@ -299,7 +312,7 @@ function startGame(seats,opts){
   K.push();K.run(main);
 }
 K=HK.init({
-  dieColor:p=>COLORS[p],diceDock:'diceDock',prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
+  dieColor:p=>COLORS[p],diceDock:'diceDock',dviewFor:p=>use3d&&window.HT3D&&HT3D.ready?HT3D.view(p==null?0:p):null,cancelDice:()=>{if(window.HT3D&&HT3D.ready)HT3D.cancelDice();},prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
   seats:TOKENS.map((t,i)=>({name:t+' '+CHARS[i],color:COLORS[i]})),
   cpuNames:CHARS,cpuNameFor:i=>CHARS[i],
   view,valid:HTE.valid,render,ui,fx,
@@ -310,6 +323,34 @@ K=HK.init({
 });
 HTE.bind(K);
 K.sndBtn($('snd'));
+// ---------- 3D-Ansicht ----------
+let use3d=false,loading3=false;
+try{use3d=localStorage.getItem('ht-3d')==='1';}catch(e){}
+const CDN3='https://cdn.jsdelivr.net/npm/',LIBS3=['three@0.128.0/build/three.min.js','three@0.128.0/examples/js/controls/OrbitControls.js'];
+const loadLibs3=()=>window.THREE&&THREE.OrbitControls?Promise.resolve():LIBS3.reduce((pr,u)=>pr.then(()=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=CDN3+u;s.onload=res;s.onerror=()=>rej(new Error(u));document.head.appendChild(s);})),Promise.resolve());
+function syncCamBtns(){$('autoCam').textContent='🎲 '+T('Würfel-Cam: ','Dice cam: ')+(window.HT3D&&HT3D.opts.auto?T('an','on'):T('aus','off'));$('diceCam').textContent=window.HT3D&&HT3D.opts.manual?T('🔍 Tablett: nah','🔍 Tray: close'):T('🔍 Tablett heranzoomen','🔍 Zoom to tray');}
+async function set3d(on){
+  if(on&&!(window.HT3D&&HT3D.ready)){
+    if(loading3)return;loading3=true;$('v3d').textContent=T('Lade 3D …','Loading 3D …');
+    try{await loadLibs3();await Dice3D.ready();HT3D.init($('stage3d'),{F,GROUPS,COLORS,TOKENS,CHARS,tx,onField:showField,sfx:k=>K.sfx(k)});}
+    catch(e){loading3=false;$('v3d').textContent=T('3D nicht verfügbar','3D unavailable');return;}
+    loading3=false;
+  }
+  use3d=on;try{localStorage.setItem('ht-3d',on?'1':'0');}catch(e){}
+  $('bwrap').hidden=on;$('stage3d').hidden=!on;$('cam3').hidden=!on;$('diceDock').hidden=on;
+  $('v3d').textContent=on?T('🧊 2D-Ansicht','🧊 2D view'):T('🧊 3D-Ansicht','🧊 3D view');
+  if(window.HT3D&&HT3D.ready){HT3D.setActive(on);if(!on)HT3D.cancelDice();}
+  if(K&&K.cancelDiceViews)K.cancelDiceViews();
+  syncCamBtns();
+  if(K&&K.V){K.prevV=null;K.apply();}
+}
+$('v3d').onclick=()=>set3d(!use3d);
+$('camReset').onclick=()=>HT3D.camReset();$('camTop').onclick=()=>HT3D.camTop();
+$('autoCam').onclick=()=>{HT3D.toggleAuto();syncCamBtns();};
+$('diceCam').onclick=()=>{const p=K&&K.V?K.V.me:0;HT3D.toggleManual(p);syncCamBtns();};
+$('ownTexBtn').onclick=()=>$('ownTex').click();
+$('ownTex').onchange=()=>{if($('ownTex').files.length)HT3D.loadOwn($('ownTex').files);};
+if(use3d)set3d(true);
 $('start').onclick=()=>K.startLocal(+$('nopp').value);
 $('again').onclick=()=>K.exit(true);
 </script>
