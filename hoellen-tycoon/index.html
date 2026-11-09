@@ -12,6 +12,7 @@
 <script src="../net.js"></script>
 <script src="../mplobby.js"></script>
 <script src="../hostkit.js"></script>
+<script src="../dice3d.js"></script>
 <script src="data.js"></script>
 <script src="engine.js"></script>
 <style>
@@ -86,7 +87,7 @@ html[data-style="cyber"] .center{background:radial-gradient(circle,#1a0d2e,#0503
       <div class="hk-main">
         <div id="hkBanner"></div>
         <div id="hkStatus"></div>
-        <div class="bwrap"><div class="board" id="board"></div><div class="tokens" id="tokens"></div></div>
+        <div class="bwrap" id="bwrap"><div class="board" id="board"></div><div class="tokens" id="tokens"></div></div>
       </div>
       <div class="hk-side">
         <div class="panel"><div id="debt"></div><div class="acts" id="acts"></div></div>
@@ -296,7 +297,7 @@ function startGame(seats,opts){
   K.push();K.run(main);
 }
 K=HK.init({
-  prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
+  diceBox:'bwrap',prefix:'htc-v1-',title:L2('Helluva Tycoon','Helluva Tycoon'),minPlayers:2,
   seats:TOKENS.map((t,i)=>({name:t+' '+CHARS[i],color:COLORS[i]})),
   cpuNames:CHARS,cpuNameFor:i=>CHARS[i],
   view,valid:HTE.valid,render,ui,fx,

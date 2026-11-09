@@ -90,10 +90,11 @@
 
   // ---------- Würfeln mit Modifikator-Runde ----------
   async function roll(p, bonusV, need, label, fail) {
-    var g = G(), a = 1 + HK.rnd(6), b = 1 + HK.rnd(6), total = a + b + bonusV;
+    var g = G(); g.roll = null; K.push();
+    var dd = await K.throwDice(p, 2, L2('Wirf die Würfel: ' + label.de, 'Throw the dice: ' + label.en)), a = dd[0], b = dd[1], total = a + b + bonusV;
     g.roll = { p: p, a: a, b: b, bonus: bonusV, mods: [], total: total, need: need, fail: fail == null ? null : fail, label: label, seq: (g.roll ? g.roll.seq : 0) + 1 };
-    K.fx({ k: 'dice', a: a, b: b }); K.push(); K.sfx('dice');
-    await K.sleep(1000);
+    K.push();
+    await K.sleep(500);
     total = await modRound(p, total, need, fail);
     g.roll.total = total; g.roll.done = true; K.push();
     await K.sleep(700);
@@ -149,8 +150,9 @@
       discardCard(q, ch[0]);
       K.say(q, L2(nm(q) + ' fordert ' + nm(p) + ' heraus!', nm(q) + ' challenges ' + nm(p) + '!'), L2('Du forderst ' + nm(p) + ' heraus!', 'You challenge ' + nm(p) + '!'));
       K.push(); await K.sleep(500);
-      var ra = 1 + HK.rnd(6) + 1 + HK.rnd(6) + bonus(g, q, 'chal'), rb = 1 + HK.rnd(6) + 1 + HK.rnd(6) + bonus(g, p, 'chal');
-      K.fx({ k: 'chal', q: q, p: p, rq: ra, rp: rb }); K.sfx('dice');
+      g.roll = null; K.push();
+      var dq = await K.throwDice(q, 2, L2('Herausforderung: Wirf die Würfel', 'Challenge: throw the dice')), dp = await K.throwDice(p, 2, L2('Herausforderung: Wirf die Würfel', 'Challenge: throw the dice'));
+      var ra = dq[0] + dq[1] + bonus(g, q, 'chal'), rb = dp[0] + dp[1] + bonus(g, p, 'chal');
       g.roll = { p: q, a: 0, b: 0, chal: { q: q, p: p, rq: ra, rp: rb }, total: ra, need: rb + 1, done: true, mods: [], label: L2('Herausforderung', 'Challenge'), seq: (g.roll ? g.roll.seq : 0) + 1 };
       K.push(); await K.sleep(1300);
       if (ra > rb) {

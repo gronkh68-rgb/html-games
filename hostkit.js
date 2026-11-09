@@ -64,8 +64,12 @@
       if (K.ROLE === 'host') K.G.seats.forEach(function (x, i) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'v', v: cfg.view(K.G, i) }); });
     };
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
-    K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
+    K.fxLocal = function (d) {
+      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview().play(d.track, { hold: 1300 }); return; }
       if (cfg.fx) cfg.fx(d);
+    };
+    K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
+      K.fxLocal(d);
       if (K.ROLE === 'host') K.G.seats.forEach(function (x) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'fx', d: d }); });
     };
 
@@ -76,8 +80,32 @@
       if (s.type === 'host') return K.uiAsk(spec);
       return new Promise(function (res) { var id = ++K.askN; K.pend[p] = { id: id, res: res, ai: ai, spec: spec }; K.L.sendTo(s.seat, { k: 'ask', id: id, spec: spec }); });
     };
-    K.uiAsk = function (spec) { return spec.k === 'dlg' ? K.dlg(spec) : cfg.ui(spec); };
+    K.uiAsk = function (spec) { return spec.k === 'dlg' ? K.dlg(spec) : spec.k === 'throw' ? K.throwUi(spec) : cfg.ui(spec); };
+    // ---------- Echte Würfelphysik (dice3d.js): Wurf per Maus ziehen, der Host rechnet, alle sehen dieselbe Bahn ----------
+    var DV = null;
+    K.dview = function () { return DV || (DV = Dice3D.view(document.getElementById(cfg.diceBox || 'game'))); };
+    K.throwUi = function (spec) {
+      var V = K.dview(), box = document.getElementById(cfg.diceBox || 'game');
+      return new Promise(function (res) {
+        var btn = document.createElement('button'); btn.className = 'btn alt'; btn.setAttribute('data-noi18n', '');
+        btn.style.cssText = 'position:absolute;left:50%;bottom:calc(6% + 46px);transform:translateX(-50%);z-index:62;padding:7px 14px;font-size:.85rem';
+        btn.textContent = '🎲 ' + T('Für mich werfen', 'Throw for me');
+        btn.onclick = function () { btn.remove(); V.cancel(); res(null); };
+        box.appendChild(btn);
+        V.drag(spec.n, { hint: spec.hint ? HK.tx(spec.hint) : T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') }).then(function (p) { btn.remove(); res(p); }, function () { btn.remove(); });
+      });
+    };
+    // Wirft n Würfel für Spieler p und gibt die Augen zurück (Host). Das Ergebnis kommt aus der Physik.
+    K.throwDice = async function (p, n, hint) {
+      var par = await K.ask(p, { k: 'throw', n: n, hint: hint || null }, function () { return Dice3D.autoParams(n); });
+      par = Dice3D.clean(par, n) || Dice3D.autoParams(n);
+      var r = await Dice3D.simulate(par);
+      K.fx({ k: 'dice3d', track: r.track }); K.sfx('dice');
+      await K.sleep(Math.round(r.track.f.length / r.track.hz * 1000) + 900);
+      return r.v;
+    };
     function validAns(spec, a, p) {
+      if (spec.k === 'throw') return a === null || Dice3D.clean(a, spec.n) !== null;
       if (spec.k === 'dlg') return Number.isInteger(a) && a >= 0 && a < spec.btns.length;
       return !!cfg.valid(spec, a, K.G, p);
     }
@@ -180,7 +208,7 @@
       if (!m) return;
       if (m.k === 'v') { K.V = m.v; K.apply(); }
       else if (m.k === 'ask') { var my = ++clientAsk; K.closeDlg(); K.uiAsk(m.spec).then(function (a) { if (my === clientAsk) K.L.send({ k: 'ans', id: m.id, a: a }); }); }
-      else if (m.k === 'fx') { if (cfg.fx) cfg.fx(m.d); }
+      else if (m.k === 'fx') { K.fxLocal(m.d); }
       else if (m.k === 'closedlg') { K.closeDlg(); }
     }
     K.cancelAsk = function (p) { var s = K.G.seats[p]; if (s && s.type === 'remote') K.L.sendTo(s.seat, { k: 'closedlg' }); };

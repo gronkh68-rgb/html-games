@@ -158,8 +158,8 @@
   }
 
   // ---------- Bewegung und Felder ----------
-  function dice() { return [1 + HK.rnd(6), 1 + HK.rnd(6)]; }
-  async function showDice(p, d) { var g = G(); g.dice = { p: p, a: d[0], b: d[1], seq: (g.dice ? g.dice.seq : 0) + 1 }; K.fx({ k: 'dice' }); K.sfx('dice'); K.push(); await K.sleep(900); }
+  async function throwDice(p) { var d = await K.throwDice(p, 2, L2('Wirf die Würfel', 'Throw the dice')); await showDice(p, d); return d; }
+  async function showDice(p, d) { var g = G(); g.dice = { p: p, a: d[0], b: d[1], seq: (g.dice ? g.dice.seq : 0) + 1 }; K.push(); await K.sleep(500); }
   async function moveTo(p, to, viaGo, steps) {
     var g = G(), from = g.pos[p];
     var passed = viaGo !== false && (steps != null ? from + steps >= 40 : to < from);
@@ -181,7 +181,7 @@
       if (o === p || g.mort[f]) { if (g.mort[f] && o !== p) say2(-1, x.n.de + ' ist mit einer Hypothek belastet: keine Miete.', x.n.en + ' is mortgaged: no rent.'); return; }
       if (g.out[o]) return;
       var r = rent(g, f, roll, mult);
-      if (x.t === 'util' && mult === 10) { var d = dice(); await showDice(p, d); r = (d[0] + d[1]) * 10; }
+      if (x.t === 'util' && mult === 10) { var d = await throwDice(p); r = (d[0] + d[1]) * 10; }
       say2(p, nm(p) + ' zahlt ' + S(r) + ' Miete an ' + nm(o) + ' (' + x.n.de + ').', nm(p) + ' pays ' + S(r) + ' rent to ' + nm(o) + ' (' + x.n.en + ').', 'Du zahlst ' + S(r) + ' Miete an ' + nm(o) + ' (' + x.n.de + ').', 'You pay ' + S(r) + ' rent to ' + nm(o) + ' (' + x.n.en + ').');
       await pay(p, r, o); return;
     }
@@ -336,8 +336,7 @@
     K.push();
   };
   async function doRoll(p) {
-    var g = G(), d = dice(), sum = d[0] + d[1], dbl = d[0] === d[1];
-    await showDice(p, d);
+    var g = G(), d = await throwDice(p), sum = d[0] + d[1], dbl = d[0] === d[1];
     if (g.jail[p] >= 0) {
       if (dbl) { g.jail[p] = -1; say2(p, nm(p) + ' würfelt einen Pasch und kommt frei!', nm(p) + ' rolls doubles and gets out!', 'Pasch! Du kommst frei!', 'Doubles! You get out!'); }
       else {
