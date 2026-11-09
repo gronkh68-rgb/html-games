@@ -121,12 +121,21 @@
     return { v: res, track: { n: n, hz: 60 / EVERY, f: frames } };
   };
 
-  function faceTex(v, cyber, size) {
+  function lum(hex) { var n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return (.299 * r + .587 * g + .114 * b) / 255; }
+  function shade(hex, f) { var n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255, m = f > 0 ? 255 : 0, a = Math.abs(f); return 'rgb(' + Math.round(r + (m - r) * a) + ',' + Math.round(g + (m - g) * a) + ',' + Math.round(b + (m - b) * a) + ')'; }
+  // Würfelseite; hex = Spielerfarbe (oder null für den neutralen Würfel)
+  function faceTex(v, cyber, size, hex) {
     var cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
     var P = { 1: [[.5, .5]], 2: [[.28, .28], [.72, .72]], 3: [[.28, .28], [.5, .5], [.72, .72]], 4: [[.28, .28], [.72, .28], [.28, .72], [.72, .72]], 5: [[.28, .28], [.72, .28], [.5, .5], [.28, .72], [.72, .72]], 6: [[.28, .25], [.72, .25], [.28, .5], [.72, .5], [.28, .75], [.72, .75]] };
-    if (cyber) { x.fillStyle = '#0b1424'; x.fillRect(0, 0, size, size); x.strokeStyle = '#00f0ff'; x.lineWidth = size * .04; x.strokeRect(size * .03, size * .03, size * .94, size * .94); }
-    else { var g = x.createLinearGradient(0, 0, size, size); g.addColorStop(0, '#fffdf4'); g.addColorStop(1, '#ece3c8'); x.fillStyle = g; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.18)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); }
-    P[v].forEach(function (p) { x.beginPath(); x.arc(p[0] * size, p[1] * size, size * (v === 1 ? .12 : .085), 0, 7); if (cyber) { x.fillStyle = '#fcee09'; x.shadowColor = '#fcee09'; x.shadowBlur = size * .05; } else { x.fillStyle = v === 1 ? '#c62828' : '#16161c'; } x.fill(); x.shadowBlur = 0; });
+    var pip;
+    if (cyber) { x.fillStyle = '#0b1424'; x.fillRect(0, 0, size, size); x.strokeStyle = hex || '#00f0ff'; x.lineWidth = size * .05; x.strokeRect(size * .03, size * .03, size * .94, size * .94); pip = hex || '#fcee09'; }
+    else if (hex) { var g2 = x.createLinearGradient(0, 0, size, size); g2.addColorStop(0, shade(hex, .18)); g2.addColorStop(1, shade(hex, -.12)); x.fillStyle = g2; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.28)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = lum(hex) > .62 ? '#16161c' : '#ffffff'; }
+    else { var g = x.createLinearGradient(0, 0, size, size); g.addColorStop(0, '#fffdf4'); g.addColorStop(1, '#ece3c8'); x.fillStyle = g; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.18)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = null; }
+    P[v].forEach(function (p) {
+      x.beginPath(); x.arc(p[0] * size, p[1] * size, size * (v === 1 ? .12 : .085), 0, 7);
+      if (cyber) { x.fillStyle = pip; x.shadowColor = pip; x.shadowBlur = size * .05; } else { x.fillStyle = pip || (v === 1 ? '#c62828' : '#16161c'); }
+      x.fill(); x.shadowBlur = 0;
+    });
     var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
   // ---------- Darstellung: Tablett als Dock neben dem Spielfeld, Kamerafahrt nur beim eigenen Wurf ----------
@@ -184,12 +193,14 @@
     R.skin = function () {
       var cy = cyberNow();
       floorMat.color.set(cy ? 0x0b1626 : 0x1f6b4d); floorMat.emissive.set(cy ? 0x001a24 : 0x000000);
-      rimMat.color.set(cy ? 0x0e2a45 : 0x6b4a2b); rimMat.emissive.set(cy ? 0x06202f : 0x000000); padMat.color.set(cy ? 0x00f0ff : 0xffe08a);
+      rimMat.color.set(cy ? 0x0e2a45 : 0x6b4a2b); rimMat.emissive.set(cy ? 0x06202f : 0x000000); padMat.color.set(R.color || (cy ? 0x00f0ff : 0xffe08a));      // Abschussring in Spielerfarbe
     };
+    R.color = null;
+    R.setColor = function (hex) { hex = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex.toLowerCase() : null; if (hex !== R.color) { R.color = hex; R.mk(); R.skin(); } };      // Würfel in Spielerfarbe
     R.mk = function () {
-      var cy = cyberNow(), key = cy ? 'c' : 's';
+      var cy = cyberNow(), key = (cy ? 'c' : 's') + (R.color || '');
       if (mats && mats.key === key) return mats;
-      mats = { key: key, list: FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: faceTex(v, cy, 128), roughness: cy ? .35 : .55, metalness: cy ? .3 : 0 }); }) };
+      mats = { key: key, list: FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: faceTex(v, cy, 128, R.color), roughness: cy ? .35 : .55, metalness: cy ? .3 : 0 }); }) };
       R.dice.forEach(function (d) { d.mesh.material = mats.list; });
       return mats;
     };
@@ -232,7 +243,7 @@
     V.drag = function (n, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
+        var R = env.R; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
         if (opts.zoom !== false) V.zoom(true);
         var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = R.dice.map(function () { return randQ(); }), spin = R.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), t0 = performance.now(), last = t0;
         var base = opts.hint || (window.SITE ? SITE.T('Würfel nach unten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice down, aim and release to shoot') : 'Pull down, aim, release');
@@ -295,7 +306,7 @@
     V.play = function (track, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        var R = env.R; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
         V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); R.aimG.visible = false; R.pad.visible = false; R.ensure(track.n); R.shown = track.n; R.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); env.anim(1);
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {

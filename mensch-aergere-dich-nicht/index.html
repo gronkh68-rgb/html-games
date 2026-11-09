@@ -669,7 +669,7 @@ async function doRoll(p){
     setMsg(phys?`${chip(p)}Ziehe den Würfel und lass los, oder klicke auf <b>${rollLabel()}</b>.`:`Klicke auf <b>${rollLabel()}</b>.`);
     netPhase={k:'idle'};netPush();
     if(phys){
-      tp=await new Promise(res=>{rollWait=()=>res(null);DICEV().drag(1).then(res,()=>{});});
+      tp=await new Promise(res=>{rollWait=()=>res(null);DICEV().drag(1,{color:COLORS[p].c}).then(res,()=>{});});
       if(!tp)DICEV().stopDrag();
       rollWait=null;btn.disabled=true;setMine(false);
     }else{
@@ -688,7 +688,7 @@ async function doRoll(p){
     const r=await Dice3D.simulate(par);
     v=r.v[0];throwId++;
     netPhase={k:'rolling',p,v,track:r.track,tid:throwId};netPush();      // alle Geräte spielen dieselbe Bahn ab
-    await DICEV().play(r.track);
+    await DICEV().play(r.track,{color:COLORS[p].c});
   }else if(PHYS){
     PD.start();await sleep(700,t);
     v=rollValue(p);
@@ -1166,7 +1166,7 @@ function applySnap(s,you){
   lastPhys=!!s.phys;syncDock(lastPhys);
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'&&ph.track){
-    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV().play(ph.track).then(()=>dieDone(v));}
+    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV().play(ph.track,{color:COLORS[ph.p]?COLORS[ph.p].c:null}).then(()=>dieDone(v));}
   }else if(ph.k==='rolling'){
     if(s.phys){}else if(!cRolling){cRolling=true;cLand=false;clearInterval(rollAnim);if(PHYS)PD.start();else{let k=0;rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}}
     if(!s.phys&&PHYS&&ph.v&&!cLand){cLand=true;const v=ph.v;PD.land(v).then(()=>dieDone(v));}
@@ -1178,7 +1178,7 @@ function applySnap(s,you){
   // Meine Aktionen
   const myRoll=ph.k==='roll'&&ph.p===you;
   canRollNet=myRoll;$('rollBtn').disabled=!myRoll;$('rollBtn').textContent=rollLabel();
-  if(myRoll&&s.phys&&!clientDrag){clientDrag=true;DICEV().drag(1).then(par=>{clientDrag=false;if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'throw',d:par});}},()=>{clientDrag=false;});}
+  if(myRoll&&s.phys&&!clientDrag){clientDrag=true;DICEV().drag(1,{color:COLORS[you]?COLORS[you].c:null}).then(par=>{clientDrag=false;if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'throw',d:par});}},()=>{clientDrag=false;});}
   else if(!myRoll&&clientDrag){clientDrag=false;DICEV().cancel();}
   if(myRoll)$('msg').innerHTML=`${chip(you)}Du bist dran: Klicke auf <b>${esc(rollLabel())}</b>.`;
   if(ph.k==='pick'&&ph.p===you){
@@ -1548,6 +1548,11 @@ function turn3(p){
   for(const k in T3.pm)T3.pm[k].mine=T3.pm[k].p===p;
   $('stage3d').style.setProperty('--pc',COLORS[p].c);
   if(!T3.follow)return;
+  // Die Kamera schwenkt nur zur Seite eines Spielers an diesem Gerät (nicht zu Computern oder Online-Spielern) und bei nur einem lokalen Spieler nur einmal
+  const mineP=q=>netRole==='client'?q===mySlot:isLocal(q);
+  if(!mineP(p))return;
+  if(active.filter(mineP).length===1&&T3.camSeat===p)return;
+  T3.camSeat=p;
   const [bx,by]=[[0,0],[9,0],[9,9],[0,9]][p],bw=w3(bx+1,by+1);
   const a=Math.atan2(bw.x,bw.z),cam=T3.camera,off=cam.position.clone();
   const rr=Math.hypot(off.x,off.z),y=off.y,a0=Math.atan2(off.x,off.z);
