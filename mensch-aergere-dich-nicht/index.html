@@ -283,7 +283,9 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
           <span id="cam3" style="display:contents" hidden>
             <button class="btn alt" id="camIso3">Schräg</button>
             <button class="btn alt" id="camTop3">Von oben</button>
-            <button class="btn alt" id="follow3">Kamera folgt: an</button>
+            <button class="btn alt" id="follow3">Kamera folgt: aus</button>
+            <button class="btn alt" id="diceCam" title="Kamera zum Würfel-Tablett fahren und wieder zurück">🎲 Würfel-Cam</button>
+            <button class="btn alt" id="autoCam" title="Fährt die Kamera bei deinem Wurf automatisch zum Tablett">Wurf-Kamera: auto</button>
           </span>
         </div>
         <button class="btn alt" id="again">Neues Spiel</button>
@@ -361,9 +363,13 @@ const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
 let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe=null,lastPhys=false;
 // Würfel-Tablett: in der 3D-Ansicht steht es als echtes Objekt neben dem Brett auf dem Tisch (Kamera fährt beim eigenen Wurf hin), in 2D als Dock
 const TRAY3={pos:[12,-.25,0],scale:.9};
-let camSave3=null;
-function focusTray3(on){
+let camSave3=null,manual3=false,autoDice3=(()=>{try{return localStorage.getItem('mdn-autodice')!=='0';}catch(e){return true;}})();
+function focusTray3(on,manual){
   if(!T3)return;
+  if(!manual){            // automatische Fahrten: nur wenn erlaubt, und nie die manuelle Würfel-Cam überstimmen
+    if(on&&(!autoDice3||manual3||camSave3))return;
+    if(!on&&manual3)return;
+  }else if(on&&camSave3){T3.controls.enabled=false;return;}
   const cam=T3.camera,ctl=T3.controls;
   T3.tw=T3.tw.filter(t=>t.key!=='cam'&&t.key!=='dicecam');
   const p0=cam.position.clone(),t0=ctl.target.clone();
@@ -381,7 +387,14 @@ const DICEV=()=>{
   if(v3&&T3&&T3.scene)return DVe||(DVe=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:TRAY3.pos,scale:TRAY3.scale,focus:focusTray3}));
   return DVd||(DVd=Dice3D.view($('diceDock')));
 };
-const cancelDice=()=>{if(DVd)DVd.cancel();if(DVe)DVe.cancel();};
+const cancelDice=()=>{manual3=false;if(DVd)DVd.cancel();if(DVe)DVe.cancel();if(T3&&camSave3)focusTray3(false,true);syncCamBtns();};
+function syncCamBtns(){const d=$('diceCam'),a=$('autoCam');if(d)d.textContent=manual3?'🎲 Würfel-Cam: an':'🎲 Würfel-Cam';if(a)a.textContent='Wurf-Kamera: '+(autoDice3?'auto':'manuell');}
+async function toggleDiceCam(){
+  if(!T3||!v3)return;
+  await DICEV().show();
+  if(manual3){manual3=false;focusTray3(false,true);}else{manual3=true;focusTray3(true,true);}
+  syncCamBtns();
+}
 const syncDock=on=>{const d=$('diceDock'),want=on&&!v3;if(d.hidden===want)d.hidden=!want;if(on)DICEV().show();};
 const physOn=()=>($('diceMode')||{}).value==='phys';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1365,7 +1378,7 @@ function init3(){
     composer=new THREE.EffectComposer(r);composer.addPass(new THREE.RenderPass(scene,camera));
     composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(512,512),.5,.45,.55));
   }catch(e){composer=null;}
-  T3={r,scene,camera,controls,composer,rain:null,room:null,env:[],group:null,pm:{},bases:{},follow:true,tw:[]};T3.perf=window.Perf3D?Perf3D.create({r,resize:resize3}):null;buildEnv3();
+  T3={r,scene,camera,controls,composer,rain:null,room:null,env:[],group:null,pm:{},bases:{},follow:(()=>{try{return localStorage.getItem('mdn-follow')==='1';}catch(e){return false;}})(),tw:[]};T3.perf=window.Perf3D?Perf3D.create({r,resize:resize3}):null;buildEnv3();$('follow3').textContent='Kamera folgt: '+(T3.follow?'an':'aus');
   // Figuren anklicken
   const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down=null;
   r.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,t:performance.now()};});
@@ -1589,7 +1602,10 @@ $('physBtn').onclick=()=>setPhys(!PHYS);setPhys(PHYS);
 $('lookBtn').onclick=openLook;$('lookDone').onclick=()=>$('lookBox').classList.remove('open');
 $('camTop3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),to=new THREE.Vector3(0,26,.01);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};
 $('camIso3').onclick=()=>{if(!T3)return;const c=T3.camera,f=c.position.clone(),a=Math.atan2(f.x,f.z),to=new THREE.Vector3(Math.sin(a)*15,14,Math.cos(a)*15);tw3(700,k=>c.position.lerpVectors(f,to,k*k*(3-2*k)),'cam');};
-$('follow3').onclick=()=>{if(!T3)return;T3.follow=!T3.follow;$('follow3').textContent='Kamera folgt: '+(T3.follow?'an':'aus');if(T3.follow&&cur>=0)turn3(cur);};
+$('follow3').onclick=()=>{if(!T3)return;T3.follow=!T3.follow;try{localStorage.setItem('mdn-follow',T3.follow?'1':'0');}catch(e){}$('follow3').textContent='Kamera folgt: '+(T3.follow?'an':'aus');if(T3.follow&&cur>=0)turn3(cur);};
+$('diceCam').onclick=toggleDiceCam;
+$('autoCam').onclick=()=>{autoDice3=!autoDice3;try{localStorage.setItem('mdn-autodice',autoDice3?'1':'0');}catch(e){}syncCamBtns();};
+syncCamBtns();
 try{if(localStorage.getItem('mdn-view')==='3d')setView(true);}catch(e){}
 </script>
 <script>

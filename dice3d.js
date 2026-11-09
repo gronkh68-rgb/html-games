@@ -67,11 +67,12 @@
     await D.ready();
     var n = params.dice.length, world = new C.World({ gravity: new C.Vec3(0, G, 0) });
     world.allowSleep = false; world.solver.iterations = 24;
-    var mDie = new C.Material('die'), mFloor = new C.Material('floor');
-    world.addContactMaterial(new C.ContactMaterial(mDie, mFloor, { friction: .32, restitution: .32 }));
-    world.addContactMaterial(new C.ContactMaterial(mDie, mDie, { friction: .25, restitution: .35 }));
-    function wall(hx, hy, hz, x, y, z) { var b = new C.Body({ mass: 0, material: mFloor }); b.addShape(new C.Box(new C.Vec3(hx, hy, hz))); b.position.set(x, y, z); world.addBody(b); }
-    wall(TX + 2, .5, TZ + 2, 0, -.5, 0);                 // Boden (Oberkante y=0)
+    var mDie = new C.Material('die'), mFloor = new C.Material('floor'), mWall = new C.Material('wall');
+    world.addContactMaterial(new C.ContactMaterial(mDie, mFloor, { friction: .3, restitution: .5 }));      // Boden: federt spürbar
+    world.addContactMaterial(new C.ContactMaterial(mDie, mWall, { friction: .1, restitution: .8 }));       // Ränder: sehr federnd wie Gummibanden
+    world.addContactMaterial(new C.ContactMaterial(mDie, mDie, { friction: .22, restitution: .5 }));
+    function wall(hx, hy, hz, x, y, z, mat) { var b = new C.Body({ mass: 0, material: mat || mWall }); b.addShape(new C.Box(new C.Vec3(hx, hy, hz))); b.position.set(x, y, z); world.addBody(b); }
+    wall(TX + 2, .5, TZ + 2, 0, -.5, 0, mFloor);         // Boden (Oberkante y=0)
     wall(.5, 5, TZ + 2, TX + .5, 5, 0); wall(.5, 5, TZ + 2, -TX - .5, 5, 0); wall(TX + 2, 5, .5, 0, 5, TZ + .5); wall(TX + 2, 5, .5, 0, 5, -TZ - .5); wall(TX + 2, .5, TZ + 2, 0, 10.5, 0);   // Wände und Decke
     var bodies = params.dice.map(function (d) {
       var b = new C.Body({ mass: 1, material: mDie, linearDamping: .06, angularDamping: .10 });
