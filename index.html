@@ -44,6 +44,10 @@ header p{margin:0;color:var(--muted);font-size:1.05rem}
 .game h2{margin:0;font-size:1.25rem}
 .game p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.4}
 .play{margin-top:auto;font-weight:600;color:var(--accent2);font-size:.95rem}
+.menu{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:18px}
+.menu button{font:inherit;font-size:.9rem;font-weight:600;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 12px;cursor:pointer}
+.menu button:hover{border-color:var(--accent)}.menu .lang{display:inline-flex;gap:6px}.menu .lang button.on{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2) inset}
+.menu .hello{color:var(--muted);font-weight:600}
 footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
 </style>
 <script src="theme.js"></script>
@@ -53,8 +57,31 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
   <header>
     <h1>Meine HTML-Spiele</h1>
     <p>Direkt im Browser spielen. Keine Installation nötig.</p>
+    <div class="menu" id="menu">
+      <span class="hello" id="hello"></span>
+      <button id="mName">👤 Name ändern</button>
+      <span class="lang" data-noi18n><button data-l="de">🇩🇪 Deutsch</button><button data-l="en">🇬🇧 English</button></span>
+    </div>
   </header>
   <div class="grid">
+    <!--SOON <a class="game" href="hoellen-tycoon/">
+      <div class="icon">😈</div>
+      <h2>Höllen-Tycoon</h2>
+      <p>Das Immobilien-Brettspiel in der Unterwelt: Straßen kaufen, Seelen kassieren, Häuser und Paläste bauen, handeln und die anderen in den Ruin treiben. 2 bis 6 Spieler, gegen Computer oder online.</p>
+      <span class="play">Spielen →</span>
+    </a> SOON-->
+    <!--SOON <a class="game" href="heldengilde/">
+      <div class="icon">⚔️</div>
+      <h2>Heldengilde</h2>
+      <p>Strategisches Kartenspiel: Stelle eine Gruppe aus Helden zusammen, würfle für ihre Fähigkeiten, besiege Monster und funke den anderen dazwischen. 2 bis 6 Spieler, gegen Computer oder online.</p>
+      <span class="play">Spielen →</span>
+    </a> SOON-->
+    <a class="game" href="auf-und-ab/">
+      <div class="icon">🔢</div>
+      <h2>Auf &amp; Ab</h2>
+      <p>Kooperatives Kartenspiel: Legt gemeinsam alle Zahlen von 2 bis 99 auf zwei aufsteigende und zwei absteigende Reihen, ohne Zahlen zu verraten. 1 bis 5 Spieler, mit Computer-Teamkollegen oder online.</p>
+      <span class="play">Spielen →</span>
+    </a>
     <a class="game" href="rummikub/">
       <div class="icon">🎲</div>
       <h2>Rummikub</h2>
@@ -73,12 +100,6 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
       <p>Der Klassiker für 2 bis 4 Spieler, mit oder ohne Computer-Gegner.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="netrunner-aergere-dich-nicht/">
-      <div class="icon">🕶️</div>
-      <h2>Netrunner ärgere dich nicht</h2>
-      <p>Das Brettspiel als 3D-Cyberpunk-Karte: Hexfelder, Sonderfelder, Hack-Terminals und bis zu 6 Spieler.</p>
-      <span class="play">Spielen →</span>
-    </a>
     <a class="game" href="farbchaos/">
       <div class="icon">🃏</div>
       <h2>Farbchaos</h2>
@@ -89,12 +110,6 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
       <div class="icon">🎴</div>
       <h2>Hanafuda Koi-Koi</h2>
       <p>Das japanische Blumenkarten-Spiel: Passende Monate sammeln, Kombinationen bilden und entscheiden, ob du weiterspielst (Koi-Koi) oder kassierst. Gegen den Computer oder online, mit 3D-Ansicht.</p>
-      <span class="play">Spielen →</span>
-    </a>
-    <a class="game" href="dschungel/">
-      <div class="icon">🌴</div>
-      <h2>Dschungel-Jagd</h2>
-      <p>Brettspiel mit Karten und Aktionsfeldern: Rätsel, Schlangen, Lianen und Fundstücke. Wer zuerst das Herz des Dschungels erreicht, gewinnt. Mit Computer-Gegnern.</p>
       <span class="play">Spielen →</span>
     </a>
     <a class="game" href="puzzle/">
@@ -146,7 +161,33 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
       <span class="play">Spielen →</span>
     </a>
   </div>
-  <footer>Weitere Spiele folgen.</footer>
+  <footer><span id="ver"></span></footer>
 </main>
+<script>
+SITE.addDict({'Meine HTML-Spiele':'My HTML Games','Direkt im Browser spielen. Keine Installation nötig.':'Play right in your browser. No installation needed.','👤 Name ändern':'👤 Change name',
+'Der Brettspiel-Klassiker mit Zahlensteinen, auch im Mehrspielermodus.':'The classic board game with number tiles, also in multiplayer.',
+'Zollkreuzwort':'Customs Crossword','Ein Kreuzworträtsel rund um den Zoll.':'A crossword puzzle about customs.',
+'Mensch ärgere dich nicht':'Ludo (Mensch ärgere dich nicht)','Der Klassiker für 2 bis 4 Spieler, mit oder ohne Computer-Gegner.':'The classic for 2 to 4 players, with or without computer opponents.',
+'Farbchaos':'Color Chaos','Das beliebte Farbkarten-Spiel für 2 bis 4: Karten nach Farbe oder Zahl ablegen, Aussetzen, Richtungswechsel, Plus-Karten und UNO rufen. Gegen den Computer oder online.':'The popular colour card game for 2 to 4: match colour or number, skip, reverse, draw cards and call UNO. Against the computer or online.',
+'Das japanische Blumenkarten-Spiel: Passende Monate sammeln, Kombinationen bilden und entscheiden, ob du weiterspielst (Koi-Koi) oder kassierst. Gegen den Computer oder online, mit 3D-Ansicht.':'The Japanese flower card game: collect matching months, build combinations and decide whether to keep going (Koi-Koi) or cash in. Against the computer or online, with 3D view.',
+'Puzzle':'Jigsaw puzzle','Eigenes Foto oder Bilder aus der Galerie, 6 bis 150 Teile, verschiedene Teileformen, Drag & Drop mit Animationen. Wahlweise flach in 2D oder als 3D-Tisch mit Schatten.':'Your own photo or gallery pictures, 6 to 150 pieces, different piece shapes, drag & drop with animations. Flat in 2D or on a 3D table with shadows.',
+'Der Klassiker mit Hold, Vorschau, Schatten-Stein, Wandtritten und Level. Mit Tastatur oder Touch.':'The classic with hold, preview, ghost piece, wall kicks and levels. Keyboard or touch.',
+'Texas Hold’em ohne Limit am 3D-Tisch. Bis zu 6 Spieler, gegen Computer oder online.':'No-limit Texas Hold’em at a 3D table. Up to 6 players, against the computer or online.',
+'Schlage den Geber am 3D-Tisch. Bis zu 5 Spieler, gegen Computer oder online.':'Beat the dealer at a 3D table. Up to 5 players, against the computer or online.',
+'Vier gewinnt':'Connect Four','Vier in einer Reihe. Gegen den Computer (3 Stufen) oder zu zweit.':'Four in a row. Against the computer (3 levels) or with two players.',
+'Mühle':'Nine Men’s Morris','Setzen, ziehen, springen: bilde Mühlen und nimm dem Gegner die Steine.':'Place, move, jump: form mills and take your opponent’s pieces.',
+'Schiffe versenken':'Battleship','Finde und versenke die gegnerische Flotte, bevor er deine erwischt.':'Find and sink the enemy fleet before it gets yours.',
+'Höllen-Tycoon':'Hell Tycoon','Das Immobilien-Brettspiel in der Unterwelt: Straßen kaufen, Seelen kassieren, Häuser und Paläste bauen, handeln und die anderen in den Ruin treiben. 2 bis 6 Spieler, gegen Computer oder online.':'The property board game in the underworld: buy streets, collect souls, build houses and palaces, trade and drive the others into ruin. 2 to 6 players, against the computer or online.',
+'Heldengilde':'Hero Guild','Strategisches Kartenspiel: Stelle eine Gruppe aus Helden zusammen, würfle für ihre Fähigkeiten, besiege Monster und funke den anderen dazwischen. 2 bis 6 Spieler, gegen Computer oder online.':'Strategic card game: build a party of heroes, roll for their abilities, slay monsters and mess with the others. 2 to 6 players, against the computer or online.',
+'Neon-Labyrinth für bis zu 4 Spieler: zusammen gegen die Geister (mit Kristall-Sync) oder gegeneinander mit eigenen Räumen und Arena-Kampf.':'Neon maze for up to 4 players: together against the ghosts (with crystal sync) or against each other with your own rooms and arena fights.',
+'Auf & Ab':'Up & Down','Kooperatives Kartenspiel: Legt gemeinsam alle Zahlen von 2 bis 99 auf zwei aufsteigende und zwei absteigende Reihen, ohne Zahlen zu verraten. 1 bis 5 Spieler, mit Computer-Teamkollegen oder online.':'Cooperative card game: together, play all numbers from 2 to 99 onto two rising and two falling rows without revealing numbers. 1 to 5 players, with computer teammates or online.'});
+function paintMenu(){const n=SITE.name();document.getElementById('hello').textContent=n?SITE.T('Hallo, ','Hello, ')+n+'!':'';
+  document.querySelectorAll('.menu .lang button').forEach(b=>b.classList.toggle('on',b.dataset.l===SITE.lang));}
+document.getElementById('ver').textContent='Version '+SITE.version;
+document.getElementById('hello').setAttribute('data-noi18n','');
+document.getElementById('mName').onclick=()=>SITE.askName(true).then(paintMenu);
+document.querySelector('.menu .lang').onclick=e=>{const b=e.target.closest('[data-l]');if(b&&b.dataset.l!==SITE.lang)SITE.setLang(b.dataset.l);};
+document.addEventListener('site-name',paintMenu);paintMenu();
+</script>
 </body>
 </html>

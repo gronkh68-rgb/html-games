@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auf & Ab</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<style>
+.wrap{max-width:1400px}
+.board{--cw:clamp(52px,calc((100vw - 420px)/9),96px);background:radial-gradient(ellipse at 50% 40%,#23415f,#0f1d2e);border:3px solid #0b1c30;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:18px;min-height:min(74vh,780px);transition:border-color .3s,box-shadow .3s}
+.board.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.35),0 0 40px rgba(255,210,63,.25)}
+html[data-style="cyber"] .board{background:radial-gradient(ellipse at 50% 40%,#0b1a2e,#04070d);border-color:#00f0ff55}
+.mates{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.mate{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 14px;border-radius:14px;border:2px solid rgba(255,255,255,.12);background:rgba(0,0,0,.25);color:#e8f2ff;font-weight:700;font-size:.9rem;min-width:110px;transition:all .2s}
+.mate.turn{border-color:#ffd23f;background:rgba(255,210,63,.16);box-shadow:0 0 20px rgba(255,210,63,.5)}
+.mate .bk{display:flex;height:calc(var(--cw)*.62)}
+.mate .bk i{width:calc(var(--cw)*.42);height:calc(var(--cw)*.62);border-radius:5px;background:repeating-linear-gradient(45deg,#2b3b8f 0 5px,#1c2766 5px 10px);border:2px solid #fff;margin-left:calc(var(--cw)*-.26);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.mate .bk i:first-child{margin-left:0}
+.mate small{color:#9fb6d6;font-weight:600}
+.piles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;justify-items:center;align-items:start;margin:auto 0}
+@media (max-width:620px){.piles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border-radius:16px;border:2px dashed transparent;cursor:pointer;transition:all .15s;min-width:calc(var(--cw)*1.4)}
+.pile .lb{font-weight:900;font-size:.95rem;color:#fff;letter-spacing:.04em}
+.pile.up .lb{color:#7dffb0}.pile.down .lb{color:#ff9d7d}
+.pile.ok{border-color:#ffd23f;background:rgba(255,210,63,.12)}
+.pile.trick{border-color:#3ee6a0;background:rgba(62,230,160,.14)}
+.pile .slot{position:relative;width:var(--cw);height:calc(var(--cw)*1.45)}
+.pile .slot .nc{position:absolute;inset:0}
+.pile .slot .nc.under{transform:rotate(-6deg) translate(-4px,2px);opacity:.75}
+.sigs{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;min-height:24px}
+.sig{font-size:.75rem;background:rgba(0,0,0,.45);border-radius:999px;padding:2px 8px;color:#fff;white-space:nowrap}
+.sig.stop{background:#c62828}.sig.good{background:#2e7d32}
+.sigbtns{display:flex;gap:4px}
+.sigbtns button{font:inherit;font-size:.78rem;padding:3px 7px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.35);color:#fff;cursor:pointer}
+.sigbtns button.on{background:#ffd23f;color:#222;border-color:#fff}
+.nc{width:var(--cw);height:calc(var(--cw)*1.45);border-radius:calc(var(--cw)*.12);background:linear-gradient(160deg,hsl(var(--h),80%,58%),hsl(var(--h),75%,38%));border:3px solid #fff;box-shadow:0 3px 9px rgba(0,0,0,.45);display:grid;place-items:center;position:relative;color:#fff;font-weight:900;user-select:none;flex:none}
+.nc .v{font-size:calc(var(--cw)*.5);text-shadow:0 2px 0 rgba(0,0,0,.35)}
+.nc .s{position:absolute;font-size:calc(var(--cw)*.2);opacity:.9}.nc .s.a{left:7%;top:4%}.nc .s.b{right:7%;bottom:4%;transform:rotate(180deg)}
+.nc.start{background:linear-gradient(160deg,#556,#223);}
+html[data-style="cyber"] .nc{background:linear-gradient(160deg,#0b1424,#04070d);border:2px solid hsl(var(--h),100%,60%);color:hsl(var(--h),100%,70%);box-shadow:0 0 12px hsla(var(--h),100%,60%,.55),inset 0 0 18px hsla(var(--h),100%,50%,.18);clip-path:polygon(12% 0,100% 0,100% 88%,88% 100%,0 100%,0 12%);border-radius:0}
+html[data-style="cyber"] .nc .v{font-family:Orbitron,system-ui;text-shadow:0 0 10px hsla(var(--h),100%,60%,.9)}
+.me{display:flex;flex-direction:column;gap:10px;align-items:center}
+.me .who{color:#fff;font-weight:800}
+.hand{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;min-height:calc(var(--cw)*1.5)}
+.hand .nc{cursor:pointer;transition:transform .15s,box-shadow .15s,opacity .2s}
+.hand .nc.sel{transform:translateY(-16px) scale(1.06);box-shadow:0 0 0 4px #ffd23f,0 10px 22px rgba(0,0,0,.5)}
+.hand .nc.dim{opacity:.55}
+.hand.active .nc:not(.dim):hover{transform:translateY(-8px)}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:#e8f2ff;font-weight:700}
+.acts .btn{min-width:160px}
+.prog{background:rgba(0,0,0,.4);border-radius:999px;padding:6px 14px}
+.deckinfo{display:flex;align-items:center;gap:10px}
+.deckinfo .nc{--h:230;--cw:44px;background:repeating-linear-gradient(45deg,#2b3b8f 0 5px,#1c2766 5px 10px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="board" id="board">
+          <div class="mates" id="mates"></div>
+          <div class="piles" id="piles"></div>
+          <div class="me">
+            <div class="who" id="meWho"></div>
+            <div class="hand" id="hand"></div>
+            <div class="acts"><span class="prog" id="prog"></span><button class="btn" id="endBtn"></button></div>
+          </div>
+        </div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div class="deckinfo"><div class="nc"></div><div><b id="deckN"></b><br><small id="leftN" style="color:var(--muted)"></small></div></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div class="toolrow" style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc;
+document.title=T('Auf & Ab','Up & Down');$('ttl').textContent=T('Auf & Ab','Up & Down');
+
+// ---------- Regeln ----------
+const RULES=()=>`<ul>
+<li>${T('Ihr spielt <b>gemeinsam</b>. Ziel: alle 98 Karten (2 bis 99) auf die vier Reihen legen.','You play <b>together</b>. Goal: play all 98 cards (2 to 99) onto the four rows.')}</li>
+<li>${T('Zwei Reihen gehen <b>aufwärts</b> (ab 1): jede Karte muss höher sein als die oberste. Zwei Reihen gehen <b>abwärts</b> (ab 100): jede Karte muss niedriger sein.','Two rows go <b>up</b> (from 1): each card must be higher than the top card. Two rows go <b>down</b> (from 100): each card must be lower.')}</li>
+<li>${T('<b>Rückwärts-Trick:</b> Eine Karte, die genau <b>10</b> unter (aufwärts) bzw. 10 über (abwärts) der obersten Karte liegt, darf trotzdem gelegt werden. Das schafft wieder Platz!','<b>Backwards trick:</b> a card exactly <b>10</b> lower (rising row) or 10 higher (falling row) than the top card may still be played. That makes room again!')}</li>
+<li>${T('Wer dran ist, legt <b>mindestens 2 Karten</b> (ist der Stapel leer, mindestens 1), gern auch mehr, und zieht dann wieder auf.','On your turn play <b>at least 2 cards</b> (1 once the draw pile is empty), more if you like, then refill your hand.')}</li>
+<li>${T('Zahlen dürft ihr nicht verraten. Erlaubt sind Hinweise an den Reihen: 🛑 „Bitte nicht auf diese Reihe“ und 👍 „Ich habe etwas Gutes für diese Reihe“.','You must not reveal numbers. Hints on the rows are allowed: 🛑 “please don’t play here” and 👍 “I have something good for this row”.')}</li>
+<li>${T('Kann jemand die Mindestzahl nicht legen, ist das Spiel vorbei. Je weniger Karten übrig sind, desto besser. Unter 10 ist großartig, 0 ist ein Sieg!','If someone cannot play the minimum, the game is over. The fewer cards left, the better. Under 10 is great, 0 is a win!')}</li>
+<li>${T('Handkarten: allein 8, zu zweit 7, ab drei Spielern 6.','Hand size: solo 8, two players 7, three or more 6.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🔢 ${T('Auf & Ab: gemeinsam gegen die Zahlen','Up & Down: together against the numbers')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Kooperatives Kartenspiel für 1 bis 5. Spielt alle Zahlen von 2 bis 99 auf vier Reihen, ohne euch Zahlen zu verraten.','Cooperative card game for 1 to 5. Play every number from 2 to 99 onto four rows without telling each other numbers.')}</p>
+<div class="row"><label for="nmate">${T('Computer-Teamkollegen','Computer teammates')}</label><select id="nmate">
+<option value="0">${T('Keine (allein)','None (solo)')}</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+<div class="hk-opts"><label><input type="checkbox" id="oHard"><span><b>${T('Profi-Modus','Expert mode')}</b><small>${T('Man muss in jedem Zug mindestens 3 Karten legen (bei leerem Stapel 1). Für Erfahrene.','You must play at least 3 cards each turn (1 once the pile is empty). For experienced players.')}</small></span></label>
+<label><input type="checkbox" id="oNoSig"><span><b>${T('Ohne Hinweise','No hints')}</b><small>${T('Die Reihen-Hinweise 🛑 und 👍 sind ausgeschaltet.','Row hints 🛑 and 👍 are disabled.')}</small></span></label></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();
+$('again').textContent=T('Zur Auswahl','Back to menu');
+function readOpts(){return {hard:$('oHard').checked,noSig:$('oNoSig').checked};}
+try{const o=JSON.parse(localStorage.getItem('aa-opts')||'{}');$('oHard').checked=!!o.hard;$('oNoSig').checked=!!o.noSig;}catch(e){}
+['oHard','oNoSig'].forEach(id=>$(id).addEventListener('change',()=>{try{localStorage.setItem('aa-opts',JSON.stringify(readOpts()));}catch(e){}}));
+
+// ---------- Spiellogik (nur auf dem Host) ----------
+const UP=[true,true,false,false];
+function fits(c,pile,top){if(UP[pile])return c>top||c===top-10;return c<top||c===top+10;}
+function cost(c,pile,top){if(UP[pile]){if(c===top-10)return -10;return c>top?c-top:1e9;}if(c===top+10)return -10;return c<top?top-c:1e9;}
+const handSize=n=>n===1?8:n===2?7:6;
+let K;
+function minFor(G){return G.deck.length?(G.opts.hard?3:2):1;}
+function legal(G,p){const m=[];G.hands[p].forEach(c=>G.piles.forEach((t,i)=>{if(fits(c,i,t))m.push({c,pile:i});}));return m;}
+function startGame(seats){
+  const G=K.G={seats,opts:readOptsSafe(),deck:HK.shuffle(Array.from({length:98},(_,i)=>i+2)),hands:[],piles:[1,1,100,100],under:[null,null,null,null],cur:0,played:0,inTurn:false,sig:[[],[],[],[]],log:[],over:null,last:null,seq:0};
+  G.hs=handSize(seats.length);
+  G.hands=seats.map(()=>G.deck.splice(0,G.hs).sort((a,b)=>a-b));
+  G.cur=HK.rnd(seats.length);
+  K.say(-1,L2(`Neues Spiel. ${K.nm(G.cur)} beginnt.`,`New game. ${K.nm(G.cur)} starts.`),L2('Neues Spiel. Du beginnst.','New game. You start.'));
+  showGame();K.push();K.run(main);
+}
+function readOptsSafe(){try{return readOpts();}catch(e){return {hard:false,noSig:false};}}
+async function main(){
+  const G=K.G;
+  while(!G.over){
+    if(!G.hands[G.cur].length){G.cur=nextWithCards(G.cur);if(G.cur<0)break;}
+    if(!G.inTurn){G.played=0;G.inTurn=true;}
+    K.snap('turn');K.push();
+    await turn(G.cur);
+    if(G.over)break;
+    refill(G.cur);G.inTurn=false;
+    if(G.hands.every(h=>!h.length)&&!G.deck.length){G.over={win:true,left:0};break;}
+    const n=nextWithCards(G.cur);if(n<0){G.over={win:true,left:0};break;}
+    G.cur=n;
+  }
+  K.push();await endGame();
+}
+function nextWithCards(p){const G=K.G,n=G.seats.length;for(let i=1;i<=n;i++){const q=(p+i)%n;if(G.hands[q].length)return q;}return -1;}
+function refill(p){
+  const G=K.G,h=G.hands[p];let k=0;
+  while(h.length<G.hs&&G.deck.length){h.push(G.deck.shift());k++;}
+  h.sort((a,b)=>a-b);
+  if(k)K.say(p,L2(`${K.nm(p)} zieht ${k} ${k===1?'Karte':'Karten'} nach.`,`${K.nm(p)} draws ${k} ${k===1?'card':'cards'}.`),L2(`Du ziehst ${k} ${k===1?'Karte':'Karten'} nach.`,`You draw ${k} ${k===1?'card':'cards'}.`));
+  if(!G.deck.length&&k)K.say(-1,L2('Der Stapel ist leer: ab jetzt reicht 1 Karte pro Zug.','The draw pile is empty: from now on 1 card per turn is enough.'));
+}
+async function turn(p){
+  const G=K.G;
+  while(true){
+    const h=G.hands[p];if(!h.length)return;
+    const min=minFor(G),moves=legal(G,p),canEnd=G.played>=min;
+    if(!moves.length){
+      if(!canEnd){
+        const left=G.deck.length+G.hands.reduce((s,x)=>s+x.length,0);
+        G.over={win:false,p,left};
+        K.say(p,L2(`${K.nm(p)} kann nicht mehr genug Karten legen. Das Spiel ist vorbei.`,`${K.nm(p)} cannot play enough cards. The game is over.`),L2('Du kannst nicht mehr genug Karten legen. Das Spiel ist vorbei.','You cannot play enough cards. The game is over.'));
+        K.sfx('bad');return;
+      }
+      return;
+    }
+    const a=await K.ask(p,{k:'turn',min,played:G.played,canEnd},()=>aiMove(p,canEnd));
+    if(!a||a.end){if(canEnd)return;continue;}
+    play(p,a.c,a.pile);
+    K.snap('turn');K.push();
+    await K.sleep(G.seats[p].type==='cpu'?750:120);
+  }
+}
+function play(p,c,pile){
+  const G=K.G,top=G.piles[pile],trick=UP[pile]?c<top:c>top;
+  G.hands[p]=G.hands[p].filter(x=>x!==c);G.under[pile]=top;G.piles[pile]=c;G.played++;G.seq++;
+  G.last={p,c,pile,seq:G.seq,trick};
+  G.sig[pile]=G.sig[pile].filter(s=>s.p!==p);
+  const pn=pileName(pile);
+  K.say(p,L2(`${K.nm(p)} legt ${c} auf ${pn.de}${trick?' (Rückwärts-Trick!)':''}.`,`${K.nm(p)} plays ${c} on ${pn.en}${trick?' (backwards trick!)':''}.`),L2(`Du legst ${c} auf ${pn.de}${trick?' (Rückwärts-Trick!)':''}.`,`You play ${c} on ${pn.en}${trick?' (backwards trick!)':''}.`));
+}
+function pileName(i){return [L2('Aufwärts 1','Up 1'),L2('Aufwärts 2','Up 2'),L2('Abwärts 1','Down 1'),L2('Abwärts 2','Down 2')][i];}
+// Computer: kleinste Lücke zuerst, Hinweise der anderen beachten
+function aiMove(p,canEnd){
+  const G=K.G;let best=null;
+  legal(G,p).forEach(m=>{
+    let s=cost(m.c,m.pile,G.piles[m.pile]);
+    if(s>0&&G.sig[m.pile].some(x=>x.p!==p&&x.t==='stop'))s+=14;
+    if(s>0&&G.sig[m.pile].some(x=>x.p!==p&&x.t==='good'))s+=4;
+    // eigene Folgekarte: ein Zug, nach dem eine eigene Karte den Rückwärts-Trick schafft, kostet effektiv wenig
+    if(s>0&&G.hands[p].includes(UP[m.pile]?m.c-10:m.c+10))s=Math.min(s,Math.max(-5,UP[m.pile]?m.c-10-G.piles[m.pile]:G.piles[m.pile]-m.c-10));
+    if(!best||s<best.s)best={c:m.c,pile:m.pile,s};
+  });
+  if(!best)return {end:true};
+  if(canEnd){
+    const lim=G.deck.length?2:4;
+    if(best.s>lim)return {end:true};
+  }
+  aiSignals(p,best);
+  return {c:best.c,pile:best.pile};
+}
+function aiSignals(p){
+  const G=K.G;if(G.opts.noSig)return;
+  for(let i=0;i<4;i++){
+    G.sig[i]=G.sig[i].filter(s=>s.p!==p);
+    const good=G.hands[p].some(c=>{const s=cost(c,i,G.piles[i]);return s<=2;});
+    if(good)G.sig[i].push({p,t:G.hands[p].some(c=>cost(c,i,G.piles[i])===-10)?'good':'stop'});
+  }
+}
+function setSig(p,pile,t){
+  const G=K.G;if(!G||G.opts.noSig||G.over||pile<0||pile>3)return;
+  const had=G.sig[pile].find(s=>s.p===p);
+  G.sig[pile]=G.sig[pile].filter(s=>s.p!==p);
+  if(t&&!(had&&had.t===t))G.sig[pile].push({p,t});
+  K.push();
+}
+async function endGame(){
+  const G=K.G,left=G.over.win?0:G.over.left;
+  const rate=left===0?L2('🏆 Perfekt! Ihr habt das Spiel geschafft!','🏆 Perfect! You beat the game!'):left<10?L2('⭐ Hervorragend!','⭐ Excellent!'):left<20?L2('👍 Gut gespielt.','👍 Well played.'):L2('Das geht noch besser.','You can do better.');
+  K.say(-1,L2(`Spielende: ${left} Karten übrig.`,`Game over: ${left} cards left.`));K.push();
+  K.sfx(left===0?'win':'bad');
+  const again=await K.vote(()=>({ico:left===0?'🏆':'🔢',title:rate,html:L2(`Übrig: <b>${left}</b> ${left===1?'Karte':'Karten'}.<br><br><b>Abstimmung:</b> Noch eine Partie?`,`Left: <b>${left}</b> ${left===1?'card':'cards'}.<br><br><b>Vote:</b> play again?`),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again){const seats=G.seats.map(s=>s.away&&s.orig&&s.type!=='cpu'?s:s);K.reset();startGame(seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})));}
+  else K.exit(false);
+}
+
+// ---------- Sicht ----------
+function view(G,s){
+  return {me:s,n:G.seats.length,names:G.seats.map(x=>x.name),types:G.seats.map(x=>x.type),hand:G.hands[s].slice(),counts:G.hands.map(h=>h.length),piles:G.piles.slice(),under:G.under.slice(),
+    deckN:G.deck.length,cur:G.cur,played:G.played,min:minFor(G),sig:G.sig.map(a=>a.map(x=>({p:x.p,t:x.t}))),log:K.logFor(s),over:G.over,last:G.last,opts:G.opts,
+    left:G.deck.length+G.hands.reduce((a,h)=>a+h.length,0)};
+}
+function valid(spec,a,G,p){
+  if(spec.k!=='turn'||!a)return false;
+  if(a.end)return !!spec.canEnd;
+  return G.hands[p].includes(a.c)&&Number.isInteger(a.pile)&&a.pile>=0&&a.pile<4&&fits(a.c,a.pile,G.piles[a.pile]);
+}
+
+// ---------- Anzeige ----------
+let inp=null,sel=null,V=null,lastRects={};
+const hue=v=>Math.round(220-(v-2)/97*220);
+const cardHtml=(v,cls='')=>v===1||v===100?`<div class="nc start ${cls}" style="--h:230"><span class="v">${v}</span></div>`:`<div class="nc ${cls}" data-v="${v}" style="--h:${hue(v)}"><span class="s a">${v}</span><span class="v">${v}</span><span class="s b">${v}</span></div>`;
+const nameOf=(V,i)=>i===V.me?T('Du','You'):esc(V.names[i]);
+function showGame(){$('setup').hidden=true;$('game').hidden=false;}
+function render(v,prev){
+  V=v;showGame();
+  // Positionen vor der Änderung merken (für die Flug-Animation)
+  const oldRects={};document.querySelectorAll('#hand .nc[data-v]').forEach(e=>{oldRects[e.dataset.v]=e.getBoundingClientRect();});
+  const mateRects={};document.querySelectorAll('.mate').forEach(e=>{mateRects[e.dataset.p]=e.getBoundingClientRect();});
+  const mine=inp&&V.cur===V.me&&!V.over;
+  if(!mine)sel=null;
+  if(sel!=null&&!V.hand.includes(sel))sel=null;
+  // Mitspieler
+  $('mates').innerHTML=V.names.map((n,i)=>i===V.me?'':`<div class="mate${V.cur===i&&!V.over?' turn':''}" data-p="${i}"><span>${esc(n)}${V.types[i]==='cpu'?' 🤖':''}</span><div class="bk">${'<i></i>'.repeat(Math.min(V.counts[i],8))}</div><small>${V.counts[i]} ${V.counts[i]===1?T('Karte','card'):T('Karten','cards')}</small></div>`).join('');
+  // Reihen
+  const okP=sel!=null?[0,1,2,3].filter(i=>fits(sel,i,V.piles[i])):[];
+  $('piles').innerHTML=V.piles.map((t,i)=>{
+    const sigs=V.sig[i].map(s=>`<span class="sig ${s.t}">${s.t==='stop'?'🛑':'👍'} ${nameOf(V,s.p)}</span>`).join('');
+    const mySig=(V.sig[i].find(s=>s.p===V.me)||{}).t;
+    const trick=okP.includes(i)&&(UP[i]?sel<t:sel>t);
+    return `<div class="pile ${UP[i]?'up':'down'}${okP.includes(i)?(trick?' trick':' ok'):''}" data-pile="${i}">
+      <div class="lb">${UP[i]?'▲ 1 → 99':'▼ 100 → 2'}</div>
+      <div class="slot">${V.under[i]!=null?cardHtml(V.under[i],'under'):''}${cardHtml(t,'top')}</div>
+      <div class="sigs">${sigs}</div>
+      ${V.opts.noSig||V.over?'':`<div class="sigbtns"><button data-sig="stop" data-pile="${i}" class="${mySig==='stop'?'on':''}" title="${T('Bitte nicht auf diese Reihe','Please don’t play here')}">🛑</button><button data-sig="good" data-pile="${i}" class="${mySig==='good'?'on':''}" title="${T('Ich habe etwas Gutes für diese Reihe','I have something good for this row')}">👍</button></div>`}
+    </div>`;}).join('');
+  // Hand
+  const can=mine?new Set(V.hand.filter(c=>[0,1,2,3].some(i=>fits(c,i,V.piles[i])))):new Set();
+  $('hand').className='hand'+(mine?' active':'');
+  $('hand').innerHTML=V.hand.map(c=>cardHtml(c,(sel===c?'sel ':'')+(mine&&!can.has(c)?'dim':''))).join('');
+  $('meWho').textContent=(SITE.name()||T('Du','You'))+' · '+V.hand.length+' '+(V.hand.length===1?T('Karte','card'):T('Karten','cards'));
+  $('prog').textContent=V.over?'':V.cur===V.me?T(`Gelegt: ${V.played} / mindestens ${V.min}`,`Played: ${V.played} / at least ${V.min}`):T(`Mindestens ${V.min} pro Zug`,`At least ${V.min} per turn`);
+  $('endBtn').textContent=T('Zug beenden','End turn');$('endBtn').disabled=!(mine&&inp.canEnd);$('endBtn').hidden=V.over||V.cur!==V.me;
+  $('deckN').textContent=T(`Nachziehstapel: ${V.deckN}`,`Draw pile: ${V.deckN}`);$('leftN').textContent=T(`Noch ${V.left} Karten im Spiel`,`${V.left} cards still in play`);
+  // Banner, Status, Protokoll
+  const b=$('hkBanner');
+  if(V.over){b.className='';b.textContent=V.over.win?T('🏆 Geschafft! Alle Karten liegen.','🏆 Done! All cards are down.'):T(`Spielende: ${V.over.left} Karten übrig`,`Game over: ${V.over.left} cards left`);}
+  else if(V.cur===V.me){b.className='me';b.textContent=T(`▶ DU BIST DRAN: Lege mindestens ${V.min} Karten`,`▶ YOUR TURN: play at least ${V.min} cards`);}
+  else{b.className='';b.textContent=T(`⏳ ${V.names[V.cur]} ist dran`,`⏳ ${V.names[V.cur]}'s turn`);}
+  $('board').classList.toggle('myturn',V.cur===V.me&&!V.over);
+  document.title=V.cur===V.me&&!V.over?T('▶ Du bist dran! – Auf & Ab','▶ Your turn! – Up & Down'):T('Auf & Ab','Up & Down');
+  if(V.cur===V.me&&!V.over&&!(prev&&prev.cur===V.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(V.log[0]?HK.tx(V.log[0]):'');
+  $('hkLog').innerHTML=V.log.slice(1,40).map(l=>`<div>${esc(HK.tx(l))}</div>`).join('');
+  // Flug-Animation der zuletzt gelegten Karte
+  if(V.last&&(!prev||!prev.last||prev.last.seq!==V.last.seq)&&prev){
+    const el=document.querySelector(`.pile[data-pile="${V.last.pile}"] .nc.top`);
+    const from=V.last.p===V.me?oldRects[V.last.c]:mateRects[V.last.p];
+    if(el&&from)fly(el,from,V.last.p!==V.me);
+    if(V.last.trick)K.toast(T('↺ Rückwärts-Trick!','↺ Backwards trick!'),1400);
+  }
+}
+let hintTxt='';
+function fly(e,from,turn){
+  const r=e.getBoundingClientRect(),dx=from.left+from.width/2-(r.left+r.width/2),dy=from.top+from.height/2-(r.top+r.height/2),dist=Math.hypot(dx,dy);
+  if(dist<4)return;
+  const dur=380+Math.min(420,dist*.5),lift=Math.min(90,20+dist*.12);
+  e.style.zIndex=50;
+  const a=e.animate([{transform:`perspective(800px) translate(${dx}px,${dy}px) scale(.8) rotateY(${turn?180:0}deg) rotate(${dx>0?-14:14}deg)`},{transform:`perspective(800px) translate(${dx/2}px,${dy/2-lift}px) scale(1.15) rotateY(${turn?90:0}deg)`},{transform:'none'}],{duration:dur,easing:'cubic-bezier(.25,.7,.25,1)'});
+  a.onfinish=()=>{e.style.zIndex='';e.animate([{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:180});K.sfx('lay');};
+  setTimeout(()=>K.sfx('flip'),dur*.35);
+}
+function ui(spec){
+  return new Promise(res=>{
+    if(spec.k==='turn'){inp={res,canEnd:spec.canEnd};hintTxt='';K.apply();}
+    else res(null);
+  });
+}
+function answer(a){if(!inp)return;const r=inp.res;inp=null;sel=null;hintTxt='';r(a);}
+$('hand').addEventListener('click',e=>{
+  const el=e.target.closest('.nc[data-v]');if(!el||!inp||!V)return;
+  const c=+el.dataset.v,ps=[0,1,2,3].filter(i=>fits(c,i,V.piles[i]));
+  if(!ps.length){hintTxt=T('Diese Karte passt gerade auf keine Reihe.','This card does not fit any row right now.');K.apply();return;}
+  if(ps.length===1&&sel===c){answer({c,pile:ps[0]});return;}
+  sel=sel===c?null:c;hintTxt=sel!=null?T('Tippe auf eine leuchtende Reihe, um die Karte zu legen.','Tap a glowing row to play the card.'):'';K.apply();
+});
+$('piles').addEventListener('click',e=>{
+  const sb=e.target.closest('[data-sig]');
+  if(sb){const pile=+sb.dataset.pile,t=sb.dataset.sig;if(K.ROLE==='client')K.L.send({k:'sig',pile,t});else setSig(K.ME,pile,t);return;}
+  const p=e.target.closest('.pile');if(!p||!inp||sel==null)return;
+  const i=+p.dataset.pile;
+  if(!fits(sel,i,V.piles[i])){hintTxt=T('Auf diese Reihe passt die Karte nicht.','The card does not fit this row.');K.apply();return;}
+  answer({c:sel,pile:i});
+});
+$('endBtn').onclick=()=>{if(inp&&inp.canEnd)answer({end:true});};
+
+K=HK.init({
+  prefix:'aua-v1-',title:L2('Auf & Ab','Up & Down'),minPlayers:1,
+  seats:[{name:'1',color:'#e53935'},{name:'2',color:'#f9a825'},{name:'3',color:'#2e9a4a'},{name:'4',color:'#1e6fd0'},{name:'5',color:'#9c27b0'}],
+  cpuNames:['Kira','Bolt','Nova','Pixel','Juno'],
+  view,valid,render,ui,
+  start:startGame,
+  resume(){K.run(main);},
+  hostMsg(p,m){if(m.k==='sig')setSig(p,+m.pile,m.t==='stop'||m.t==='good'?m.t:null);},
+  onGame:showGame,
+  onSetup(){inp=null;sel=null;$('game').hidden=true;$('setup').hidden=false;document.title=T('Auf & Ab','Up & Down');}
+});
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nmate').value);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>
