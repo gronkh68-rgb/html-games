@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wortgitter</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<script src="dict.js"></script>
+<script src="engine.js"></script>
+<style>
+.wrap{max-width:1400px}
+.hk-layout{grid-template-columns:minmax(0,1fr) 300px}
+.bw{width:min(100%,calc(100vh - 290px));min-width:300px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(15,1fr);gap:2px;background:#0e3b2c;border:5px solid #0b2a20;border-radius:12px;padding:3px;aspect-ratio:1;user-select:none;transition:border-color .3s,box-shadow .3s}
+.grid.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.3),0 0 30px rgba(255,210,63,.25)}
+html[data-style="cyber"] .grid{background:#04070d;border-color:#00f0ff55}
+.sq{position:relative;border-radius:3px;background:#1d6b4f;display:grid;place-items:center;font-size:clamp(5px,.8vw,10px);font-weight:800;color:rgba(255,255,255,.85);text-align:center;line-height:1;aspect-ratio:1;cursor:pointer}
+html[data-style="cyber"] .sq{background:#0b1626;color:#9fb6d6}
+.sq.TW{background:#c62828}.sq.DW{background:#e57399}.sq.TL{background:#1565c0}.sq.DL{background:#64b5f6;color:#0b2540}
+html[data-style="cyber"] .sq.TW{background:#5a0f22;box-shadow:inset 0 0 0 1px #ff2a55}html[data-style="cyber"] .sq.DW{background:#3a1030;box-shadow:inset 0 0 0 1px #ff7ac6}html[data-style="cyber"] .sq.TL{background:#0a2a55;box-shadow:inset 0 0 0 1px #40a9ff}html[data-style="cyber"] .sq.DL{background:#0c2238;box-shadow:inset 0 0 0 1px #7fd3f7;color:#7fd3f7}
+.sq.star::before{content:'★';font-size:2.2em;color:#ffd23f}
+.sq.drop{outline:2px solid #ffd23f;z-index:2}
+.tile{position:absolute;inset:4%;border-radius:12%;background:linear-gradient(160deg,#fff6dc,#f0d9a0);color:#2a1d10;display:grid;place-items:center;font-weight:900;font-size:clamp(9px,1.7vw,22px);box-shadow:0 1px 3px rgba(0,0,0,.5),inset 0 -2px 0 rgba(0,0,0,.15);font-family:system-ui,sans-serif}
+.tile i{position:absolute;right:7%;bottom:3%;font-style:normal;font-size:.42em}
+.tile.blank{color:#b71c1c}
+.tile.new{background:linear-gradient(160deg,#fffbe8,#ffe27a);box-shadow:0 0 0 2px #ffd23f,0 2px 6px rgba(0,0,0,.5)}
+.tile.last{box-shadow:0 0 0 2px #3ddc84,0 1px 3px rgba(0,0,0,.5)}
+html[data-style="cyber"] .tile{background:linear-gradient(160deg,#0d1424,#05070d);color:#fcee09;border:1px solid #fcee09;box-shadow:0 0 6px rgba(252,238,9,.45)}
+html[data-style="cyber"] .tile.new{color:#00f0ff;border-color:#00f0ff;box-shadow:0 0 10px #00f0ff}
+html[data-style="cyber"] .tile.blank{color:#ff7ac6}
+.tile.pop{animation:tpop .35s ease-out}
+@keyframes tpop{from{transform:scale(.2) rotate(-20deg);opacity:0}to{transform:none;opacity:1}}
+.rackbar{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:10px}
+.rack{display:flex;gap:6px;justify-content:center;background:linear-gradient(180deg,#6d4c2f,#4a3220);padding:8px 10px;border-radius:12px;min-height:66px;box-shadow:0 4px 10px rgba(0,0,0,.4)}
+html[data-style="cyber"] .rack{background:#0b1626;border:1px solid #00f0ff55}
+.rt{position:relative;width:52px;height:52px;cursor:grab;touch-action:none}
+.rt .tile{inset:0;font-size:26px}
+.rt.sel .tile{box-shadow:0 0 0 3px #ffd23f,0 6px 12px rgba(0,0,0,.5);transform:translateY(-6px)}
+.rt.used{opacity:.25;pointer-events:none}
+.rt.sw .tile{box-shadow:0 0 0 3px #e53935}
+.ghost{position:fixed;width:52px;height:52px;pointer-events:none;z-index:900;transform:translate(-50%,-50%) scale(1.1)}
+.ghost .tile{inset:0;font-size:26px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btns .btn{padding:8px 14px}
+.preview{min-height:1.4em;font-weight:700;color:#e8f2ff;text-align:center}
+.preview .bad{color:#ff8a8a}.preview .ok{color:#8dffb0}
+.ps{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:10px;border:2px solid transparent}
+.ps.turn{border-color:#ffd23f;background:rgba(255,210,63,.1)}
+.ps b{font-size:1.2rem}.ps small{color:var(--muted)}
+.loading{padding:30px;text-align:center;font-weight:700}
+.lgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
+.lgrid button{font:inherit;font-weight:900;font-size:1.1rem;padding:8px 0;border-radius:8px;border:1px solid var(--border);background:var(--card-hover);color:var(--text);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="bw"><div class="grid" id="grid"></div></div>
+        <div class="rackbar">
+          <div class="preview" id="preview"></div>
+          <div class="rack" id="rack"></div>
+          <div class="btns" id="btns"></div>
+        </div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="scores"></div><div id="bagInfo" style="margin-top:8px;color:var(--muted);font-size:.88rem"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="blankDlg" hidden style="z-index:950"><div class="box"><h2 id="blankT"></h2><div class="lgrid" id="blankL"></div></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const TT=T('Wortgitter','Word Grid');document.title=TT;$('ttl').textContent=TT;
+const RULES=()=>`<ul>
+<li>${T('Jeder hat 7 Buchstabensteine. Lege Wörter wie im Kreuzworträtsel, waagrecht oder senkrecht, angeschlossen an liegende Steine. Das erste Wort muss über den Stern ★ in der Mitte.','Everyone has 7 letter tiles. Lay words crossword-style, across or down, connected to tiles on the board. The first word must cover the centre star ★.')}</li>
+<li>${T('Punkte: Summe der Buchstabenwerte. <b>2B/3B</b> verdoppeln/verdreifachen einen Buchstaben, <b>2W/3W</b> das ganze Wort. Prämienfelder zählen nur beim ersten Belegen.','Points: sum of letter values. <b>DL/TL</b> double/triple a letter, <b>DW/TW</b> the whole word. Premium squares only count when first covered.')}</li>
+<li>${T('Alle neu entstandenen Wörter zählen. Wer alle 7 Steine auf einmal legt, bekommt <b>50 Extrapunkte</b>.','All newly formed words count. Using all 7 tiles at once gives a <b>50 point bonus</b>.')}</li>
+<li>${T('Joker (leere Steine) stehen für einen beliebigen Buchstaben und zählen 0 Punkte.','Blanks stand for any letter and score 0 points.')}</li>
+<li>${T('Statt zu legen, darfst du Steine tauschen (wenn noch mindestens 7 im Beutel sind) oder passen.','Instead of playing you may exchange tiles (if at least 7 are left in the bag) or pass.')}</li>
+<li>${T('Das Spiel endet, wenn der Beutel leer ist und jemand alle Steine gelegt hat, oder nach 6 Zügen hintereinander ohne Punkte. Reststeine werden abgezogen und dem gutgeschrieben, der fertig ist.','The game ends when the bag is empty and someone has used all tiles, or after 6 scoreless turns in a row. Remaining tiles are subtracted and given to whoever went out.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🔤 ${T('Wortgitter: das Buchstaben-Legespiel','Word Grid: the letter tile game')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Lege Wörter auf das 15×15-Brett, nutze Prämienfelder und schlage deine Gegner. Mit Wörterbuch (über 1 Million deutsche Wortformen bzw. 270.000 englische Wörter). 2 bis 4 Spieler.','Lay words on the 15×15 board, use premium squares and beat your opponents. With a dictionary (over 1 million German word forms or 270,000 English words). 2 to 4 players.')}</p>
+<div class="row"><label for="wlang">${T('Sprache der Wörter','Word language')}</label><select id="wlang"><option value="de">Deutsch (102 ${T('Steine','tiles')}, ÄÖÜ)</option><option value="en">English (100 ${T('Steine','tiles')})</option></select></div>
+<div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></div>
+<div class="row"><label for="lvl">${T('Stärke','Strength')}</label><select id="lvl"><option value="0">${T('Leicht','Easy')}</option><option value="1" selected>${T('Mittel','Medium')}</option><option value="2">${T('Schwer','Hard')}</option></select></div>
+<div class="hk-opts"><label><input type="checkbox" id="oFree"><span><b>${T('Ohne Wörterbuch-Prüfung','No dictionary check')}</b><small>${T('Jedes Wort wird angenommen (für Fachbegriffe und Namen unter Freunden). Die Computer nutzen trotzdem das Wörterbuch.','Every word is accepted (for jargon and names among friends). Computers still use the dictionary.')}</small></span></label></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('wlang').value=SITE.lang==='en'?'en':'de';
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+function readOpts(){return {lang:$('wlang').value,lvl:+$('lvl').value,free:$('oFree').checked};}
+try{const o=JSON.parse(localStorage.getItem('wg-opts')||'null');if(o){$('wlang').value=o.lang;$('lvl').value=o.lvl;$('oFree').checked=o.free;}}catch(e){}
+['wlang','lvl','oFree'].forEach(id=>$(id).addEventListener('change',()=>{try{localStorage.setItem('wg-opts',JSON.stringify(readOpts()));}catch(e){}}));
+
+let K,DICT=null;
+const valOf=(g,l)=>WGE.val(g.lang,l);
+// ---------- Spielablauf (Host) ----------
+function newBag(lang){const b=[];let id=0;const S=WGE.SETS[lang];for(const l in S)for(let i=0;i<S[l][0];i++)b.push({id:id++,l,v:S[l][1]});return HK.shuffle(b);}
+function draw(g,p){while(g.racks[p].length<7&&g.bag.length)g.racks[p].push(g.bag.pop());}
+async function startGame(seats,opts){
+  K.reset();
+  const g={seats,opts,lang:opts.lang,log:[],board:new Array(225).fill(null),bag:newBag(opts.lang),racks:seats.map(()=>[]),scores:seats.map(()=>0),cur:HK.rnd(seats.length),zero:0,first:true,over:null,last:null,seq:0};
+  K.G=g;seats.forEach((_,p)=>draw(g,p));
+  K.say(-1,L2('Neues Spiel ('+(opts.lang==='en'?'Englisch':'Deutsch')+'). '+K.nm(g.cur)+' beginnt.','New game ('+(opts.lang==='en'?'English':'German')+'). '+K.nm(g.cur)+' starts.'));
+  showGame();K.push();K.run(main);
+}
+async function ensureDict(lang){
+  if(DICT&&DICT.lang===lang)return DICT.d;
+  K.toast(T('Wörterbuch wird geladen …','Loading dictionary …'),8000);
+  const d=await WGDict.load(lang);DICT={lang,d};K.toast('');return d;
+}
+async function main(){
+  const g=K.G;
+  await ensureDict(g.lang);
+  let err=null;
+  while(!g.over){
+    const p=g.cur;
+    K.snap('turn');K.push();
+    const a=await K.ask(p,{k:'turn',err},()=>aiMove(g,p));
+    err=null;
+    if(!a)continue;
+    if(a.t==='pass'){g.zero++;K.say(p,L2(K.nm(p)+' passt.',K.nm(p)+' passes.'),L2('Du passt.','You pass.'));g.last=null;next(g);continue;}
+    if(a.t==='swap'){
+      const ids=new Set(a.ids),out=g.racks[p].filter(t=>ids.has(t.id));
+      g.racks[p]=g.racks[p].filter(t=>!ids.has(t.id));draw(g,p);g.bag=HK.shuffle(g.bag.concat(out));g.zero++;g.last=null;
+      K.say(p,L2(K.nm(p)+' tauscht '+out.length+' Steine.',K.nm(p)+' exchanges '+out.length+' tiles.'),L2('Du tauschst '+out.length+' Steine.','You exchange '+out.length+' tiles.'));K.sfx('take');next(g);continue;
+    }
+    // Legen
+    const rack=g.racks[p],placed=a.tiles.map(t=>{const rt=rack.find(r=>r.id===t.id);return {x:t.x,y:t.y,l:rt.l==='?'?t.l:rt.l,v:rt.v,b:rt.l==='?',id:t.id};});
+    const ev=WGE.evaluate(g.board,placed,g.first);
+    if(ev.err){err=ev.err;continue;}
+    if(!g.opts.free||g.seats[p].type==='cpu'){
+      const bad=ev.words.filter(w=>!WGDict.has(DICT.d,w.w)).map(w=>w.w);
+      if(bad.length){err=L2('Nicht im Wörterbuch: '+bad.join(', '),'Not in the dictionary: '+bad.join(', '));K.say(p,L2(K.nm(p)+' versucht ein ungültiges Wort ('+bad.join(', ')+').',K.nm(p)+' tries an invalid word ('+bad.join(', ')+').'));continue;}
+    }
+    placed.forEach(t=>{g.board[t.y*15+t.x]={l:t.l,v:t.v,b:t.b,p,id:t.id};});
+    g.racks[p]=rack.filter(r=>!placed.some(t=>t.id===r.id));draw(g,p);
+    g.scores[p]+=ev.score;g.first=false;g.zero=0;g.seq++;
+    g.last={p,cells:placed.map(t=>t.y*15+t.x),words:ev.words.map(w=>w.w),score:ev.score,bingo:ev.bingo,seq:g.seq};
+    const ws=ev.words.map(w=>w.w+' ('+w.score+')').join(', ');
+    K.say(p,L2(K.nm(p)+' legt '+ws+(ev.bingo?' + 50 Bonus':'')+' = '+ev.score+' Punkte.',K.nm(p)+' plays '+ws+(ev.bingo?' + 50 bonus':'')+' = '+ev.score+' points.'),L2('Du legst '+ws+(ev.bingo?' + 50 Bonus':'')+' = '+ev.score+' Punkte.','You play '+ws+(ev.bingo?' + 50 bonus':'')+' = '+ev.score+' points.'));
+    K.fx({k:'play',bingo:ev.bingo});K.sfx(ev.bingo?'win':'lay');
+    if(!g.racks[p].length&&!g.bag.length){finish(g,p);break;}
+    next(g);
+    if(g.seats[p].type==='cpu')await K.sleep(400);
+  }
+  K.push();
+  const w=g.scores.indexOf(Math.max(...g.scores));K.sfx('win');
+  const again=await K.vote(q=>({ico:'🏆',title:q===w?L2('Du hast gewonnen!','You won!'):L2(g.seats[w].name+' gewinnt!',g.seats[w].name+' wins!'),html:L2(g.seats.map((s,i)=>esc(s.name)+': <b>'+g.scores[i]+'</b>').join('<br>')+'<br><br><b>Abstimmung:</b> Noch eine Partie?',g.seats.map((s,i)=>esc(s.name)+': <b>'+g.scores[i]+'</b>').join('<br>')+'<br><br><b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function next(g){
+  if(g.zero>=6){finish(g,-1);return;}
+  g.cur=(g.cur+1)%g.seats.length;
+}
+function finish(g,out){
+  let bonus=0;
+  g.racks.forEach((r,i)=>{const s=r.reduce((a,t)=>a+t.v,0);g.scores[i]-=s;bonus+=s;});
+  if(out>=0)g.scores[out]+=bonus;
+  g.over={out};
+  K.say(-1,L2(out>=0?K.nm(out)+' hat alle Steine gelegt. Reststeine werden verrechnet.':'Sechs Züge ohne Punkte: Spielende. Reststeine werden abgezogen.',out>=0?K.nm(out)+' used all tiles. Remaining tiles are settled.':'Six scoreless turns: game over. Remaining tiles are subtracted.'));
+}
+function aiMove(g,p){
+  if(!DICT)return {t:'pass'};
+  const res=WGE.genMoves(g.board,g.racks[p],g.lang,DICT.d,g.first,g.opts.lvl===2?2500:1200);
+  const scored=[];
+  res.moves.forEach(m=>{const pl=m.tiles.map(t=>({x:t.x,y:t.y,l:t.l,v:t.b?0:WGE.val(g.lang,t.l),id:t.id}));const ev=WGE.evaluate(g.board,pl,g.first);if(!ev.err&&ev.words.every(w=>WGDict.has(DICT.d,w.w))){let s=ev.score;if(pl.some(t=>t.v===0)&&ev.score<30&&!ev.bingo)s-=12;scored.push({m,s,real:ev.score});}});
+  if(!scored.length){
+    if(g.bag.length>=7){const rk=g.racks[p],bad=rk.filter(t=>'QXYJVÖÜÄC'.includes(t.l)||rk.filter(u=>u.l===t.l).length>2);return {t:'swap',ids:(bad.length?bad:rk).slice(0,7).map(t=>t.id)};}
+    return {t:'pass'};
+  }
+  scored.sort((a,b)=>b.s-a.s);
+  const lvl=g.opts.lvl,pick=lvl===2?0:lvl===1?Math.floor(scored.length*Math.random()*.25):Math.floor(scored.length*(.3+Math.random()*.5));
+  const m=scored[Math.min(pick,scored.length-1)].m;
+  return {t:'play',tiles:m.tiles.map(t=>({id:t.id,x:t.x,y:t.y,l:t.l}))};
+}
+// ---------- Sicht ----------
+function view(g,s){
+  return {me:s,n:g.seats.length,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),board:g.board,rack:g.racks[s].map(t=>({id:t.id,l:t.l,v:t.v})),counts:g.racks.map(r=>r.length),
+    scores:g.scores,cur:g.cur,bag:g.bag.length,first:g.first,over:g.over,last:g.last,lang:g.lang,opts:g.opts,log:K.logFor(s)};
+}
+function valid(spec,a,g,p){
+  if(spec.k!=='turn'||!a)return false;
+  if(a.t==='pass')return true;
+  const rack=g.racks[p],ids=new Set(rack.map(t=>t.id));
+  if(a.t==='swap')return Array.isArray(a.ids)&&a.ids.length>0&&a.ids.length<=7&&g.bag.length>=7&&a.ids.every(i=>ids.has(i))&&new Set(a.ids).size===a.ids.length;
+  if(a.t==='play'){
+    if(!Array.isArray(a.tiles)||!a.tiles.length||a.tiles.length>7)return false;
+    const L=WGE.letters(g.lang);
+    return a.tiles.every(t=>ids.has(t.id)&&Number.isInteger(t.x)&&Number.isInteger(t.y)&&(rack.find(r=>r.id===t.id).l!=='?'||L.includes(t.l)))&&new Set(a.tiles.map(t=>t.id)).size===a.tiles.length;
+  }
+  return false;
+}
+// ---------- Darstellung ----------
+let V=null,inp=null,hintTxt='',tent=[],selId=null,swapMode=false,swapSel=new Set(),order=[],lastSeen=0;
+function showGame(){$('setup').hidden=true;$('game').hidden=false;}
+(function buildGrid(){let h='';for(let i=0;i<225;i++){const pr=WGE.PREM[i];h+=`<div class="sq ${pr}${i===112?' star':''}" data-k="${i}">${i===112?'':pr?prLabel(pr):''}</div>`;}$('grid').innerHTML=h;})();
+function prLabel(pr){return SITE.lang==='en'?pr:({TW:'3W',DW:'2W',TL:'3B',DL:'2B'})[pr];}
+const tileHtml=(l,v,cls)=>`<div class="tile ${cls||''}">${l==='?'?'':esc(l)}${v?`<i>${v}</i>`:''}</div>`;
+function render(v,prev){
+  V=v;showGame();
+  const mine=!!inp&&V.cur===V.me&&!V.over;
+  if(!mine){tent=[];swapMode=false;swapSel.clear();}
+  // Rack-Reihenfolge des Spielers beibehalten
+  const ids=V.rack.map(t=>t.id);order=order.filter(i=>ids.includes(i));ids.forEach(i=>{if(!order.includes(i))order.push(i);});
+  tent=tent.filter(t=>ids.includes(t.id)&&!V.board[t.y*15+t.x]);
+  const fresh=V.last&&V.last.seq!==lastSeen;
+  document.querySelectorAll('#grid .sq').forEach(sq=>{
+    const k=+sq.dataset.k,b=V.board[k],t=tent.find(x=>x.y*15+x.x===k);
+    let h='';
+    if(b)h=tileHtml(b.l,b.b?0:b.v,(b.b?'blank ':'')+(V.last&&V.last.cells.includes(k)?'last '+(fresh?'pop':''):''));
+    else if(t)h=tileHtml(t.l,t.v,'new'+(t.b?' blank':''));
+    else h=k===112?'':WGE.PREM[k]?prLabel(WGE.PREM[k]):'';
+    if(sq._h!==h){sq.innerHTML=h;sq._h=h;}
+  });
+  if(fresh)lastSeen=V.last.seq;
+  $('grid').classList.toggle('myturn',mine);
+  // Bank
+  $('rack').innerHTML=order.map(id=>{const t=V.rack.find(r=>r.id===id),used=tent.some(x=>x.id===id);return `<div class="rt${used?' used':''}${selId===id?' sel':''}${swapSel.has(id)?' sw':''}" data-id="${id}">${tileHtml(t.l,t.v,t.l==='?'?'blank':'')}</div>`;}).join('');
+  // Knöpfe
+  let b='';
+  if(mine){
+    if(swapMode)b=`<button class="btn" data-a="doswap" ${swapSel.size?'':'disabled'}>🔁 ${T('Ausgewählte tauschen','Exchange selected')} (${swapSel.size})</button><button class="btn alt" data-a="noswap">${T('Abbrechen','Cancel')}</button>`;
+    else b=`<button class="btn" data-a="play" ${tent.length?'':'disabled'}>✔ ${T('Legen','Play')}</button><button class="btn alt" data-a="back" ${tent.length?'':'disabled'}>↩ ${T('Zurücknehmen','Recall')}</button><button class="btn alt" data-a="mix">🔀 ${T('Mischen','Shuffle')}</button><button class="btn alt" data-a="swap" ${V.bag>=7?'':'disabled'}>🔁 ${T('Tauschen','Exchange')}</button><button class="btn alt" data-a="pass">⏭ ${T('Passen','Pass')}</button>`;
+  }
+  $('btns').innerHTML=b;
+  updatePreview();
+  // Spieler
+  $('scores').innerHTML=V.names.map((n,i)=>`<div class="ps${V.cur===i&&!V.over?' turn':''}"><span>${i===V.me?T('Du','You'):esc(n)}${V.types[i]==='cpu'?' 🤖':''}<br><small>${V.counts[i]} ${T('Steine','tiles')}</small></span><b>${V.scores[i]}</b></div>`).join('');
+  $('bagInfo').textContent=T(`Im Beutel: ${V.bag} Steine · Wörter: ${V.lang==='en'?'Englisch':'Deutsch'}`,`In the bag: ${V.bag} tiles · words: ${V.lang==='en'?'English':'German'}`);
+  const bn=$('hkBanner');
+  if(V.over){bn.className='';const w=V.scores.indexOf(Math.max(...V.scores));bn.textContent=w===V.me?T('🏆 Du gewinnst!','🏆 You win!'):`🏆 ${V.names[w]} ${T('gewinnt!','wins!')}`;}
+  else if(V.cur===V.me){bn.className='me';bn.textContent=T('▶ DU BIST DRAN: Lege ein Wort','▶ YOUR TURN: play a word');}
+  else{bn.className='';bn.textContent=T(`⏳ ${V.names[V.cur]} ist dran`,`⏳ ${V.names[V.cur]}'s turn`)+(V.types[V.cur]==='cpu'?T(' (überlegt …)',' (thinking …)'):'');}
+  document.title=V.cur===V.me&&!V.over?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if(V.cur===V.me&&!V.over&&!(prev&&prev.cur===V.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(V.log[0]?tx(V.log[0]):'');
+  $('hkLog').innerHTML=V.log.slice(1,60).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+}
+function updatePreview(){
+  const el=$('preview');
+  if(!tent.length||!V){el.innerHTML='';return;}
+  const ev=WGE.evaluate(V.board,tent.map(t=>({x:t.x,y:t.y,l:t.l,v:t.v,id:t.id})),V.first);
+  if(ev.err){el.innerHTML=`<span class="bad">${esc(tx(ev.err))}</span>`;return;}
+  let bad=[];if(DICT&&DICT.lang===V.lang&&!(V.opts&&V.opts.free))bad=ev.words.filter(w=>!WGDict.has(DICT.d,w.w)).map(w=>w.w);
+  el.innerHTML=ev.words.map(w=>`<span class="${bad.includes(w.w)?'bad':'ok'}">${esc(w.w)}</span>`).join(' · ')+` = <b>${ev.score}</b> ${T('Punkte','points')}${ev.bingo?' 🎉 +50':''}${bad.length?` <span class="bad">(${T('nicht im Wörterbuch','not in dictionary')})</span>`:''}`;
+}
+function fx(d){if(d.k==='play'&&d.bingo)K.toast(T('🎉 Alle 7 Steine! +50','🎉 All 7 tiles! +50'),2000);}
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res};hintTxt=spec.err?'⚠ '+tx(spec.err):'';if(spec.err)K.sfx('bad');K.apply();}else res(null);});}
+function answer(a){if(!inp)return;const r=inp.res;inp=null;hintTxt='';tent=[];selId=null;swapMode=false;swapSel.clear();K.apply();r(a);}
+function rackTile(id){return V.rack.find(t=>t.id===id);}
+async function placeAt(id,k){
+  if(!inp||!V||V.board[k]||tent.some(t=>t.y*15+t.x===k))return;
+  const t=rackTile(id);if(!t||tent.some(x=>x.id===id))return;
+  let l=t.l;
+  if(l==='?'){l=await pickBlank();if(!l)return;}
+  tent.push({id,x:k%15,y:Math.floor(k/15),l,v:t.l==='?'?0:t.v,b:t.l==='?'});selId=null;K.sfx('lay');K.apply();
+}
+function pickBlank(){return new Promise(res=>{$('blankT').textContent=T('Joker: welcher Buchstabe?','Blank: which letter?');$('blankL').innerHTML=WGE.letters(V.lang).map(l=>`<button data-l="${l}">${l}</button>`).join('')+`<button data-l="" style="grid-column:span 2">✕</button>`;$('blankDlg').hidden=false;$('blankL').onclick=e=>{const b=e.target.closest('[data-l]');if(!b)return;$('blankDlg').hidden=true;res(b.dataset.l||null);};});}
+$('grid').addEventListener('click',e=>{
+  const sq=e.target.closest('.sq');if(!sq||!inp)return;const k=+sq.dataset.k;
+  const t=tent.find(x=>x.y*15+x.x===k);
+  if(t){tent=tent.filter(x=>x!==t);K.apply();return;}
+  if(selId!=null)placeAt(selId,k);
+});
+$('rack').addEventListener('click',e=>{
+  const el=e.target.closest('.rt');if(!el||!V)return;const id=+el.dataset.id;
+  if(swapMode){swapSel.has(id)?swapSel.delete(id):swapSel.add(id);K.apply();return;}
+  selId=selId===id?null:id;K.apply();
+});
+$('btns').addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b||!inp)return;const a=b.dataset.a;
+  if(a==='play')answer({t:'play',tiles:tent.map(t=>({id:t.id,x:t.x,y:t.y,l:t.l}))});
+  else if(a==='back'){tent=[];K.apply();}
+  else if(a==='mix'){order=HK.shuffle(order);K.apply();}
+  else if(a==='swap'){tent=[];swapMode=true;swapSel.clear();hintTxt=T('Wähle die Steine zum Tauschen.','Select the tiles to exchange.');K.apply();}
+  else if(a==='noswap'){swapMode=false;swapSel.clear();hintTxt='';K.apply();}
+  else if(a==='doswap')answer({t:'swap',ids:[...swapSel]});
+  else if(a==='pass')K.dlg({ico:'⏭',title:L2('Wirklich passen?','Really pass?'),html:'',btns:[L2('Passen','Pass'),L2('Abbrechen','Cancel')]}).then(i=>{if(i===0)answer({t:'pass'});});
+});
+// Ziehen mit Maus oder Finger
+let drag=null;
+$('rack').addEventListener('pointerdown',e=>{
+  const el=e.target.closest('.rt');if(!el||!inp||swapMode)return;const id=+el.dataset.id;
+  drag={id,el,sx:e.clientX,sy:e.clientY,ghost:null};
+});
+addEventListener('pointermove',e=>{
+  if(!drag)return;
+  if(!drag.ghost&&Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>8){drag.ghost=document.createElement('div');drag.ghost.className='ghost';drag.ghost.innerHTML=drag.el.innerHTML;document.body.appendChild(drag.ghost);drag.el.style.opacity=.3;}
+  if(drag.ghost){drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';document.querySelectorAll('.sq.drop').forEach(s=>s.classList.remove('drop'));const sq=document.elementFromPoint(e.clientX,e.clientY);const s2=sq&&sq.closest&&sq.closest('.sq');if(s2)s2.classList.add('drop');}
+});
+addEventListener('pointerup',e=>{
+  if(!drag)return;const d=drag;drag=null;
+  if(!d.ghost)return;d.ghost.remove();d.el.style.opacity='';document.querySelectorAll('.sq.drop').forEach(s=>s.classList.remove('drop'));
+  const sq=document.elementFromPoint(e.clientX,e.clientY);const s2=sq&&sq.closest&&sq.closest('.sq');
+  if(s2)placeAt(d.id,+s2.dataset.k);
+  selId=null;setTimeout(()=>K.apply(),0);
+});
+K=HK.init({
+  prefix:'wgt-v1-',title:L2('Wortgitter','Word Grid'),minPlayers:2,
+  seats:[{name:'1',color:'#e53935'},{name:'2',color:'#f9a825'},{name:'3',color:'#2e9a4a'},{name:'4',color:'#1e6fd0'}],
+  cpuNames:['Kira','Bolt','Nova','Pixel'],
+  view,valid,render,ui,fx,
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){showGame();},
+  onSetup(){inp=null;tent=[];$('game').hidden=true;$('setup').hidden=false;document.title=TT;}
+});
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nopp').value);
+$('again').onclick=()=>K.exit(true);
+// Wörterbuch für die Vorschau beim Mitspieler im Hintergrund laden
+document.addEventListener('visibilitychange',()=>{});
+setTimeout(()=>{const l=$('wlang').value;WGDict.load(l).then(d=>{if(!DICT)DICT={lang:l,d};}).catch(()=>{});},1500);
+</script>
+</body>
+</html>
