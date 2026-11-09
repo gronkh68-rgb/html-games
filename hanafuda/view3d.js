@@ -53,7 +53,7 @@
     if (H.ready) return;
     host = hostEl; api = apiObj;
     r = new THREE.WebGLRenderer({ antialias: true });
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); host.appendChild(r.domElement);
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); host.appendChild(r.domElement);
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(40, 1, .1, 500);
     controls = new THREE.OrbitControls(camera, r.domElement);

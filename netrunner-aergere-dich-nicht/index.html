@@ -291,7 +291,7 @@ let perf=null;
 function initThree(){
   try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}
   catch(e){$('nogl').hidden=false;$('setup').hidden=true;return false;}
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
   renderer.setClearColor(0x05060b);
   stage.appendChild(renderer.domElement);
   scene=new THREE.Scene();

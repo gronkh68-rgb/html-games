@@ -80,29 +80,47 @@
       b.velocity.set(d.v[0], d.v[1], d.v[2]); b.angularVelocity.set(d.w[0], d.w[1], d.w[2]);
       world.addBody(b); return b;
     });
-    var frames = [], step = 0, calm = 0, rerolls = 0, maxSteps = 60 * 14, res = null;
+    var frames = [], step = 0, calm = 0, rerolls = 0, maxSteps = 60 * 6, res = null;
     function rec() { var f = []; bodies.forEach(function (b) { f.push(+b.position.x.toFixed(2), +b.position.y.toFixed(2), +b.position.z.toFixed(2), +b.quaternion.x.toFixed(3), +b.quaternion.y.toFixed(3), +b.quaternion.z.toFixed(3), +b.quaternion.w.toFixed(3)); }); frames.push(f); }
+    var topOf = function (b) { return topFace([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w]); };
     rec();
     while (step < maxSteps) {
       world.step(DT); step++;
       if (step % EVERY === 0) rec();
-      var still = bodies.every(function (b) { return b.velocity.length() < .12 && b.angularVelocity.length() < .25 && b.position.y < HALF + .06; });
+      // "Ruhig" zählt nur die Geschwindigkeit: Ein schräg lehnender Würfel liegt höher als ein flacher und darf trotzdem nicht ewig warten
+      var still = bodies.every(function (b) { return b.velocity.length() < .15 && b.angularVelocity.length() < .3; });
       calm = still ? calm + 1 : 0;
-      if (calm > 24) {
-        var tf = bodies.map(function (b) { return topFace([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w]); });
+      if (calm > 14) {
+        var tf = bodies.map(topOf);
         if (tf.every(function (t) { return t.d > .985; })) { res = tf.map(function (t) { return t.v; }); break; }
-        // Schräg liegen geblieben (Würfel lehnt an Wand oder anderem Würfel): wie am echten Tisch neu anstoßen
-        if (rerolls++ < 3) { bodies.forEach(function (b, i) { if (tf[i].d <= .985) { b.velocity.set(rnd(-2, 2), 7, rnd(-2, 2)); b.angularVelocity.set(rnd(-8, 8), rnd(-8, 8), rnd(-8, 8)); } }); calm = 0; }
-        else { res = tf.map(function (t) { return t.v; }); break; }
+        // Schräg liegen geblieben (lehnt an Wand oder anderem Würfel): wie am echten Tisch sofort neu anstoßen
+        if (rerolls++ < 2) { bodies.forEach(function (b, i) { if (tf[i].d <= .985) { b.velocity.set(rnd(-2.5, 2.5), 6.5, rnd(-2.5, 2.5)); b.angularVelocity.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9)); } }); calm = 0; }
+        else break;
       }
     }
-    if (!res) res = bodies.map(function (b) { return topFace([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w]).v; });
+    if (!res) {
+      // Immer noch nicht flach (oder nach 8 s noch in Bewegung): kippt in die nächstliegende flache Lage ein, statt das Spiel warten zu lassen
+      var tf2 = bodies.map(topOf);
+      if (tf2.some(function (t) { return t.d <= .985; })) {
+        var starts = bodies.map(function (b) { return { p: b.position.clone(), q: b.quaternion.clone() }; });
+        var targets = bodies.map(function (b) {
+          var q = b.quaternion, t = topOf(b), best = 0, bd = -2;
+          for (var i = 0; i < 6; i++) { var nn = q.vmult(new C.Vec3(FACE_N[i][0], FACE_N[i][1], FACE_N[i][2])); if (nn.y > bd) { bd = nn.y; best = nn; } }
+          var r = new C.Quaternion(); r.setFromVectors(best, new C.Vec3(0, 1, 0)); var tq = r.mult(q); tq.normalize(); return tq;
+        });
+        for (var f = 1; f <= 14; f++) {
+          var u = f / 14, e = u * u * (3 - 2 * u);
+          bodies.forEach(function (b, i) { var q = new C.Quaternion(); starts[i].q.slerp(targets[i], e, q); b.quaternion.copy(q); b.position.set(starts[i].p.x, starts[i].p.y + (HALF - starts[i].p.y) * e, starts[i].p.z); });
+          rec(); rec();
+        }
+      }
+      res = bodies.map(function (b) { return topOf(b).v; });
+    }
     // Endlage ein letztes Mal exakt festhalten
     rec(); rec();
     return { v: res, track: { n: n, hz: 60 / EVERY, f: frames } };
   };
 
-  // ---------- Darstellung ----------
   function faceTex(v, cyber, size) {
     var cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
     var P = { 1: [[.5, .5]], 2: [[.28, .28], [.72, .72]], 3: [[.28, .28], [.5, .5], [.72, .72]], 4: [[.28, .28], [.72, .28], [.28, .72], [.72, .72]], 5: [[.28, .28], [.72, .28], [.5, .5], [.28, .72], [.72, .72]], 6: [[.28, .25], [.72, .25], [.28, .5], [.72, .5], [.28, .75], [.72, .75]] };
@@ -125,53 +143,64 @@
       '#diceBackdrop{position:fixed;inset:0;z-index:899;background:rgba(5,8,18,.6);opacity:0;transition:opacity .35s;pointer-events:auto}';
     document.head.appendChild(st);
   }
-  D.view = function (host) {
-    addCss();
-    var V = { dice: [], busy: false, zoomed: false };
-    var cs = getComputedStyle(host); if (cs.position === 'static') host.style.position = 'relative';
-    var wrap = document.createElement('div'); wrap.className = 'dice-wrap'; wrap.setAttribute('data-noi18n', '');
-    var cv = document.createElement('canvas'), hint = document.createElement('div'); hint.className = 'dh';
-    wrap.appendChild(cv); wrap.appendChild(hint); host.appendChild(wrap); V.wrap = wrap; V.host = host;
-    var renderer, scene, cam, ray, plane, trayG, aimG, band, handle, pad, dots = [], floorMat, rimMat, padMat, shadowPlane, mats = null, geo = null, raf = 0, hideT = 0, backdrop = null, unzoomT = 0, visible = true;
-    function cyber() { return document.documentElement.getAttribute('data-style') === 'cyber'; }
-    function build() {
-      if (renderer) return;
-      renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, powerPreference: 'high-performance' }); renderer.setClearColor(0, 0); renderer.shadowMap.enabled = true;
-      scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, 1, .1, 100); ray = new THREE.Raycaster(); plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.5);
-      scene.add(new THREE.AmbientLight(0xffffff, .72));
-      var dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(-4, 14, 6); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024);
-      var sc = dl.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 10; sc.bottom = -10; sc.near = 1; sc.far = 40; scene.add(dl);
-      shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: .38 })); shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.position.y = .03; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
-      geo = new THREE.BoxGeometry(1, 1, 1);
-      // Tablett: Filzboden, Holzrand, Abschussfeld
-      trayG = new THREE.Group(); scene.add(trayG);
-      floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95 });
-      var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; trayG.add(floor);
-      rimMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: .55 });
-      var RT = .8, RH = 1.15;
-      function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; trayG.add(m); }
-      rim(TX * 2 + RT * 2, RT, 0, -TZ - RT / 2); rim(TX * 2 + RT * 2, RT, 0, TZ + RT / 2); rim(RT, TZ * 2, -TX - RT / 2, 0); rim(RT, TZ * 2, TX + RT / 2, 0);
-      padMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide });
-      pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); pad.rotation.x = -Math.PI / 2; pad.position.set(0, .04, ANCH_Z); pad.visible = false; trayG.add(pad);
-      // Zielhilfe: Gummiband, Griff und Punktreihe in Schussrichtung
-      aimG = new THREE.Group(); aimG.visible = false; scene.add(aimG);
-      var am = function () { return new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthTest: false }); };
-      band = new THREE.Mesh(geo, am()); band.renderOrder = 10; aimG.add(band);
-      handle = new THREE.Mesh(new THREE.RingGeometry(.3, .45, 28), am()); handle.rotation.x = -Math.PI / 2; handle.renderOrder = 11; aimG.add(handle);
-      for (var di = 0; di < 9; di++) { var dm = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), am()); dm.renderOrder = 10; aimG.add(dm); dots.push(dm); }
-      skin(); resize();
-    }
-    function skin() {
-      var cy = cyber();
+  // ---------- Darstellung ----------
+  // Das Tablett (Rig) ist ein Objekt in einer 3D-Szene. Es gibt zwei Einbauarten:
+  //   D.view(host)   eigenes kleines Fenster (Dock) für 2D-Spiele, fährt beim eigenen Wurf groß ins Bild
+  //   D.embed({...}) das Tablett steht als echtes Objekt neben dem Spielbrett in der Szene des Spiels, die Kamera fährt dorthin
+  var ASP = (TX * 2 + 2.8) / (TZ * 2 + 2.8), MAXP = 4.6, ANCH_Z = TZ - 1.7;
+  var cssDone = false;
+  function addCss() {
+    if (cssDone) return; cssDone = true;
+    var st = document.createElement('style');
+    st.textContent = '.dice-wrap{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:rgba(8,12,22,.55);border:2px solid rgba(255,255,255,.18);box-shadow:0 6px 20px rgba(0,0,0,.45)}' +
+      '.dice-wrap canvas{display:block;width:100%;height:100%;touch-action:none}' +
+      '.dice-embed{position:absolute;inset:0;pointer-events:none;z-index:60}' +
+      '.dice-wrap .dh,.dice-embed .dh{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:3;pointer-events:none;background:rgba(10,14,30,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 10px;font:700 12px system-ui,sans-serif;text-align:center;display:none;width:88%}' +
+      '.dice-wrap.big .dh,.dice-embed .dh{font-size:15px;padding:8px 14px;width:auto;max-width:92%}' +
+      '.dice-embed .dh{bottom:62px}' +
+      '.dice-wrap .dbtn,.dice-embed .dbtn{position:absolute;left:50%;bottom:54px;transform:translateX(-50%);z-index:4;font:600 13px system-ui,sans-serif;color:#fff;background:rgba(40,46,70,.95);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:7px 14px;cursor:pointer;pointer-events:auto}' +
+      '.dice-embed .dbtn{bottom:112px}' +
+      '#diceBackdrop{position:fixed;inset:0;z-index:899;background:rgba(5,8,18,.6);opacity:0;transition:opacity .35s;pointer-events:auto}';
+    document.head.appendChild(st);
+  }
+  var cyberNow = function () { return document.documentElement.getAttribute('data-style') === 'cyber'; };
+  // Tablett-Bauteile: Filzboden, Holzrand, Abschussfeld, Zielhilfe und die Würfel. Lokale Koordinaten = Physik-Koordinaten.
+  function mkRig(parent) {
+    var R = { dice: [], shown: 0 }, geo = new THREE.BoxGeometry(1, 1, 1), mats = null;
+    R.group = new THREE.Group(); parent.add(R.group);
+    var floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95 });
+    var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; R.group.add(floor);
+    var rimMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: .55 }), RT = .8, RH = 1.15;
+    function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; R.group.add(m); }
+    rim(TX * 2 + RT * 2, RT, 0, -TZ - RT / 2); rim(TX * 2 + RT * 2, RT, 0, TZ + RT / 2); rim(RT, TZ * 2, -TX - RT / 2, 0); rim(RT, TZ * 2, TX + RT / 2, 0);
+    var padMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide });
+    R.pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); R.pad.rotation.x = -Math.PI / 2; R.pad.position.set(0, .04, ANCH_Z); R.pad.visible = false; R.group.add(R.pad);
+    // Zielhilfe: Gummiband, Griff und Punktreihe in Schussrichtung
+    R.aimG = new THREE.Group(); R.aimG.visible = false; R.group.add(R.aimG);
+    var am = function () { return new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthTest: false }); };
+    var band = new THREE.Mesh(geo, am()); band.renderOrder = 10; R.aimG.add(band);
+    var handle = new THREE.Mesh(new THREE.RingGeometry(.3, .45, 28), am()); handle.rotation.x = -Math.PI / 2; handle.renderOrder = 11; R.aimG.add(handle);
+    var dots = []; for (var di = 0; di < 9; di++) { var dm = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), am()); dm.renderOrder = 10; R.aimG.add(dm); dots.push(dm); }
+    R.skin = function () {
+      var cy = cyberNow();
       floorMat.color.set(cy ? 0x0b1626 : 0x1f6b4d); floorMat.emissive.set(cy ? 0x001a24 : 0x000000);
       rimMat.color.set(cy ? 0x0e2a45 : 0x6b4a2b); rimMat.emissive.set(cy ? 0x06202f : 0x000000); padMat.color.set(cy ? 0x00f0ff : 0xffe08a);
-      wrap.style.borderColor = cy ? 'rgba(0,240,255,.45)' : 'rgba(255,255,255,.18)';
-    }
-    new MutationObserver(function () { if (renderer) { skin(); mk(); once(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
-    function updateAim(ax, az, pull) {      // Gummiband, Griff und Zielpunkte; Rückgabe: Kraft 0..1
+    };
+    R.mk = function () {
+      var cy = cyberNow(), key = cy ? 'c' : 's';
+      if (mats && mats.key === key) return mats;
+      mats = { key: key, list: FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: faceTex(v, cy, 128), roughness: cy ? .35 : .55, metalness: cy ? .3 : 0 }); }) };
+      R.dice.forEach(function (d) { d.mesh.material = mats.list; });
+      return mats;
+    };
+    R.ensure = function (n) {
+      while (R.dice.length < n) { var m = new THREE.Mesh(geo, R.mk().list); m.castShadow = true; R.group.add(m); R.dice.push({ mesh: m }); }
+      R.dice.forEach(function (d, i) { d.mesh.visible = i < n || (d.mesh.visible && i < R.shown); });
+    };
+    R.aim = function (ax, az, pull) {      // Gummiband, Griff und Zielpunkte; Rückgabe: Kraft 0..1
       var len = Math.hypot(pull.x, pull.z), power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), col = new THREE.Color().setHSL(.33 * (1 - power), .9, .55);
-      aimG.visible = len > .2;
-      if (!aimG.visible) return 0;
+      R.aimG.visible = len > .2;
+      if (!R.aimG.visible) return 0;
       var ex = ax + pull.x, ez = az + pull.z;
       band.position.set((ax + ex) / 2, .6, (az + ez) / 2); band.scale.set(len, .06, .16); band.rotation.y = -Math.atan2(pull.z, pull.x); band.material.color.copy(col);
       handle.position.set(ex, .6, ez); handle.material.color.copy(col);
@@ -182,117 +211,70 @@
         m.position.set(x, .55, z); m.scale.setScalar(1.15 - i * .09); m.material.color.copy(col);
       });
       return power;
-    }
-    function mk() {
-      var cy = cyber(), key = cy ? 'c' : 's';
-      if (mats && mats.key === key) return mats;
-      mats = { key: key, list: FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: faceTex(v, cy, 128), roughness: cy ? .35 : .55, metalness: cy ? .3 : 0 }); }) };
-      V.dice.forEach(function (d) { d.mesh.material = mats.list; });
-      return mats;
-    }
-    function resize() {
-      if (!renderer) return;
-      var w = wrap.clientWidth || 200, h = wrap.clientHeight || 280;
-      renderer.setPixelRatio(Math.min(V.zoomed ? 2 : 1.5, window.devicePixelRatio || 1)); renderer.setSize(w, h, false);
-      cam.aspect = w / h; var vf = cam.fov * Math.PI / 180, needH = (TZ + 1.4) * 2, needW = (TX + 1.4) * 2;
-      var dist = Math.max(needH / (2 * Math.tan(vf / 2)), needW / (2 * Math.tan(vf / 2) * cam.aspect));
-      cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
-    }
-    var ro = window.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe(wrap);
-    function ensure(n) {
-      while (V.dice.length < n) { var m = new THREE.Mesh(geo, mk().list); m.castShadow = true; scene.add(m); V.dice.push({ mesh: m }); }
-      V.dice.forEach(function (d, i) { d.mesh.visible = i < n || (d.mesh.visible && i < V.shown); });
-    }
-    // Es wird nur gezeichnet, wenn sich etwas bewegt (spart Leistung); sonst genau ein Bild pro Änderung
-    function loop() { raf = 0; if (renderer && visible) renderer.render(scene, cam); if (V._anim) raf = requestAnimationFrame(loop); }
-    function kick() { if (!raf) raf = requestAnimationFrame(loop); }
-    function once() { if (renderer && visible && !V._anim) renderer.render(scene, cam); }
-    // Dock ein-/ausblenden (z. B. wenn kein Spiel läuft)
-    V.show = function (on) {
-      if (on === false) { visible = false; host.style.display = 'none'; V._anim = 0; return; }
-      visible = true; host.style.display = ''; return D.ready().then(function () { build(); mk(); resize(); once(); });
     };
-    V.hint = function (t) { hint.textContent = t || ''; hint.style.display = t ? 'block' : 'none'; };
+    R.skin();
+    return R;
+  }
+
+  // Steuerung (Schleuder, Abspielen) – unabhängig davon, ob das Tablett im Dock oder in der Spielszene steht
+  function controller(env) {
+    var V = { busy: false, zoomed: false, wrap: env.wrap, host: env.host, shown: 0 }, hideT = 0, unzoomT = 0;
     function setDie(d, p, q) { d.mesh.position.set(p[0], p[1], p[2]); d.mesh.quaternion.set(q[0], q[1], q[2], q[3]); }
-    // ----- Kamerafahrt: das Tablett fährt groß in die Mitte (nur wenn man selbst wirft), danach zurück ins Dock -----
-    function bigRect() {
-      var iw = window.innerWidth, ih = window.innerHeight, h = Math.min(ih * .92, 940), w = h * ASP;
-      if (w > iw * .96) { w = iw * .96; h = w / ASP; }
-      return { left: (iw - w) / 2, top: (ih - h) / 2, width: w, height: h };
-    }
-    function applyBig() { var b = bigRect(); wrap.style.cssText = 'position:fixed;z-index:900;left:' + b.left + 'px;top:' + b.top + 'px;width:' + b.width + 'px;height:' + b.height + 'px;inset:auto'; wrap.style.left = b.left + 'px'; wrap.style.top = b.top + 'px'; }
-    V.zoom = function (on) {
-      if (on === V.zoomed || !renderer) return;
-      clearTimeout(unzoomT);
-      var first = wrap.getBoundingClientRect();
-      V.zoomed = on;
-      if (on) {
-        if (!backdrop) { backdrop = document.createElement('div'); backdrop.id = 'diceBackdrop'; }
-        document.body.appendChild(backdrop); void backdrop.offsetWidth; backdrop.style.opacity = '1';
-        document.body.appendChild(wrap); applyBig(); wrap.classList.add('big');
-      } else {
-        if (backdrop) { backdrop.style.opacity = '0'; var bd = backdrop; setTimeout(function () { if (!V.zoomed && bd.parentNode) bd.remove(); }, 380); }
-        host.appendChild(wrap); wrap.style.cssText = ''; wrap.classList.remove('big');
-      }
-      resize();
-      var last = wrap.getBoundingClientRect();
-      if (wrap.animate && last.width && first.width) {
-        wrap.animate([{ transformOrigin: '0 0', transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px) scale(' + (first.width / last.width) + ',' + (first.height / last.height) + ')' }, { transformOrigin: '0 0', transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
-        V._anim = 1; kick(); setTimeout(function () { if (!V._tick && !V._playing) { V._anim = 0; once(); } }, 480);
-      }
-    };
-    addEventListener('resize', function () { if (V.zoomed) { applyBig(); resize(); } });
+    V.hint = function (t) { env.hint(t); };
+    V.show = function (on) { return env.show(on); };
+    V.zoom = function (on) { if (on === V.zoomed) return; V.zoomed = on; env.focus(on); };
     V.hide = function () {      // Würfel wegräumen und aus der Kamerafahrt zurück
-      clearTimeout(hideT); V._anim = 0; V._playing = 0; V.hint('');
+      clearTimeout(hideT); clearTimeout(unzoomT); env.anim(0); V._playing = 0; V.hint('');
       if (V.zoomed) V.zoom(false);
-      if (renderer) { aimG.visible = false; pad.visible = false; V.dice.forEach(function (d) { d.mesh.visible = false; }); V.shown = 0; once(); }
+      var R = env.R; if (R) { R.aimG.visible = false; R.pad.visible = false; R.dice.forEach(function (d) { d.mesh.visible = false; }); R.shown = 0; env.once(); }
     };
-    // Schleuder: Würfel nach hinten (nach unten) ziehen, zielen, loslassen -> Wurfdaten. Mit V.cancel()/V.stopDrag() abbrechbar.
+    // Schleuder: Würfel nach hinten (nach unten) ziehen, zielen, loslassen -> Wurfdaten.
     V.drag = function (n, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        mk(); skin(); clearTimeout(hideT); clearTimeout(unzoomT); ensure(n); V.shown = n; V.busy = true; V._anim = 1;
+        var R = env.R; R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
         if (opts.zoom !== false) V.zoom(true);
-        var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = V.dice.map(function () { return randQ(); }), spin = V.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), tmp = new THREE.Vector3(), t0 = performance.now(), last = t0;
+        var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = R.dice.map(function () { return randQ(); }), spin = R.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), t0 = performance.now(), last = t0;
         var base = opts.hint || (window.SITE ? SITE.T('Würfel nach unten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice down, aim and release to shoot') : 'Pull down, aim, release');
         var off = function (i) { return (i - (n - 1) / 2) * 1.55; };
-        pad.visible = true; aimG.visible = false;
-        V.dice.slice(0, n).forEach(function (d, i) { d.mesh.visible = true; setDie(d, [ax + off(i), .5, az], q0[i]); });
-        V.hint(base); wrap.style.cursor = 'grab';
-        function pt(e) { var r = cv.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam); return ray.ray.intersectPlane(plane, tmp) ? [tmp.x, tmp.z] : null; }
+        R.pad.visible = true; R.aimG.visible = false;
+        R.dice.slice(0, n).forEach(function (d, i) { d.mesh.visible = true; setDie(d, [ax + off(i), .5, az], q0[i]); });
+        V.hint(base); env.cursor('grab');
         function tick(now) {
           var dt = Math.min(.05, (now - last) / 1000); last = now;
-          V.dice.slice(0, n).forEach(function (d, i) {
+          R.dice.slice(0, n).forEach(function (d, i) {
             var s = held ? 1.6 : .35, ax2 = new THREE.Vector3(spin[i][0], spin[i][1], spin[i][2]), a = ax2.length() * dt * s;
             if (a > 0) { var dq = new THREE.Quaternion().setFromAxisAngle(ax2.normalize(), a); var cq = new THREE.Quaternion(q0[i][0], q0[i][1], q0[i][2], q0[i][3]).premultiply(dq); q0[i] = [cq.x, cq.y, cq.z, cq.w]; }
             var py = held ? .9 : .5 + .12 * Math.abs(Math.sin((now - t0) / 500));
             d.mesh.position.set(ax + off(i) + pull.x * .22, py, az + pull.z * .22); d.mesh.quaternion.set(q0[i][0], q0[i][1], q0[i][2], q0[i][3]);
           });
+          env.once();
           if (V._tick) requestAnimationFrame(tick);
         }
-        V._tick = 1; requestAnimationFrame(tick); kick();
+        V._tick = 1; requestAnimationFrame(tick);
+        var L = env.listen;
         return new Promise(function (res, rej) {
           function down(e) {
-            var p = pt(e); if (!p) return;
-            var hit = V.dice.slice(0, n).some(function (d) { return ray.ray.distanceToPoint(d.mesh.position) < 1.9; });      // nur ein Griff auf den Würfel startet den Schuss
+            var p = env.pt(e); if (!p) return;
+            var hit = R.dice.slice(0, n).some(function (d) { return env.near(d.mesh.position, 1.9); });      // nur ein Griff auf den Würfel startet den Schuss
             if (!hit) return;
-            held = true; gp = p.slice(); try { wrap.setPointerCapture(e.pointerId); } catch (er) {} wrap.style.cursor = 'grabbing'; e.preventDefault(); e.stopPropagation(); move(e);
+            held = true; gp = p.slice(); try { L.setPointerCapture(e.pointerId); } catch (er) {} env.cursor('grabbing'); e.preventDefault(); e.stopImmediatePropagation(); move(e);
           }
           function move(e) {
-            if (!held) return; var p = pt(e); if (!p) return;
+            if (!held) return; var p = env.pt(e); if (!p) return;
             var vx = p[0] - gp[0], vz = p[1] - gp[1], len = Math.hypot(vx, vz);
             if (len > MAXP) { vx *= MAXP / len; vz *= MAXP / len; }
             pull = { x: vx, z: vz };
-            var pw = updateAim(ax, az, pull);
+            var pw = R.aim(ax, az, pull);
             V.hint(base + (Math.hypot(vx, vz) > .7 ? '  ·  ' + (window.SITE ? SITE.T('Kraft', 'Power') : 'Power') + ' ' + Math.round(pw * 100) + ' %' : ''));
-            if (e.cancelable) e.preventDefault(); e.stopPropagation();
+            if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation();
           }
           function up(e) {
-            if (!held) return; held = false; wrap.style.cursor = 'grab'; e.stopPropagation(); try { wrap.releasePointerCapture(e.pointerId); } catch (er) {}
+            if (!held) return; held = false; env.cursor('grab'); e.stopImmediatePropagation(); try { L.releasePointerCapture(e.pointerId); } catch (er) {}
             var len = Math.hypot(pull.x, pull.z);
-            if (len < .7) { pull = { x: 0, z: 0 }; aimG.visible = false; V.hint(base); return; }      // zu wenig gezogen: nichts passiert, nochmal versuchen
+            if (len < .7) { pull = { x: 0, z: 0 }; R.aimG.visible = false; V.hint(base); return; }      // zu wenig gezogen: nichts passiert, nochmal versuchen
             var power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), speed = 10 + power * 34, dice = [], base0 = Math.atan2(-pull.z, -pull.x);
-            cleanup(); aimG.visible = false; pad.visible = false;
+            cleanup(); R.aimG.visible = false; R.pad.visible = false;
             for (var i = 0; i < n; i++) {
               var ang = base0 + rnd(-.04, .04), vx2 = Math.cos(ang) * speed, vz2 = Math.sin(ang) * speed;
               // Drehung: Rollen in Schussrichtung plus zufälliges Taumeln aus der Hand
@@ -301,33 +283,33 @@
             }
             res({ dice: dice });
           }
-          function cleanup() { wrap.removeEventListener('pointerdown', down, true); wrap.removeEventListener('pointermove', move, true); wrap.removeEventListener('pointerup', up, true); wrap.removeEventListener('pointercancel', up, true); wrap.style.cursor = ''; V._tick = 0; V.hint(''); V._cleanup = null; }
+          function cleanup() { L.removeEventListener('pointerdown', down, true); L.removeEventListener('pointermove', move, true); L.removeEventListener('pointerup', up, true); L.removeEventListener('pointercancel', up, true); env.cursor(''); V._tick = 0; V.hint(''); V._cleanup = null; }
           V._cleanup = function () { cleanup(); rej(new Error('cancel')); };
-          wrap.addEventListener('pointerdown', down, true); wrap.addEventListener('pointermove', move, true); wrap.addEventListener('pointerup', up, true); wrap.addEventListener('pointercancel', up, true);
+          L.addEventListener('pointerdown', down, true); L.addEventListener('pointermove', move, true); L.addEventListener('pointerup', up, true); L.addEventListener('pointercancel', up, true);
         });
       });
     };
     V.stopDrag = function () { if (V._cleanup) V._cleanup(); };                       // Zieh-Eingabe beenden, Kamerafahrt bleibt (der Wurf folgt gleich)
     V.cancel = function () { if (V._cleanup) V._cleanup(); V.busy = false; V.hide(); };    // alles zurücksetzen
-    // Gerechnete Bahn abspielen. Rückgabe: Promise (Würfel liegen). Beim Werfenden ist das Tablett groß, bei allen anderen im Dock.
+    // Gerechnete Bahn abspielen. Rückgabe: Promise (Würfel liegen). Beim Werfenden fährt die Kamera zum Tablett, bei den anderen bleibt sie.
     V.play = function (track, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        mk(); skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
-        V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); aimG.visible = false; pad.visible = false; ensure(track.n); V.shown = track.n; V.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); resize(); V._anim = 1; kick();
+        var R = env.R; R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); R.aimG.visible = false; R.pad.visible = false; R.ensure(track.n); R.shown = track.n; R.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); env.anim(1);
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {
           var done = false;
           function fin() {
-            if (done) return; done = true; V._playing = 0; setFrame(frames.length - 1, 0); V._anim = 1; kick(); V.busy = false;
-            setTimeout(function () { if (!V._playing && !V._tick) { V._anim = 0; once(); } }, 120);
-            if (V.zoomed) unzoomT = setTimeout(function () { if (!V._playing) V.zoom(false); }, opts.hold == null ? 1300 : opts.hold);      // zurück ins Dock; die Würfel bleiben dort liegen
+            if (done) return; done = true; V._playing = 0; setFrame(frames.length - 1, 0); env.once(); V.busy = false;
+            setTimeout(function () { if (!V._playing && !V._tick) env.anim(0); }, 120);
+            if (V.zoomed) unzoomT = setTimeout(function () { if (!V._playing) V.zoom(false); }, opts.hold == null ? 1300 : opts.hold);      // zurück; die Würfel bleiben auf dem Tablett liegen
             res();
           }
           function setFrame(i, u) {
             var a = frames[i], b = frames[Math.min(frames.length - 1, i + 1)];
             for (var k = 0; k < n; k++) {
-              var o = k * 7, d = V.dice[k];
+              var o = k * 7, d = R.dice[k];
               d.mesh.position.set(a[o] + (b[o] - a[o]) * u, a[o + 1] + (b[o + 1] - a[o + 1]) * u, a[o + 2] + (b[o + 2] - a[o + 2]) * u);
               q1.set(a[o + 3], a[o + 4], a[o + 5], a[o + 6]); q2.set(b[o + 3], b[o + 4], b[o + 5], b[o + 6]); d.mesh.quaternion.copy(q1).slerp(q2, u);
             }
@@ -337,7 +319,7 @@
             if (done) return;
             var el = (performance.now() - t0) / 1000 * hz, i = Math.floor(el);
             if (i >= frames.length - 1) { fin(); return; }
-            setFrame(i, el - i);
+            setFrame(i, el - i); env.once();
             if (opts.sound) { var y = frames[i][1]; if (prevY != null && prevY > .62 && y <= .62) opts.sound('hit'); prevY = y; }
             requestAnimationFrame(step);
           }
@@ -347,7 +329,116 @@
         });
       });
     };
-    V.destroy = function () { V.cancel(); if (ro) ro.disconnect(); wrap.remove(); };
+    V.destroy = function () { V.cancel(); if (env.destroy) env.destroy(); };
+    Object.defineProperty(V, 'R', { get: function () { return env.R; } });
     return V;
+  }
+
+  // ----- Dock: eigenes kleines Fenster; beim eigenen Wurf fährt es groß in die Bildmitte -----
+  D.view = function (host) {
+    addCss();
+    var cs = getComputedStyle(host); if (cs.position === 'static') host.style.position = 'relative';
+    var wrap = document.createElement('div'); wrap.className = 'dice-wrap'; wrap.setAttribute('data-noi18n', '');
+    var cv = document.createElement('canvas'), hint = document.createElement('div'); hint.className = 'dh';
+    wrap.appendChild(cv); wrap.appendChild(hint); host.appendChild(wrap);
+    var env = { host: host, wrap: wrap, R: null }, V;
+    var renderer, scene, cam, ray, plane, tmp = null, raf = 0, anim = 0, visible = true, backdrop = null, zoomed = false;
+    function build() {
+      if (renderer) return;
+      renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, powerPreference: 'high-performance' }); renderer.setClearColor(0, 0); renderer.shadowMap.enabled = true;
+      tmp = new THREE.Vector3(); scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, 1, .1, 100); ray = new THREE.Raycaster(); plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.5);
+      scene.add(new THREE.AmbientLight(0xffffff, .72));
+      var dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(-4, 14, 6); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024);
+      var sc = dl.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 10; sc.bottom = -10; sc.near = 1; sc.far = 40; scene.add(dl);
+      var sp = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: .38 })); sp.rotation.x = -Math.PI / 2; sp.position.y = .03; sp.receiveShadow = true; scene.add(sp);
+      env.R = mkRig(scene); env.R.mk(); resize();
+    }
+    function resize() {
+      if (!renderer) return;
+      var w = wrap.clientWidth || 200, h = wrap.clientHeight || 280;
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(w, h, false);
+      cam.aspect = w / h; var vf = cam.fov * Math.PI / 180, needH = (TZ + 1.4) * 2, needW = (TX + 1.4) * 2;
+      var dist = Math.max(needH / (2 * Math.tan(vf / 2)), needW / (2 * Math.tan(vf / 2) * cam.aspect));
+      cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
+    }
+    var ro = window.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe(wrap);
+    // Es wird nur gezeichnet, wenn sich etwas bewegt (spart Leistung); sonst genau ein Bild pro Änderung
+    function loop() { raf = 0; if (renderer && visible) renderer.render(scene, cam); if (anim) raf = requestAnimationFrame(loop); }
+    function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+    function once() { if (renderer && visible && !anim) renderer.render(scene, cam); }
+    new MutationObserver(function () { if (env.R) { env.R.skin(); env.R.mk(); once(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
+    env.ready = function () { return D.ready().then(build); };
+    env.show = function (on) {
+      if (on === false) { visible = false; host.style.display = 'none'; anim = 0; return Promise.resolve(); }
+      return env.ready().then(function () { if (!visible || host.style.display === 'none') { visible = true; host.style.display = ''; resize(); } });
+    };
+    env.hint = function (t) { hint.textContent = t || ''; hint.style.display = t ? 'block' : 'none'; };
+    env.anim = function (f) { anim = f; if (f) kick(); else once(); };
+    env.once = once;
+    env.pt = function (e) { var r = cv.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam); return ray.ray.intersectPlane(plane, tmp) ? [tmp.x, tmp.z] : null; };
+    env.near = function (v3, rad) { return ray.ray.distanceToPoint(v3) < rad; };
+    env.listen = wrap; env.cursor = function (c) { wrap.style.cursor = c; };
+    function bigRect() {
+      var iw = window.innerWidth, ih = window.innerHeight, h = Math.min(ih * .92, 940), w = h * ASP;
+      if (w > iw * .96) { w = iw * .96; h = w / ASP; }
+      return { left: (iw - w) / 2, top: (ih - h) / 2, width: w, height: h };
+    }
+    function applyBig() { var b = bigRect(); wrap.style.cssText = 'position:fixed;z-index:900;left:' + b.left + 'px;top:' + b.top + 'px;width:' + b.width + 'px;height:' + b.height + 'px;inset:auto'; wrap.style.left = b.left + 'px'; wrap.style.top = b.top + 'px'; }
+    env.focus = function (on) {      // Kamerafahrt als Vergrößerung des Fensters
+      if (!renderer || on === zoomed) return;
+      var first = wrap.getBoundingClientRect(); zoomed = on;
+      if (on) {
+        if (!backdrop) { backdrop = document.createElement('div'); backdrop.id = 'diceBackdrop'; }
+        document.body.appendChild(backdrop); void backdrop.offsetWidth; backdrop.style.opacity = '1';
+        document.body.appendChild(wrap); applyBig(); wrap.classList.add('big');
+      } else {
+        if (backdrop) { backdrop.style.opacity = '0'; var bd = backdrop; setTimeout(function () { if (!zoomed && bd.parentNode) bd.remove(); }, 380); }
+        host.appendChild(wrap); wrap.style.cssText = ''; wrap.classList.remove('big');
+      }
+      resize();
+      var last = wrap.getBoundingClientRect();
+      if (wrap.animate && last.width && first.width) {
+        wrap.animate([{ transformOrigin: '0 0', transform: 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px) scale(' + (first.width / last.width) + ',' + (first.height / last.height) + ')' }, { transformOrigin: '0 0', transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        var keep = anim; anim = 1; kick(); setTimeout(function () { if (!V._tick && !V._playing) { anim = 0; once(); } else anim = keep || anim; }, 480);
+      }
+    };
+    addEventListener('resize', function () { if (zoomed) { applyBig(); resize(); } });
+    env.destroy = function () { if (ro) ro.disconnect(); wrap.remove(); };
+    V = controller(env);
+    return V;
+  };
+
+  // ----- Eingebettet: das Tablett steht als Objekt neben dem Spielbrett in der Szene des Spiels -----
+  // o: { scene, camera, dom (Zeichenfläche), stage (Element für Hinweise), pos:[x,y,z], scale, rotY, focus(on) (Kamerafahrt) }
+  D.embed = function (o) {
+    addCss();
+    var overlay = document.createElement('div'); overlay.className = 'dice-embed'; overlay.setAttribute('data-noi18n', '');
+    var hint = document.createElement('div'); hint.className = 'dh'; overlay.appendChild(hint);
+    var st = o.stage; st.appendChild(overlay);      // die Position der Bühne bleibt unverändert (ihr Stil legt sie fest)
+    var env = { host: st, wrap: overlay, R: null }, ray = null, pl = null, tmp = null, S = o.scale || 1;
+    env.ready = function () {
+      return D.ready().then(function () {
+        if (env.R) return;
+        ray = new THREE.Raycaster(); pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); tmp = new THREE.Vector3();
+        env.R = mkRig(o.scene); env.R.mk();
+        var g = env.R.group; g.position.set(o.pos[0], o.pos[1], o.pos[2]); g.scale.setScalar(S); g.rotation.y = o.rotY || 0; g.updateMatrixWorld(true);
+        new MutationObserver(function () { env.R.skin(); env.R.mk(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
+      });
+    };
+    env.show = function (on) { return env.ready().then(function () { env.R.group.visible = on !== false; }); };
+    env.hint = function (t) { hint.textContent = t || ''; hint.style.display = t ? 'block' : 'none'; };
+    env.anim = function () { }; env.once = function () { };      // die Szene des Spiels zeichnet ohnehin ständig
+    env.pt = function (e) {
+      var r = o.dom.getBoundingClientRect(), g = env.R.group; g.updateMatrixWorld(true);
+      ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), o.camera);
+      pl.constant = -(g.position.y + .5 * S);
+      if (!ray.ray.intersectPlane(pl, tmp)) return null;
+      var l = g.worldToLocal(tmp.clone()); return [l.x, l.z];
+    };
+    env.near = function (v3, rad) { return ray.ray.distanceToPoint(env.R.group.localToWorld(v3.clone())) < rad * S; };
+    env.listen = o.dom; env.cursor = function (c) { o.dom.style.cursor = c; };
+    env.focus = function (on) { if (o.focus) o.focus(on); };
+    env.destroy = function () { overlay.remove(); };
+    return controller(env);
   };
 })();

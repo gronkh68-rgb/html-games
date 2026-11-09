@@ -358,9 +358,31 @@ const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():
 // cfg: 'human' = an diesem Gerät, 'remote' = Online-Spieler, 'cpu', 'off'
 const isLocal=p=>cfg[p]==='human';
 const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
-let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DV=null;
-const DICEV=()=>DV||(DV=Dice3D.view($('diceDock')));
-const syncDock=on=>{const d=$('diceDock');if(d.hidden!==!on){d.hidden=!on;if(on)DICEV().show();}};
+let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe=null,lastPhys=false;
+// Würfel-Tablett: in der 3D-Ansicht steht es als echtes Objekt neben dem Brett auf dem Tisch (Kamera fährt beim eigenen Wurf hin), in 2D als Dock
+const TRAY3={pos:[12,-.25,0],scale:.9};
+let camSave3=null;
+function focusTray3(on){
+  if(!T3)return;
+  const cam=T3.camera,ctl=T3.controls;
+  T3.tw=T3.tw.filter(t=>t.key!=='cam'&&t.key!=='dicecam');
+  const p0=cam.position.clone(),t0=ctl.target.clone();
+  if(on){
+    camSave3={pos:p0.clone(),target:t0.clone()};
+    const c=new THREE.Vector3(TRAY3.pos[0],TRAY3.pos[1],TRAY3.pos[2]),to={pos:c.clone().add(new THREE.Vector3(3.5,17.5,9.5)),target:c.clone().add(new THREE.Vector3(3.5,0,.3))};
+    ctl.enabled=false;
+    tw3(900,k=>{const e=k*k*(3-2*k);cam.position.lerpVectors(p0,to.pos,e);ctl.target.lerpVectors(t0,to.target,e);},'dicecam');
+  }else if(camSave3){
+    const sv=camSave3;camSave3=null;
+    tw3(900,k=>{const e=k*k*(3-2*k);cam.position.lerpVectors(p0,sv.pos,e);ctl.target.lerpVectors(t0,sv.target,e);if(k>=1)ctl.enabled=true;},'dicecam');
+  }else ctl.enabled=true;
+}
+const DICEV=()=>{
+  if(v3&&T3&&T3.scene)return DVe||(DVe=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:TRAY3.pos,scale:TRAY3.scale,focus:focusTray3}));
+  return DVd||(DVd=Dice3D.view($('diceDock')));
+};
+const cancelDice=()=>{if(DVd)DVd.cancel();if(DVe)DVe.cancel();};
+const syncDock=on=>{const d=$('diceDock'),want=on&&!v3;if(d.hidden===want)d.hidden=!want;if(on)DICEV().show();};
 const physOn=()=>($('diceMode')||{}).value==='phys';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pname=p=>names[p]?` (${esc(names[p])})`:'';
@@ -818,14 +840,14 @@ function startGame(){
 }
 function launch(){            // startet das Spiel mit den Werten in cfg und names
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
-  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);if(DV)DV.cancel();syncDock(physOn());bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);cancelDice();syncDock(physOn());bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
   pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
   gameLoop();
 }
 function backToSetup(){
-  token++;pick=null;rollWait=null;setMine(false);if(DV)DV.cancel();syncDock(false);buildSetup();
+  token++;pick=null;rollWait=null;setMine(false);cancelDice();syncDock(false);buildSetup();
   $('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;
 }
 $('start').onclick=startGame;
@@ -1100,7 +1122,7 @@ function onClientMsg(m){
   if(m.t==='welcome'){if(m.tok)setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();$('joinForm').hidden=true;$('joinLobby').hidden=false;}
   else if(m.t==='lobby'){
     mySlot=m.you;if(m.cols)m.cols.forEach((k,i)=>setSeatColor(i,k));
-    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;if(DV)DV.cancel();syncDock(false);$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
+    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;cancelDice();syncDock(false);$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
     $('joinForm').hidden=true;$('joinLobby').hidden=false;
     $('joinSlots').innerHTML=m.slots.map((s,i)=>{
       const me=i===m.you;
@@ -1121,7 +1143,7 @@ function onClientClose(){if(netRole==='client')goMenu('Die Verbindung zum Host i
 function goMenu(why){
   setMine(false);
   if(!why)setRejoin(null);   // freiwillig gegangen: kein Wiederbeitritt anbieten
-  leaveNet();token++;if(DV)DV.cancel();syncDock(false);
+  leaveNet();token++;cancelDice();syncDock(false);
   $('game').hidden=true;$('setup').hidden=false;
   if(!$('winBox').hidden){$('winBox').hidden=true;}
   showMode('join');errMsg(why||'');
@@ -1141,7 +1163,7 @@ function applySnap(s,you){
   if(cur!==lastCur){lastCur=cur;showTurn(cur);}else showScores();
   $('msg').innerHTML=safeHtml(s.msg);
   const ph=s.phase||{k:'idle'};
-  syncDock(!!s.phys);
+  lastPhys=!!s.phys;syncDock(lastPhys);
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'&&ph.track){
     if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV().play(ph.track).then(()=>dieDone(v));}
@@ -1240,6 +1262,7 @@ async function setView(on){
   $('view3d').textContent=on?'2D-Ansicht':'3D-Ansicht';
   $('cam3').hidden=!on;
   if(on){resize3();if(active.length){build3();if(cur>=0)turn3(cur);}}
+  cancelDice();if(T3&&T3.controls)T3.controls.enabled=true;syncDock(netRole==='client'?lastPhys:(physOn()&&!$('game').hidden));
 }
 // Umgebung je nach Stil: Cyber = Neon-Stadt mit Regen, Standard = gemütliches Wohnzimmer
 function buildEnv3(){
@@ -1324,14 +1347,14 @@ function buildEnv3(){
     let tt=0;T3.rain={obj:pts,update(dt){tt+=dt;for(let i=0;i<N;i++){pos[i*3+1]-=dt*(.8+(i%5)*.12);pos[i*3]+=Math.sin(tt*.7+ph[i])*dt*.7;pos[i*3+2]+=Math.cos(tt*.5+ph[i])*dt*.3;if(pos[i*3+1]<-.4)pos[i*3+1]=22;}pg.attributes.position.needsUpdate=true;}};
   }else{
     scene.fog=new THREE.Fog(0x2a1a10,70,150);T3.r.setClearColor(0x2a1a10);
-    T3.room=Room3D.livingRoom(THREE,{half:60,tableTopY:-.25,table:{shape:'square',size:15}});add(T3.room.group);
+    T3.room=Room3D.livingRoom(THREE,{half:60,tableTopY:-.25,table:{shape:'square',size:36}});add(T3.room.group);
   }
 }
 new MutationObserver(()=>{if(T3){buildEnv3();build3();if(typeof cur==='number'&&cur>=0)turn3(cur);}}).observe(document.documentElement,{attributes:true,attributeFilter:['data-style']});
 function init3(){
   const el3=$('stage3d');
   const r=new THREE.WebGLRenderer({antialias:true});
-  r.setPixelRatio(Math.min(devicePixelRatio||1,1.5));r.setClearColor(0x05060b);
+  r.setPixelRatio(Math.min(devicePixelRatio||1,2));r.setClearColor(0x05060b);
   el3.appendChild(r.domElement);
   const scene=new THREE.Scene();
   const camera=new THREE.PerspectiveCamera(55,1,.1,200);camera.position.set(0,14,15);
@@ -1358,6 +1381,7 @@ function init3(){
     if(h)onPieceClick(h.object.userData.p,h.object.userData.i);
   });
   addEventListener('resize',resize3);
+  if(window.ResizeObserver)new ResizeObserver(()=>resize3()).observe(el3);      // auch wenn die Ansicht beim Laden noch keine Größe hatte
   requestAnimationFrame(tick3);
   setInterval(()=>runTw3(performance.now()),50);
 }

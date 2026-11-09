@@ -35,7 +35,7 @@
     var self = this, THREEx = window.THREE;
     this.host = host; this.cards = {}; this.chips = {}; this.labels = {}; this.tw = []; this.style = null; this.view = null; this.markers = {}; this.texCache = {}; this.matCache = {};
     var r = this.r = new THREE.WebGLRenderer({ antialias: true });
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); host.appendChild(r.domElement);
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); host.appendChild(r.domElement);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, 1, .1, 400); this.camera.position.set(0, 21, 27);
     var c = this.controls = new THREE.OrbitControls(this.camera, r.domElement);
