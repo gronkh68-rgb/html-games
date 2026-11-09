@@ -30,9 +30,15 @@
 #pdie .f i.on{background:radial-gradient(circle at 35% 30%,#555,#111)}
 #pdie .f i.one.on{background:radial-gradient(circle at 35% 30%,#ff5a5a,#b30000);width:100%;height:100%}
 #pdie .sh{position:absolute;left:calc(var(--ds)*-.55);top:calc(var(--ds)*-.2);width:calc(var(--ds)*1.1);height:calc(var(--ds)*.4);border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%)}
-html[data-style="cyber"] #pdie .f{background:linear-gradient(135deg,#1b2433,#0a0f18);box-shadow:inset 0 0 0 2px #2fd6e8,0 0 8px rgba(47,214,232,.35)}
-html[data-style="cyber"] #pdie .f i.on{background:#2fd6e8;box-shadow:0 0 5px #2fd6e8}
-html[data-style="cyber"] #pdie .f i.one.on{background:#ff3b8b;box-shadow:0 0 6px #ff3b8b}
+#pdie .f b,#pdie .fx{display:none}
+html[data-style="cyber"] #pdie .f{background:radial-gradient(circle,#13203a,#070d19);box-shadow:inset 0 0 0 2px #35f4ff,inset 0 0 10px rgba(53,244,255,.45),0 0 10px rgba(53,244,255,.6);border-radius:8%}
+html[data-style="cyber"] #pdie .f i{display:none}
+html[data-style="cyber"] #pdie .f b{display:grid;place-items:center;position:absolute;inset:0;font:900 calc(var(--ds)*.6)/1 Orbitron,"Share Tech Mono",monospace;color:#f4ffff;text-shadow:0 0 6px #35f4ff,0 0 14px #35f4ff,0 0 26px #00b4d8}
+html[data-style="cyber"] #pdie.hit .f{animation:pdhit .9s ease-out}
+html[data-style="cyber"] #pdie .fx{display:block;position:absolute;left:calc(var(--ds)*-.5);top:calc(var(--ds)*-.5);width:var(--ds);height:var(--ds);border:2px solid #35f4ff;border-radius:50%;box-shadow:0 0 14px #35f4ff,inset 0 0 14px #35f4ff;opacity:0;pointer-events:none}
+html[data-style="cyber"] #pdie.hit .fx{animation:pdring .9s ease-out}
+@keyframes pdhit{0%{filter:brightness(1)}20%{filter:brightness(2.2) saturate(1.4)}100%{filter:brightness(1)}}
+@keyframes pdring{0%{opacity:.95;transform:scale(.7)}100%{opacity:0;transform:scale(3.4)}}
 html[data-style="anime"] #pdie .f{background:linear-gradient(135deg,#fff6e0,#e6d3a8);box-shadow:inset 0 0 0 2px #7a1c24}
 html[data-style="anime"] #pdie .f i.one.on{background:radial-gradient(circle at 35% 30%,#ff4d5e,#a30f22)}
 @media (max-width:760px){.layout{grid-template-columns:1fr}}
@@ -616,8 +622,8 @@ const PD=(()=>{
   function build(){
     if(root)return;
     root=document.createElement('div');root.id='pdie';
-    root.innerHTML='<div class="sh"></div><div class="cube">'+[1,2,3,4,5,6].map(n=>
-      `<div class="f" style="transform:${POS[n]} translateZ(calc(var(--ds)/2))">${[0,1,2,3,4,5,6,7,8].map(k=>`<i class="${PIPS[n].includes(k)?'on':''}${n===1?' one':''}"></i>`).join('')}</div>`).join('')+'</div>';
+    root.innerHTML='<div class="sh"></div><div class="fx"></div><div class="cube">'+[1,2,3,4,5,6].map(n=>
+      `<div class="f" style="transform:${POS[n]} translateZ(calc(var(--ds)/2))">${[0,1,2,3,4,5,6,7,8].map(k=>`<i class="${PIPS[n].includes(k)?'on':''}${n===1?' one':''}"></i>`).join('')}<b>${n}</b></div>`).join('')+'</div>';
     $('boardWrap').appendChild(root);cube=root.querySelector('.cube');sh=root.querySelector('.sh');
   }
   function draw(x,y,h){
@@ -625,7 +631,8 @@ const PD=(()=>{
     const k=Math.min(h/ds,1);
     sh.style.transform=`translate(${x}px,${y+ds*.38}px) scale(${1-k*.35})`;sh.style.opacity=String(.9-k*.5);
   }
-  function hide(){st='idle';if(root)root.style.opacity='0';}
+  function hit(){root.classList.remove('hit');void root.offsetWidth;root.classList.add('hit');}
+  function hide(){st='idle';if(root){root.style.opacity='0';root.classList.remove('hit');}}
   function step(now){
     raf=0;if(st==='idle'||st==='done')return;
     const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
@@ -646,7 +653,7 @@ const PD=(()=>{
       ax=tgt.ax0+(tgt.ax-tgt.ax0)*e;ay=tgt.ay0+(tgt.ay-tgt.ay0)*e;az=tgt.az0+(tgt.az-tgt.az0)*e;
       x=sx*(1-e);y=sy*(1-e);
       h=ds*.5*Math.pow(1-u,2)*Math.abs(Math.sin(u*Math.PI*2.5));
-      if(u>=1){st='done';draw(0,0,0);clearTimeout(hideT);hideT=setTimeout(hide,1300);const r=res;res=null;if(r)r();return;}
+      if(u>=1){st='done';draw(0,0,0);hit();clearTimeout(hideT);hideT=setTimeout(hide,1300);const r=res;res=null;if(r)r();return;}
     }
     sx=x;sy=y;draw(x,y,h);raf=requestAnimationFrame(step);
   }
@@ -671,7 +678,7 @@ const PD=(()=>{
       // Notbremse: in einem Hintergrund-Tab pausiert der Browser die Animation, das Spiel darf deshalb nicht hängen
       setTimeout(()=>{
         if(st!=='land'||prom!==my)return;
-        ax=tgt.ax;ay=tgt.ay;az=tgt.az;st='done';draw(0,0,0);
+        ax=tgt.ax;ay=tgt.ay;az=tgt.az;st='done';draw(0,0,0);hit();
         clearTimeout(hideT);hideT=setTimeout(hide,1300);const r=res;res=null;if(r)r();
       },LAND+250);
       return prom;
@@ -1487,7 +1494,17 @@ function build3(){
   // Grundplatte
   const plate=new THREE.Mesh(new THREE.BoxGeometry(11.6*S3,.3,11.6*S3),new THREE.MeshStandardMaterial(CY()?{color:0x0a0d16,roughness:.6,metalness:.5,emissive:0x03121a}:AN()?{color:0x6b4226,roughness:.6}:DK()?{color:0x161a23,roughness:.85}:{color:0xc89a5a,roughness:.7}));
   plate.position.y=-.1;G.add(plate);
-  if(CY()){const pe=new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),new THREE.LineBasicMaterial({color:0x00f0ff}));pe.position.copy(plate.position);G.add(pe);}
+  if(CY()){
+    const pe=new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),new THREE.LineBasicMaterial({color:0x00f0ff}));pe.position.copy(plate.position);G.add(pe);
+    // Leuchtrahmen am Rand: schmale, helle Leiste (Bloom macht den Schein) und weiter innen eine dünne gestrichelte Zierlinie
+    const hw=11.6*S3/2,fm=new THREE.MeshBasicMaterial({color:0x35f4ff}),th=.05;
+    [[0,-hw,hw*2,th],[0,hw,hw*2,th],[-hw,0,th,hw*2],[hw,0,th,hw*2]].forEach(([x,z,w,d])=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w,.045,d),fm);b.position.set(x,.065,z);G.add(b);});
+    const ih=hw-.28,dm=new THREE.LineDashedMaterial({color:0x00b4d8,dashSize:.35,gapSize:.22,transparent:true,opacity:.75});
+    const il=new THREE.Line(new THREE.BufferGeometry().setFromPoints([[-ih,-ih],[ih,-ih],[ih,ih],[-ih,ih],[-ih,-ih]].map(a=>new THREE.Vector3(a[0],.058,a[1]))),dm);il.computeLineDistances();G.add(il);
+    [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sz])=>{   // Eck-Winkel
+      const c=new THREE.Mesh(new THREE.BoxGeometry(.9,.05,.09),fm);c.position.set(sx*(hw-.55),.07,sz*(hw-.12));G.add(c);
+      const d=new THREE.Mesh(new THREE.BoxGeometry(.09,.05,.9),fm);d.position.set(sx*(hw-.12),.07,sz*(hw-.55));G.add(d);});
+  }
   const tile=(c,r,h,color,emis,eI,edge,rad=.48,kind)=>{
     const g=new THREE.CylinderGeometry(rad,rad,h,CY()?8:24);g.rotateY(Math.PI/8);
     let mt,lc=edge,lo=1;
@@ -1504,6 +1521,14 @@ function build3(){
     }
     const m=new THREE.Mesh(g,mt);
     const w=w3(c,r);m.position.set(w.x,h/2,w.z);G.add(m);
+    if(CY()){   // Cyber: nur die obere Kontur (klar lesbar, nicht fett) plus ein schwacher Halo-Ring darum
+      const ring=(rr,col,op,add)=>{const pts=[];for(let k=0;k<8;k++){const a=Math.PI/8+k*Math.PI/4;pts.push(new THREE.Vector3(Math.sin(a)*rr,0,Math.cos(a)*rr));}
+        const l=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:op,blending:add?THREE.AdditiveBlending:THREE.NormalBlending,depthWrite:false}));
+        l.position.set(w.x,h+.006,w.z);G.add(l);};
+      const br=new THREE.Color(lc).lerp(new THREE.Color(0xffffff),.25).getHex();
+      ring(rad*.97,br,1,false);ring(rad*1.08,lc,.28,true);
+      return;
+    }
     const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:lc,transparent:true,opacity:lo}));e.position.copy(m.position);G.add(e);
   };
   // Basen (Plattform + Leuchtrahmen)
@@ -1523,14 +1548,14 @@ function build3(){
   [0,1,2,3].forEach(p=>LANE[p].forEach(([c,r])=>{const cc=pc3(p);tile(c,r,.2,0x10131c,cc,.35,cc,.44,'lane');}));
   // Mitte: Server-Turm (Cyber) oder kleine Holzsäule (Standard)
   T3.rings=[];T3.spin=null;T3.tint=[];
-  if(CY()){
-    const core=new THREE.Mesh(new THREE.CylinderGeometry(.3,.45,3.4,8,1,true),new THREE.MeshBasicMaterial({color:0x00f0ff,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
-    core.position.set(0,1.7,0);G.add(core);T3.tint.push(core.material);
-    const inner=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,3.6,8),new THREE.MeshBasicMaterial({color:0xe8ffff}));inner.position.set(0,1.8,0);G.add(inner);
-    for(let i=0;i<3;i++){
-      const ring=new THREE.Mesh(new THREE.TorusGeometry(.6+i*.18,.03,8,40),new THREE.MeshBasicMaterial({color:i%2?0xff2fa8:0x00f0ff}));
-      ring.rotation.x=Math.PI/2;ring.position.set(0,.8+i*.8,0);ring.userData.s=(i%2?1:-1)*(.7+i*.2);G.add(ring);T3.rings.push(ring);T3.tint.push(ring.material);
-    }
+  if(CY()){   // flaches Hologramm-Emblem statt Turm: bleibt unter Figurenhöhe und verdeckt nichts
+    const disc=new THREE.Mesh(new THREE.CylinderGeometry(.42,.46,.06,8),new THREE.MeshBasicMaterial({color:0x00f0ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+    disc.rotation.y=Math.PI/8;disc.position.y=.12;G.add(disc);T3.tint.push(disc.material);
+    const dot=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.09,8),new THREE.MeshBasicMaterial({color:0xe8ffff}));dot.position.y=.15;G.add(dot);
+    [[.58,.72,Math.PI*1.5,0x00f0ff],[.8,.9,Math.PI*1.2,0xff2fa8],[1.0,1.06,Math.PI*1.6,0x00f0ff]].forEach(([ri,ro,arc,col],i)=>{
+      const ring=new THREE.Mesh(new THREE.RingGeometry(ri,ro,48,1,0,arc),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
+      ring.rotation.x=-Math.PI/2;ring.position.y=.13+i*.01;ring.userData.s=(i%2?1:-1)*(.8+i*.3);G.add(ring);T3.rings.push(ring);T3.tint.push(ring.material);
+    });
   }else if(AN()){
     const rd=new THREE.MeshStandardMaterial({color:0xc4262e,roughness:.5}),bk=new THREE.MeshStandardMaterial({color:0x14101e,roughness:.5}),st=new THREE.MeshStandardMaterial({color:0x8a8590,roughness:.9});
     const pd=new THREE.Mesh(new THREE.CylinderGeometry(.5,.6,.34,10),st);pd.position.y=.17;G.add(pd);

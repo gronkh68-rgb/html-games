@@ -128,14 +128,28 @@
   function faceTex(v, cyber, size, hex) {
     var cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
     var P = { 1: [[.5, .5]], 2: [[.28, .28], [.72, .72]], 3: [[.28, .28], [.5, .5], [.72, .72]], 4: [[.28, .28], [.72, .28], [.28, .72], [.72, .72]], 5: [[.28, .28], [.72, .28], [.5, .5], [.28, .72], [.72, .72]], 6: [[.28, .25], [.72, .25], [.28, .5], [.72, .5], [.28, .75], [.72, .75]] };
+    if (cyber) {      // Cyber: große Zahl statt Augen, Leuchtrand mit Eckmarken
+      var col = hex || '#00f0ff';
+      x.fillStyle = '#070d19'; x.fillRect(0, 0, size, size);
+      var gr = x.createRadialGradient(size / 2, size / 2, size * .05, size / 2, size / 2, size * .7); gr.addColorStop(0, 'rgba(255,255,255,.08)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, size, size);
+      x.shadowColor = col; x.shadowBlur = size * .07; x.strokeStyle = col; x.lineWidth = size * .045; x.strokeRect(size * .035, size * .035, size * .93, size * .93);
+      x.shadowBlur = 0; x.strokeStyle = '#ffffff'; x.globalAlpha = .55; x.lineWidth = size * .012; x.strokeRect(size * .035, size * .035, size * .93, size * .93); x.globalAlpha = 1;
+      x.strokeStyle = col; x.lineWidth = size * .03; var cl = size * .16, m0 = size * .1;       // Eckwinkel innen
+      [[m0, m0, 1, 1], [size - m0, m0, -1, 1], [m0, size - m0, 1, -1], [size - m0, size - m0, -1, -1]].forEach(function (c) { x.beginPath(); x.moveTo(c[0] + c[2] * cl, c[1]); x.lineTo(c[0], c[1]); x.lineTo(c[0], c[1] + c[3] * cl); x.stroke(); });
+      x.font = '900 ' + Math.round(size * .6) + 'px Orbitron, "Share Tech Mono", ui-monospace, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      var ty = size * .535;
+      x.shadowColor = col; x.shadowBlur = size * .12; x.fillStyle = col; x.fillText(String(v), size / 2, ty);
+      x.shadowBlur = size * .03; x.fillStyle = '#f4ffff'; x.fillText(String(v), size / 2, ty); x.shadowBlur = 0;
+      if (v === 6) { x.fillStyle = '#f4ffff'; x.shadowColor = col; x.shadowBlur = size * .05; x.fillRect(size * .36, size * .86, size * .28, size * .04); x.shadowBlur = 0; }      // Strich unter der 6, damit sie nicht mit der 9 verwechselt wird
+      var tc = new THREE.CanvasTexture(cv); tc.anisotropy = 4; return tc;
+    }
     var pip;
-    if (cyber) { x.fillStyle = '#0b1424'; x.fillRect(0, 0, size, size); x.strokeStyle = hex || '#00f0ff'; x.lineWidth = size * .05; x.strokeRect(size * .03, size * .03, size * .94, size * .94); pip = hex || '#fcee09'; }
-    else if (hex) { var g2 = x.createLinearGradient(0, 0, size, size); g2.addColorStop(0, shade(hex, .18)); g2.addColorStop(1, shade(hex, -.12)); x.fillStyle = g2; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.28)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = lum(hex) > .62 ? '#16161c' : '#ffffff'; }
+    if (hex) { var g2 = x.createLinearGradient(0, 0, size, size); g2.addColorStop(0, shade(hex, .18)); g2.addColorStop(1, shade(hex, -.12)); x.fillStyle = g2; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.28)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = lum(hex) > .62 ? '#16161c' : '#ffffff'; }
     else { var g = x.createLinearGradient(0, 0, size, size); g.addColorStop(0, '#fffdf4'); g.addColorStop(1, '#ece3c8'); x.fillStyle = g; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.18)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = null; }
     P[v].forEach(function (p) {
       x.beginPath(); x.arc(p[0] * size, p[1] * size, size * (v === 1 ? .12 : .085), 0, 7);
-      if (cyber) { x.fillStyle = pip; x.shadowColor = pip; x.shadowBlur = size * .05; } else { x.fillStyle = pip || (v === 1 ? '#c62828' : '#16161c'); }
-      x.fill(); x.shadowBlur = 0;
+      x.fillStyle = pip || (v === 1 ? '#c62828' : '#16161c');
+      x.fill();
     });
     var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
@@ -177,7 +191,7 @@
   var cyberNow = function () { return document.documentElement.getAttribute('data-style') === 'cyber'; };
   // Tablett-Bauteile: Filzboden, Holzrand, Abschussfeld, Zielhilfe und die Würfel. Lokale Koordinaten = Physik-Koordinaten.
   function mkRig(parent) {
-    var R = { dice: [], shown: 0 }, geo = new THREE.BoxGeometry(1, 1, 1), mats = null;
+    var R = { dice: [], shown: 0 }, geo = new THREE.BoxGeometry(1, 1, 1), mats = null, fontTried = false;
     R.group = new THREE.Group(); parent.add(R.group);
     var floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95 });
     var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; R.group.add(floor);
@@ -202,8 +216,17 @@
     R.mk = function () {
       var cy = cyberNow(), key = (cy ? 'c' : 's') + (R.color || '');
       if (mats && mats.key === key) return mats;
-      mats = { key: key, list: FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: faceTex(v, cy, 128, R.color), roughness: cy ? .35 : .55, metalness: cy ? .3 : 0 }); }) };
+      mats = { key: key, list: FACE_V.map(function (v) {
+        var t = faceTex(v, cy, cy ? 256 : 128, R.color);
+        // Cyber: Zahl und Rand leuchten selbst (Emissive-Map), beim Liegenbleiben blitzt es auf
+        return new THREE.MeshStandardMaterial(cy ? { map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .75, roughness: .35, metalness: .3 } : { map: t, roughness: .55, metalness: 0 });
+      }) };
+      mats.cy = cy;
       R.dice.forEach(function (d) { d.mesh.material = mats.list; });
+      if (cy && !fontTried && document.fonts && document.fonts.load) {      // Orbitron nachladen, dann Texturen neu zeichnen
+        fontTried = true;
+        document.fonts.load('900 40px Orbitron').then(function () { mats = null; R.mk(); R.skin(); }, function () { });
+      }
       return mats;
     };
     R.ensure = function (n) {
@@ -225,6 +248,26 @@
       });
       return power;
     };
+    // Landeeffekt (Cyber): Welle um jeden Würfel und kurzes Aufleuchten der Zahlen
+    var fxT = 0, fxRings = [], fxRaf = 0, fxDone = null;
+    R.fxStop = function () { cancelAnimationFrame(fxRaf); fxRaf = 0; fxRings.forEach(function (m) { m.visible = false; }); if (mats && mats.cy) mats.list.forEach(function (m) { m.emissiveIntensity = .75; }); };
+    R.land = function (n, done) {
+      if (!cyberNow()) return;
+      R.fxStop(); fxDone = done; fxT = performance.now();
+      var col = R.color || '#00f0ff';
+      for (var i = 0; i < n; i++) {
+        if (!fxRings[i]) { var m = new THREE.Mesh(new THREE.RingGeometry(.62, .72, 48), new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; R.group.add(m); fxRings[i] = m; }
+        fxRings[i].material.color.set(col); fxRings[i].position.set(R.dice[i].mesh.position.x, .06, R.dice[i].mesh.position.z); fxRings[i].visible = true;
+      }
+      function f(now) {
+        var u = Math.min(1, (now - fxT) / 900), e = 1 - Math.pow(1 - u, 2);
+        fxRings.forEach(function (m, i) { if (i >= n) return; m.scale.setScalar(1 + e * 3.2); m.material.opacity = .9 * (1 - u); });
+        if (mats && mats.cy) { var fl = u < .2 ? 1 + 1.6 * (u / .2) : 2.6 - 1.85 * Math.min(1, (u - .2) / .8); mats.list.forEach(function (m) { m.emissiveIntensity = Math.max(.75, fl); }); }
+        if (fxDone) fxDone();
+        if (u < 1) fxRaf = requestAnimationFrame(f); else R.fxStop();
+      }
+      fxRaf = requestAnimationFrame(f);
+    };
     R.skin();
     return R;
   }
@@ -239,7 +282,7 @@
     V.hide = function () {      // Würfel wegräumen und aus der Kamerafahrt zurück
       clearTimeout(hideT); clearTimeout(unzoomT); env.anim(0); V._playing = 0; V.hint('');
       if (V.zoomed) V.zoom(false);
-      var R = env.R; if (R) { R.aimG.visible = false; R.pad.visible = false; R.dice.forEach(function (d) { d.mesh.visible = false; }); R.shown = 0; env.once(); }
+      var R = env.R; if (R) { R.fxStop(); R.aimG.visible = false; R.pad.visible = false; R.dice.forEach(function (d) { d.mesh.visible = false; }); R.shown = 0; env.once(); }
     };
     // Schleuder: Würfel nach hinten (nach unten) ziehen, zielen, loslassen -> Wurfdaten.
     V.drag = function (n, opts) {
@@ -314,7 +357,7 @@
         return new Promise(function (res) {
           var done = false;
           function fin() {
-            if (done) return; done = true; V._playing = 0; setFrame(frames.length - 1, 0); env.once(); V.busy = false;
+            if (done) return; done = true; V._playing = 0; setFrame(frames.length - 1, 0); env.once(); V.busy = false; R.land(n, env.once);
             setTimeout(function () { if (!V._playing && !V._tick) env.anim(0); }, 120);
             if (V.zoomed) unzoomT = setTimeout(function () { if (!V._playing) V.zoom(false); }, opts.hold == null ? 1300 : opts.hold);      // zurück; die Würfel bleiben auf dem Tablett liegen
             res();
