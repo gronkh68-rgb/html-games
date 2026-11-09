@@ -82,6 +82,8 @@ body.full3d{overflow:hidden}
 #unoBtn{font-weight:900;letter-spacing:.06em;background:#e53935;color:#fff;border:3px solid #fff;border-radius:999px;padding:8px 22px;cursor:pointer;opacity:.35;transition:opacity .2s,transform .2s}
 #unoBtn.ready{opacity:1;animation:bob .5s ease-in-out infinite alternate}
 #unoBtn.on{opacity:1;background:#43a047}
+#unoBtn.auto{opacity:.6;background:#37474f;border-color:#90a4ae;font-size:.8rem;padding:8px 16px;letter-spacing:0}
+#hudBtns #unoBtn{padding:10px 26px;font-size:1rem}#hudBtns #unoBtn.auto{padding:8px 14px;font-size:.8rem}
 
 /* Karten */
 .uc{--w:var(--cw,64px);--c:#e53935;width:var(--w);height:calc(var(--w)*1.5);border-radius:calc(var(--w)*.11);background:var(--c);border:calc(var(--w)*.055) solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.45);
@@ -350,11 +352,14 @@ function confirmUno(){   // einmalige Erinnerung statt stiller Strafe
   unoWarned=true;hint('Drücke zuerst UNO!, sonst musst du 2 Karten ziehen. Tippe die Karte nochmal an, wenn du es trotzdem willst.');return false;
 }
 function unoCheck(){
-  const b=$('unoBtn'),man=!!(V&&V.opts&&V.opts.unoManual);b.style.display=man?'':'none';
+  const b=$('unoBtn'),man=!!(V&&V.opts&&V.opts.unoManual);b.style.display='';      // der Knopf ist immer da; ohne die Option zeigt er nur an, dass UNO automatisch gerufen wird
   const mine=man&&inp&&inp.mode==='turn'&&V&&V.hand.length===2;
-  b.classList.toggle('ready',!!mine&&!unoOn);b.classList.toggle('on',unoOn);b.textContent=unoOn?'UNO! ✓':'UNO!';
+  b.classList.toggle('auto',!man);b.classList.toggle('ready',!!mine&&!unoOn);b.classList.toggle('on',man&&unoOn);b.textContent=!man?'UNO (automatisch)':(unoOn?'UNO! ✓':'UNO!');
 }
-$('unoBtn').onclick=()=>{if(V.opts&&V.opts.unoManual&&inp&&inp.mode==='turn'&&V.hand.length===2){unoOn=!unoOn;unoCheck();if(unoOn)sfx('take');}};
+$('unoBtn').onclick=()=>{
+  if(!(V&&V.opts&&V.opts.unoManual)){hint('UNO wird für dich automatisch gerufen. Willst du den Knopf selbst drücken, schalte vor dem Spiel „UNO selbst rufen“ ein.');return;}
+  if(inp&&inp.mode==='turn'&&V.hand.length===2){unoOn=!unoOn;unoCheck();if(unoOn)sfx('take');}else hint('Der UNO-Knopf zählt, wenn du noch zwei Karten hast und gleich die vorletzte legst.');
+};
 $('hand').addEventListener('click',e=>{
   let el=e.target.closest('.uc');
   if(inp&&inp.mode==='turn'){   // bei überlappenden Karten die spielbare unter dem Zeiger nehmen
@@ -574,13 +579,14 @@ function showSpin(i,text,who){
 function fullOn(){
   const st=$('stage3d');st.classList.add('full');document.body.classList.add('full3d');
   $('hudTop').append($('turnBanner'),$('status'));
-  $('hudBtns').append($('v3d'),$('fsBtn'),$('snd'),$('again'));
+  $('hudBtns').append($('unoBtn'),$('v3d'),$('fsBtn'),$('snd'),$('again'));
 }
 function fullOff(){
   const st=$('stage3d');st.classList.remove('full');document.body.classList.remove('full3d');
   const main=document.querySelector('.main'),tr=document.querySelector('.toolrow'),side=document.querySelector('.side');
   main.insertBefore($('status'),main.firstChild);if($('turnBanner'))main.insertBefore($('turnBanner'),main.firstChild);
   tr.append($('v3d'),$('snd'));side.insertBefore($('again'),tr.nextSibling);
+  const ua=document.querySelector('#me .actions');if(ua)ua.append($('unoBtn'));
   try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
 }
 function toggleFs(){
@@ -612,7 +618,7 @@ try{want3d=localStorage.getItem('fc-3d')==='1';}catch(e){}
 // Zusatzregeln merken
 const OPT_IDS={oStack:'stack',oChal:'challenge',oSeven:'sevenzero',oSpin:'spin',oUno:'unoManual'};
 function readOpts(){const o={};for(const id in OPT_IDS)o[OPT_IDS[id]]=$(id).checked;try{localStorage.setItem('fc-opts',JSON.stringify(o));}catch(e){}return o;}
-try{const o=JSON.parse(localStorage.getItem('fc-opts')||'{}');for(const id in OPT_IDS)$(id).checked=!!o[OPT_IDS[id]];}catch(e){}
+try{const raw=localStorage.getItem('fc-opts'),o=JSON.parse(raw||'{}');for(const id in OPT_IDS)$(id).checked=!!o[OPT_IDS[id]];if(raw===null)$('oUno').checked=true;}catch(e){}      // neue Spieler: UNO selbst rufen ist an
 // ---------- Computer ----------
 function aiColor(p){
   const cnt=[0,0,0,0];G.hands[p].forEach(c=>{if(c.col<4)cnt[c.col]++;});
