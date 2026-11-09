@@ -44,8 +44,8 @@
   D.autoParams = function (n) {
     var d = [];
     for (var i = 0; i < n; i++) {
-      var ang = rnd(-.5, .5), sp = rnd(12, 24), x = -TX + 1.2, z = rnd(-1.6, 1.6) + i * 1.3 - (n - 1) * .65;
-      d.push({ p: [x, 1.8, z], q: randQ(), v: [Math.cos(ang) * sp, rnd(-2, 2), Math.sin(ang) * sp], w: [rnd(-20, 20), rnd(-20, 20), rnd(-20, 20)] });
+      var ang = rnd(-.5, .5), sp = rnd(12, 32), x = -TX + 1.7, z = rnd(-.4, .4) + i * 1.3 - (n - 1) * .65;
+      d.push({ p: [x, .9, z], q: randQ(), v: [Math.cos(ang) * sp, rnd(-2, 2), Math.sin(ang) * sp], w: [rnd(-20, 20), rnd(-20, 20), rnd(-20, 20)] });
     }
     return { dice: d };
   };
@@ -117,20 +117,54 @@
     var cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:60;touch-action:none';
     var hint = document.createElement('div'); hint.style.cssText = 'position:absolute;left:50%;bottom:6%;transform:translateX(-50%);z-index:61;pointer-events:none;background:rgba(10,14,30,.88);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:12px;padding:8px 14px;font:700 14px system-ui,sans-serif;text-align:center;display:none;max-width:92%';
     container.appendChild(cv); container.appendChild(hint);
-    var renderer, scene, cam, ray, plane, tray, shadowPlane, lastStyle = '', mats = null, geo = null, raf = 0, hideT = 0;
+    var renderer, scene, cam, ray, plane, trayG, aimG, band, handle, pad, dots = [], floorMat, rimMat, padMat, shadowPlane, lastStyle = '', mats = null, geo = null, raf = 0, hideT = 0, MAXP = 4.2;
     function cyber() { return document.documentElement.getAttribute('data-style') === 'cyber'; }
     function build() {
       if (renderer) return;
       renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); renderer.setClearColor(0, 0); renderer.shadowMap.enabled = true;
-      scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, 1, .1, 100); ray = new THREE.Raycaster(); plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.6);
+      scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, 1, .1, 100); ray = new THREE.Raycaster(); plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.5);
       scene.add(new THREE.AmbientLight(0xffffff, .72));
       var dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(-4, 14, 6); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024);
       var sc = dl.shadow.camera; sc.left = -9; sc.right = 9; sc.top = 7; sc.bottom = -7; sc.near = 1; sc.far = 40; scene.add(dl);
-      shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), new THREE.ShadowMaterial({ opacity: .38 })); shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
-      var shp = new THREE.Shape(), r = .5, w = TX, h = TZ; shp.moveTo(-w + r, -h); shp.lineTo(w - r, -h); shp.quadraticCurveTo(w, -h, w, -h + r); shp.lineTo(w, h - r); shp.quadraticCurveTo(w, h, w - r, h); shp.lineTo(-w + r, h); shp.quadraticCurveTo(-w, h, -w, h - r); shp.lineTo(-w, -h + r); shp.quadraticCurveTo(-w, -h, -w + r, -h);
-      tray = new THREE.Mesh(new THREE.ShapeGeometry(shp), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .28, depthWrite: false })); tray.rotation.x = -Math.PI / 2; tray.position.y = .005; tray.visible = false; scene.add(tray);
+      shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), new THREE.ShadowMaterial({ opacity: .38 })); shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.position.y = .03; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
       geo = new THREE.BoxGeometry(1, 1, 1);
+      // Tablett: Filzboden, Holzrand, Abschussfeld
+      trayG = new THREE.Group(); trayG.visible = false; scene.add(trayG);
+      floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95, transparent: true, opacity: .93 });
+      var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; trayG.add(floor);
+      rimMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: .55 });
+      var RT = .8, RH = 1.15;
+      function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; trayG.add(m); }
+      rim(TX * 2 + RT * 2, RT, 0, -TZ - RT / 2); rim(TX * 2 + RT * 2, RT, 0, TZ + RT / 2); rim(RT, TZ * 2, -TX - RT / 2, 0); rim(RT, TZ * 2, TX + RT / 2, 0);
+      padMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide });
+      pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); pad.rotation.x = -Math.PI / 2; pad.position.y = .04; pad.visible = false; trayG.add(pad);
+      // Zielhilfe: Gummiband, Griff und Punktreihe in Schussrichtung
+      aimG = new THREE.Group(); aimG.visible = false; scene.add(aimG);
+      var am = function () { return new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthTest: false }); };
+      band = new THREE.Mesh(geo, am()); band.renderOrder = 10; aimG.add(band);
+      handle = new THREE.Mesh(new THREE.RingGeometry(.3, .45, 28), am()); handle.rotation.x = -Math.PI / 2; handle.renderOrder = 11; aimG.add(handle);
+      for (var di = 0; di < 9; di++) { var dm = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), am()); dm.renderOrder = 10; aimG.add(dm); dots.push(dm); }
       resize();
+    }
+    function skin() {
+      var cy = cyber();
+      floorMat.color.set(cy ? 0x0b1626 : 0x1f6b4d); floorMat.emissive.set(cy ? 0x001a24 : 0x000000);
+      rimMat.color.set(cy ? 0x12304a : 0x6b4a2b); rimMat.emissive.set(cy ? 0x0a3a55 : 0x000000); padMat.color.set(cy ? 0x00f0ff : 0xffe08a);
+    }
+    function updateAim(ax, az, pull) {      // Gummiband, Griff und Zielpunkte; Rückgabe: Kraft 0..1
+      var len = Math.hypot(pull.x, pull.z), power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), col = new THREE.Color().setHSL(.33 * (1 - power), .9, .55);
+      aimG.visible = len > .2;
+      if (!aimG.visible) return 0;
+      var ex = ax + pull.x, ez = az + pull.z;
+      band.position.set((ax + ex) / 2, .6, (az + ez) / 2); band.scale.set(len, .06, .16); band.rotation.y = -Math.atan2(pull.z, pull.x); band.material.color.copy(col);
+      handle.position.set(ex, .6, ez); handle.material.color.copy(col);
+      var dx = -pull.x / len, dz = -pull.z / len;
+      dots.forEach(function (m, i) {
+        var d = 1.1 + i * (.62 + power * .55), x = ax + dx * d, z = az + dz * d;
+        m.visible = len > .7 && Math.abs(x) < TX - .3 && Math.abs(z) < TZ - .3;
+        m.position.set(x, .55, z); m.scale.setScalar(1.15 - i * .09); m.material.color.copy(col);
+      });
+      return power;
     }
     function mk() {
       var cy = cyber(), key = cy ? 'c' : 's';
@@ -154,26 +188,29 @@
     function loop() { raf = 0; if (renderer) { renderer.render(scene, cam); } if (V._anim) raf = requestAnimationFrame(loop); }
     function kick() { if (!raf) raf = requestAnimationFrame(loop); }
     V.show = function (on) { cv.style.display = on ? '' : 'none'; };
-    V.hide = function () { clearTimeout(hideT); V._anim = 0; hint.style.display = 'none'; if (renderer) { tray.visible = false; V.dice.forEach(function (d) { d.mesh.visible = false; }); renderer.render(scene, cam); } };
+    V.hide = function () { clearTimeout(hideT); V._anim = 0; hint.style.display = 'none'; if (renderer) { trayG.visible = false; aimG.visible = false; pad.visible = false; V.dice.forEach(function (d) { d.mesh.visible = false; }); renderer.render(scene, cam); } };
     V.hint = function (t) { hint.textContent = t || ''; hint.style.display = t ? '' : 'none'; };
     function setDie(d, p, q) { d.mesh.position.set(p[0], p[1], p[2]); d.mesh.quaternion.set(q[0], q[1], q[2], q[3]); }
-    // Würfel ziehen und werfen -> Wurfdaten. opts.hint = Text. Mit V.cancel() abbrechbar.
+    // Schleuder: Würfel nach hinten ziehen, zielen, loslassen -> Wurfdaten. opts.hint = Text. Mit V.cancel() abbrechbar.
     V.drag = function (n, opts) {
       opts = opts || {};
       return D.ready().then(function () {
-        build(); mk(); clearTimeout(hideT); ensure(n); tray.visible = true; V.busy = true; V._anim = 1; resize();
-        var held = null, hist = [], q0 = V.dice.map(function () { return randQ(); }), spin = V.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), pos = V.dice.map(function (_, i) { return [-TX + 1.2, .5, (i - (n - 1) / 2) * 1.5]; }), tmp = new THREE.Vector3(), t0 = performance.now(), last = t0;
-        V.dice.slice(0, n).forEach(function (d, i) { setDie(d, pos[i], q0[i]); });
-        V.hint(opts.hint || (window.SITE ? SITE.T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') : 'Drag to throw'));
+        build(); mk(); skin(); clearTimeout(hideT); ensure(n); trayG.visible = true; V.busy = true; V._anim = 1; resize();
+        var ax = -TX + 1.7, az = 0, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = V.dice.map(function () { return randQ(); }), spin = V.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), tmp = new THREE.Vector3(), t0 = performance.now(), last = t0;
+        var base = opts.hint || (window.SITE ? SITE.T('Würfel nach hinten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice back, aim and release to shoot') : 'Pull back, aim, release');
+        var off = function (i) { return (i - (n - 1) / 2) * 1.55; };
+        pad.visible = true; pad.position.set(ax, .04, az); aimG.visible = false;
+        V.dice.slice(0, n).forEach(function (d, i) { setDie(d, [ax, .5, az + off(i)], q0[i]); });
+        V.hint(base);
         container.style.cursor = 'grab'; container.style.touchAction = 'none';
         function pt(e) { var r = cv.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam); return ray.ray.intersectPlane(plane, tmp) ? [tmp.x, tmp.z] : null; }
         function tick(now) {
           var dt = Math.min(.05, (now - last) / 1000); last = now;
           V.dice.slice(0, n).forEach(function (d, i) {
-            var s = held ? 1 : .35, ax = new THREE.Vector3(spin[i][0], spin[i][1], spin[i][2]), a = ax.length() * dt * s;
-            if (a > 0) { var dq = new THREE.Quaternion().setFromAxisAngle(ax.normalize(), a); var cq = new THREE.Quaternion(q0[i][0], q0[i][1], q0[i][2], q0[i][3]).premultiply(dq); q0[i] = [cq.x, cq.y, cq.z, cq.w]; }
-            var py = held ? 1.6 : .5 + .12 * Math.abs(Math.sin((now - t0) / 500));
-            d.mesh.position.set(pos[i][0], py, pos[i][2]); d.mesh.quaternion.set(q0[i][0], q0[i][1], q0[i][2], q0[i][3]);
+            var s = held ? 1.6 : .35, ax2 = new THREE.Vector3(spin[i][0], spin[i][1], spin[i][2]), a = ax2.length() * dt * s;
+            if (a > 0) { var dq = new THREE.Quaternion().setFromAxisAngle(ax2.normalize(), a); var cq = new THREE.Quaternion(q0[i][0], q0[i][1], q0[i][2], q0[i][3]).premultiply(dq); q0[i] = [cq.x, cq.y, cq.z, cq.w]; }
+            var py = held ? .9 : .5 + .12 * Math.abs(Math.sin((now - t0) / 500));
+            d.mesh.position.set(ax + pull.x * .22, py, az + off(i) + pull.z * .22); d.mesh.quaternion.set(q0[i][0], q0[i][1], q0[i][2], q0[i][3]);
           });
           if (V._tick) requestAnimationFrame(tick);
         }
@@ -181,27 +218,31 @@
         return new Promise(function (res, rej) {
           function down(e) {
             var p = pt(e); if (!p) return;
-            var hit = V.dice.slice(0, n).some(function (d) { return ray.ray.distanceToPoint(d.mesh.position) < 1.15; });      // nur ein Griff direkt auf den Würfel startet den Wurf, der Rest des Bretts bleibt bedienbar
+            var hit = V.dice.slice(0, n).some(function (d) { return ray.ray.distanceToPoint(d.mesh.position) < 1.6; });      // nur ein Griff auf den Würfel startet den Schuss, der Rest des Bretts bleibt bedienbar
             if (!hit) return;
-            held = { id: e.pointerId }; hist = [{ t: e.timeStamp, x: p[0], z: p[1] }]; try { container.setPointerCapture(e.pointerId); } catch (er) {} container.style.cursor = 'grabbing'; e.preventDefault(); e.stopPropagation(); move(e);
+            held = true; gp = p.slice();      // gezogen wird relativ zum Griffpunkt
+            try { container.setPointerCapture(e.pointerId); } catch (er) {} container.style.cursor = 'grabbing'; e.preventDefault(); e.stopPropagation(); move(e);
           }
           function move(e) {
             if (!held) return; var p = pt(e); if (!p) return;
-            var cx = Math.max(-TX + .8, Math.min(TX - .8, p[0])), cz = Math.max(-TZ + .8, Math.min(TZ - .8, p[1]));
-            hist.push({ t: e.timeStamp, x: cx, z: cz }); while (hist.length > 2 && e.timeStamp - hist[0].t > 160) hist.shift();
-            for (var i = 0; i < n; i++) pos[i] = [cx, .5, cz + (i - (n - 1) / 2) * 1.25];
+            var vx = p[0] - gp[0], vz = p[1] - gp[1], len = Math.hypot(vx, vz);
+            if (len > MAXP) { vx *= MAXP / len; vz *= MAXP / len; }
+            pull = { x: vx, z: vz };
+            var pw = updateAim(ax, az, pull);
+            V.hint(base + (Math.hypot(vx, vz) > .7 ? '  ·  ' + (window.SITE ? SITE.T('Kraft', 'Power') : 'Power') + ' ' + Math.round(pw * 100) + ' %' : ''));
             if (e.cancelable) e.preventDefault(); e.stopPropagation();
           }
           function up(e) {
-            if (!held) return; held = null; container.style.cursor = ''; e.stopPropagation(); try { container.releasePointerCapture(e.pointerId); } catch (er) {}
-            var a = hist[0], b = hist[hist.length - 1], dtm = Math.max(.03, (b.t - a.t) / 1000), vx = (b.x - a.x) / dtm, vz = (b.z - a.z) / dtm, sp = Math.hypot(vx, vz);
-            if (sp > 46) { vx *= 46 / sp; vz *= 46 / sp; sp = 46; }
-            cleanup();
-            var dice = [];
+            if (!held) return; held = false; container.style.cursor = 'grab'; e.stopPropagation(); try { container.releasePointerCapture(e.pointerId); } catch (er) {}
+            var len = Math.hypot(pull.x, pull.z);
+            if (len < .7) { pull = { x: 0, z: 0 }; aimG.visible = false; V.hint(base); return; }      // zu wenig gezogen: nichts passiert, nochmal versuchen
+            var power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), speed = 9 + power * 31, dice = [], base0 = Math.atan2(-pull.z, -pull.x);
+            cleanup(); aimG.visible = false; pad.visible = false;
             for (var i = 0; i < n; i++) {
-              // Drehung: Rollen in Wurfrichtung plus zufälliges Taumeln aus der Hand
-              var w = [vz * 1.1 + rnd(-9, 9) + spin[i][0] * 1.5, rnd(-8, 8) + spin[i][1] * 1.5, -vx * 1.1 + rnd(-9, 9) + spin[i][2] * 1.5];
-              dice.push({ p: [pos[i][0], 1.6, pos[i][2]], q: q0[i].slice(), v: [vx * (1 + i * .02), rnd(-2, 0), vz], w: w });
+              var ang = base0 + rnd(-.04, .04), vx = Math.cos(ang) * speed, vz = Math.sin(ang) * speed;
+              // Drehung: Rollen in Schussrichtung plus zufälliges Taumeln aus der Hand
+              var w = [vz * 1.0 + rnd(-9, 9) + spin[i][0] * 1.5, rnd(-8, 8) + spin[i][1] * 1.5, -vx * 1.0 + rnd(-9, 9) + spin[i][2] * 1.5];
+              dice.push({ p: [ax + pull.x * .22, .9, az + off(i) + pull.z * .22], q: q0[i].slice(), v: [vx, rnd(-1.5, .5), vz], w: w });
             }
             res({ dice: dice });
           }
@@ -216,8 +257,8 @@
     V.play = function (track, opts) {
       opts = opts || {};
       return D.ready().then(function () {
-        build(); mk(); clearTimeout(hideT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
-        V._tick = 0; V.busy = true; V.hint(''); ensure(track.n); tray.visible = true; resize(); V._anim = 1; kick();
+        build(); mk(); skin(); clearTimeout(hideT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        V._tick = 0; V.busy = true; V.hint(''); ensure(track.n); trayG.visible = true; aimG.visible = false; pad.visible = false; resize(); V._anim = 1; kick();
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {
           var done = false;
