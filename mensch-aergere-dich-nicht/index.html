@@ -9,6 +9,7 @@
 <script src="../theme.js?v=dark1"></script>
 <script src="../room3d.js"></script>
 <script src="../dice.js"></script>
+<script src="../dice3d.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
 <script src="../net-config.js"></script>
@@ -201,7 +202,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
   <div id="setup" class="panel">
     <div class="row"><label>Dein Name</label><input id="myName" maxlength="14" placeholder="Name"></div>
     <div class="row"><label for="diceMode">Würfel</label>
-      <select id="diceMode"><option value="bag">Ausgeglichen: jeder Spieler hat seinen eigenen Würfel</option><option value="rand">Echter Zufall (ein gemeinsamer Würfel)</option></select></div>
+      <select id="diceMode"><option value="phys">Echter Wurf: Würfel per Maus ziehen und werfen (Physik)</option><option value="bag">Ausgeglichen: jeder Spieler hat seinen eigenen Würfel</option><option value="rand">Echter Zufall (ein gemeinsamer Würfel)</option></select></div>
     <p class="hint" id="diceHint" style="margin:-2px 0 8px;font-size:.8rem;color:var(--muted)">Ausgeglichen: Jeder Spieler würfelt aus einem eigenen Beutel mit 1 bis 6 (alle sechs Würfe je einmal). Nach höchstens 5 Würfen ohne 6 kommt sicher eine, und zwei Sechsen direkt hintereinander gibt es nicht. Online gilt die Einstellung des Hosts.</p>
     <div class="row" id="modeTabs">
       <button class="btn" data-m="local">Lokal</button>
@@ -266,7 +267,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
         <div class="panel scores" id="scores"></div>
         <details class="panel rules"><summary>Regeln</summary><ul>
           <li>Mit einer 6 kommt eine Figur aus dem Haus. Das ist Pflicht, solange eine im Haus ist.</li>
-          <li>Wer eine 6 würfelt, würfelt nochmal. Standardmäßig hat jeder Spieler einen eigenen, ausgeglichenen Würfel (einstellbar vor dem Start).</li>
+          <li>Wer eine 6 würfelt, würfelt nochmal. Standardmäßig wirfst du den Würfel selbst: ziehen, loslassen, die Physik entscheidet. Alternativ gibt es einen ausgeglichenen Würfel je Spieler (einstellbar vor dem Start).</li>
           <li>Solange noch Figuren im Haus sind, muss die Figur auf dem Startfeld zuerst weiterziehen.</li>
           <li>Ohne Figur auf dem Feld darf man dreimal würfeln.</li>
           <li>Wer auf eine fremde Figur zieht, wirft sie raus. Im Ziel darf man nicht überspringen.</li>
@@ -353,7 +354,9 @@ const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():
 // cfg: 'human' = an diesem Gerät, 'remote' = Online-Spieler, 'cpu', 'off'
 const isLocal=p=>cfg[p]==='human';
 const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
-let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,mySlot=-1,canRollNet=false;
+let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DV=null;
+const DICEV=()=>DV||(DV=Dice3D.view($('boardWrap')));
+const physOn=()=>($('diceMode')||{}).value==='phys';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pname=p=>names[p]?` (${esc(names[p])})`:'';
 function netPush(){}                     // wird im Mehrspieler-Teil ersetzt (Host schickt den Spielstand)
@@ -627,17 +630,25 @@ function rollValue(p){
   return v;
 }
 async function doRoll(p){
-  const btn=$('rollBtn');
+  const btn=$('rollBtn'),phys=physOn();
+  let tp=null;                                   // Wurfdaten aus der Hand (nur "Echter Wurf")
   if(cfg[p]==='remote'){
     netPhase={k:'roll',p};setMsg(`${chip(p)}<b>${COLORS[p].n}${pname(p)}</b> ist am Zug …`);netPush();
     await new Promise(res=>{remoteRoll=res;});remoteRoll=null;
+    tp=remoteThrow;remoteThrow=null;
   }else if(isLocal(p)){
     btn.disabled=false;setMine(true,p);
     $('rollBtn').textContent=rollLabel();
-    setMsg(`Klicke auf <b>${rollLabel()}</b>.`);
+    setMsg(phys?`${chip(p)}Ziehe den Würfel und lass los, oder klicke auf <b>${rollLabel()}</b>.`:`Klicke auf <b>${rollLabel()}</b>.`);
     netPhase={k:'idle'};netPush();
-    await new Promise(res=>{rollWait=res;});
-    rollWait=null;btn.disabled=true;setMine(false);
+    if(phys){
+      tp=await new Promise(res=>{rollWait=()=>res(null);DICEV().drag(1).then(res,()=>{});});
+      if(!tp)DICEV().cancel();
+      rollWait=null;btn.disabled=true;setMine(false);
+    }else{
+      await new Promise(res=>{rollWait=res;});
+      rollWait=null;btn.disabled=true;setMine(false);
+    }
   }else{
     setMsg('Der Computer würfelt …');
     await sleep(420);
@@ -645,7 +656,13 @@ async function doRoll(p){
   const t=token;
   netPhase={k:'rolling',p};netPush();
   let v;
-  if(PHYS){
+  if(phys){
+    const par=Dice3D.clean(tp,1)||Dice3D.autoParams(1);
+    const r=await Dice3D.simulate(par);
+    v=r.v[0];throwId++;
+    netPhase={k:'rolling',p,v,track:r.track,tid:throwId};netPush();      // alle Geräte spielen dieselbe Bahn ab
+    await DICEV().play(r.track);
+  }else if(PHYS){
     PD.start();await sleep(700,t);
     v=rollValue(p);
     netPhase={k:'rolling',p,v};netPush();      // Mitspieler lassen ihren Würfel jetzt auf diese Zahl landen
@@ -796,25 +813,25 @@ function startGame(){
 }
 function launch(){            // startet das Spiel mit den Werten in cfg und names
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
-  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
+  token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);if(DV)DV.cancel();if(physOn())Dice3D.ready();bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
   pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
   gameLoop();
 }
 function backToSetup(){
-  token++;pick=null;rollWait=null;setMine(false);buildSetup();
+  token++;pick=null;rollWait=null;setMine(false);if(DV)DV.cancel();buildSetup();
   $('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;
 }
 $('start').onclick=startGame;
 $('again').onclick=backToSetup;
 $('winBtn').onclick=backToSetup;
 const rollClick=()=>{
-  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'roll'});}}
+  if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;if(clientDrag){clientDrag=false;DICEV().cancel();}sendHost({t:'roll'});}}
   else if(rollWait)rollWait();
 };
 $('rollBtn').onclick=rollClick;$('die').onclick=rollClick;
-try{$('diceMode').value=localStorage.getItem('mdn-dice')||'bag';}catch(e){}
+try{$('diceMode').value=localStorage.getItem('mdn-dice')||'phys';}catch(e){}
 $('diceMode').onchange=()=>{try{localStorage.setItem('mdn-dice',$('diceMode').value);}catch(e){}};
 buildSetup();setDie(0);
 </script>
@@ -930,7 +947,7 @@ function onHostMsg(conn,m){
     broadcastLobby();return;
   }
   if(conn.slot===undefined)return;
-  if(m.t==='roll'){if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===conn.slot)remoteRoll();}
+  if(m.t==='roll'||m.t==='throw'){if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===conn.slot){remoteThrow=m.t==='throw'?m.d:null;remoteRoll();}}
   else if(m.t==='pick'){
     if(pick&&pick.p===conn.slot&&cfg[conn.slot]==='remote'){
       const mv=pick.moves.find(x=>x.i===m.i);
@@ -1050,7 +1067,7 @@ netPush=function(){
   pushQ=true;queueMicrotask(()=>{pushQ=false;broadcastSnap();});
 };
 function snapObj(){
-  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k)};
+  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,phys:physOn(),msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k)};
 }
 function broadcastSnap(){
   if(netRole!=='host')return;
@@ -1120,9 +1137,11 @@ function applySnap(s,you){
   $('msg').innerHTML=safeHtml(s.msg);
   const ph=s.phase||{k:'idle'};
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
-  if(ph.k==='rolling'){
-    if(!cRolling){cRolling=true;cLand=false;clearInterval(rollAnim);if(PHYS)PD.start();else{let k=0;rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}}
-    if(PHYS&&ph.v&&!cLand){cLand=true;const v=ph.v;PD.land(v).then(()=>dieDone(v));}
+  if(ph.k==='rolling'&&ph.track){
+    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV().play(ph.track).then(()=>dieDone(v));}
+  }else if(ph.k==='rolling'){
+    if(s.phys){}else if(!cRolling){cRolling=true;cLand=false;clearInterval(rollAnim);if(PHYS)PD.start();else{let k=0;rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}}
+    if(!s.phys&&PHYS&&ph.v&&!cLand){cLand=true;const v=ph.v;PD.land(v).then(()=>dieDone(v));}
   }else if(cRolling){
     cRolling=false;clearInterval(rollAnim);
     if(PHYS){if(!cLand){cLand=true;const v=s.die;PD.land(v).then(()=>dieDone(v));}}
@@ -1131,6 +1150,8 @@ function applySnap(s,you){
   // Meine Aktionen
   const myRoll=ph.k==='roll'&&ph.p===you;
   canRollNet=myRoll;$('rollBtn').disabled=!myRoll;$('rollBtn').textContent=rollLabel();
+  if(myRoll&&s.phys&&!clientDrag){clientDrag=true;DICEV().drag(1).then(par=>{clientDrag=false;if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;sendHost({t:'throw',d:par});}},()=>{clientDrag=false;});}
+  else if(!myRoll&&clientDrag){clientDrag=false;DICEV().cancel();}
   if(myRoll)$('msg').innerHTML=`${chip(you)}Du bist dran: Klicke auf <b>${esc(rollLabel())}</b>.`;
   if(ph.k==='pick'&&ph.p===you){
     pick={p:you,moves:ph.moves.map(i=>({i})),res:m=>sendHost({t:'pick',i:m.i})};
