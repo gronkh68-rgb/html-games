@@ -41,6 +41,12 @@
   apply(current()); // Cyber ist die Voreinstellung; Anime gibt es nur auf Seiten mit window.ANIME_STYLE
   applyFx(get(FX) === 'off');
   if (get(RAIN) === 'off') root.setAttribute('data-rain', 'off');
+  var repaint = null;
+  // Für das Profil: gespeicherten Stil lesen/setzen. Japan und Dunkel gibt es nur auf Seiten, die sie anbieten; sonst gilt dort Cyber.
+  window.SITE_STYLE = {
+    raw: function () { var v = get(KEY); return v === 'standard' || v === 'anime' || v === 'dark' ? v : 'cyber'; },
+    set: function (m) { set(KEY, m); apply(current()); if (repaint) repaint(); }
+  };
 
   addEventListener('DOMContentLoaded', function () {
     var css = document.createElement('style');
@@ -95,13 +101,13 @@
       if (off) root.setAttribute('data-rain', 'off'); else root.removeAttribute('data-rain');
       set(RAIN, off ? 'off' : 'on'); paint();
     };
-    paint();
+    paint(); repaint = paint;
   });
 })();
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.7.1';
+  var VERSION = '3.8.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -184,28 +190,89 @@
     '#siteOv h2{margin:0 0 6px;font-size:1.3rem}#siteOv p{margin:0 0 14px;color:#a9afd6;font-size:.9rem}' +
     '#siteOv input{width:100%;box-sizing:border-box;font:inherit;font-size:1.1rem;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#0d1020;color:#fff}' +
     '#siteOv .rw{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}#siteOv button{flex:1;font:inherit;font-weight:700;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;background:#7c5cff;color:#fff}#siteOv button.alt{background:rgba(255,255,255,.12)}' +
+    '#siteOv .bx.prof{width:min(94vw,470px);max-height:94vh;overflow:auto}#siteOv .lb{display:block;margin:14px 0 6px;font-weight:700;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:#a9afd6}#siteOv .nt{display:block;margin-top:6px;color:#8990b8;font-size:.76rem;line-height:1.3}' +
+    '#siteOv .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px}#siteOv .tiles .tl{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:9px 4px 7px;font-size:.78rem;font-weight:600;line-height:1.15;background:rgba(255,255,255,.07);border:2px solid transparent;border-radius:12px;color:#eef0ff}' +
+    '#siteOv .tiles .tl.on{border-color:#fff;background:rgba(124,92,255,.35)}#siteOv .sv{width:54px;height:38px;border-radius:8px;display:grid;place-items:center;font-weight:900;border:1px solid rgba(255,255,255,.3)}' +
+    '#siteOv .dv{width:40px;height:40px;border-radius:16%;border:1px solid;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:6px;box-sizing:border-box;gap:2px}#siteOv .dv i{border-radius:50%}#siteOv .dv.num{display:grid;grid-template:none;place-items:center;padding:0;font:900 22px system-ui,sans-serif;border-radius:8%;border-width:2px}#siteOv .dv.auto{border:1px dashed rgba(255,255,255,.4);place-items:center;padding:0;font-size:22px;grid-template:none}' +
     '#siteOv .lg{display:flex;gap:8px;margin:0 0 12px}#siteOv .lg button{padding:7px}#siteOv .lg button.on{outline:2px solid #fff}' +
     '#siteUpd{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:1900;background:#1d2342;color:#fff;border:1px solid #7c5cff;border-radius:14px;padding:10px 12px 10px 16px;display:flex;gap:10px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45);font:600 14px system-ui,sans-serif;max-width:calc(100vw - 24px)}' +
     '#siteUpd button{font:inherit;border:0;border-radius:9px;padding:7px 12px;cursor:pointer;background:#7c5cff;color:#fff}#siteUpd button.x{background:transparent;color:#aab;padding:4px 6px}';
   function addCss() { if (document.getElementById('siteCss')) return; var s = document.createElement('style'); s.id = 'siteCss'; s.textContent = css; document.head.appendChild(s); }
+  // ---------- Würfel-Designs (gelten in allen Spielen; 'auto' = passend zum Stil) ----------
+  var DICEK = 'html-games-dice';
+  SITE.DICE = {
+    classic: { n: ['Klassisch', 'Classic'], bg: ['#fffdf4', '#ece3c8'], pip: '#16161c', one: '#c62828', edge: 'rgba(0,0,0,.25)' },
+    casino: { n: ['Casino', 'Casino'], bg: ['#ef4444', '#a5121b'], pip: '#ffffff', one: '#ffffff', edge: '#5a0a10' },
+    noir: { n: ['Schwarz-Gold', 'Black & gold'], bg: ['#2c2c34', '#0b0b0f'], pip: '#ffc857', one: '#ffc857', edge: '#ffc857' },
+    ocean: { n: ['Ozean', 'Ocean'], bg: ['#2f7fd8', '#123c7a'], pip: '#ffffff', one: '#ffe08a', edge: '#0a2550' },
+    neon: { n: ['Neon (Zahlen)', 'Neon (numbers)'], num: true, bg: ['#0b1424', '#070d19'], pip: '#00f0ff', one: '#00f0ff', edge: '#00f0ff' },
+    player: { n: ['Spielerfarbe', 'Player colour'], player: true, bg: ['#8f74ff', '#5b3fd6'], pip: '#ffffff', one: '#ffffff', edge: 'rgba(0,0,0,.3)' }
+  };
+  SITE.dice = function () { var v = get(DICEK); return v && SITE.DICE[v] ? v : 'auto'; };
+  SITE.setDice = function (v) { if (v !== 'auto' && !SITE.DICE[v]) v = 'auto'; set(DICEK, v); applyDice(); document.dispatchEvent(new CustomEvent('site-dice', { detail: v })); };
+  function applyDice() { var v = SITE.dice(); if (v === 'auto') root.removeAttribute('data-dice'); else root.setAttribute('data-dice', v); }
+  applyDice();
+  // Flache Würfel (.die) und der Animationswürfel (#pdie) im gewählten Design, unabhängig vom Stil der Seite
+  (function () {
+    var s = '';
+    Object.keys(SITE.DICE).forEach(function (k) {
+      var d = SITE.DICE[k], H = 'html[data-dice="' + k + '"] ', bg = d.player ? 'var(--pc,' + d.bg[0] + ')' : 'linear-gradient(135deg,' + d.bg[0] + ',' + d.bg[1] + ')';
+      if (d.num) {
+        s += H + '.die{background:' + bg + '!important;border:2px solid ' + d.edge + '!important;border-radius:8%!important;display:flex!important;align-items:center;justify-content:center;box-shadow:0 0 14px ' + d.edge + ',inset 0 0 12px rgba(0,240,255,.2)!important}' +
+          H + '.die .dp{display:none!important}' + H + '.die .dn{display:block!important;font:900 calc(var(--die)*.56)/1 Orbitron,system-ui,sans-serif;color:#f4ffff;text-shadow:0 0 10px ' + d.pip + ',0 0 22px ' + d.pip + '}' +
+          H + '#pdie .f{background:' + bg + '!important;border-radius:8%!important;box-shadow:inset 0 0 0 2px ' + d.edge + ',inset 0 0 10px ' + d.edge + ',0 0 10px ' + d.edge + '!important}' +
+          H + '#pdie .f i{display:none!important}' + H + '#pdie .f b{display:grid!important;place-items:center;position:absolute;inset:0;font:900 calc(var(--ds)*.6)/1 Orbitron,system-ui,sans-serif;color:#f4ffff;text-shadow:0 0 6px ' + d.pip + ',0 0 16px ' + d.pip + '}';
+      } else {
+        s += H + '.die{background:' + bg + '!important;border:1px solid ' + d.edge + '!important;border-radius:16%!important;display:block!important;box-shadow:0 4px 14px rgba(0,0,0,.4),inset 0 0 0 1px ' + d.edge + '!important}' +
+          H + '.die::before,' + H + '.die::after{display:none!important}' +
+          H + '.die .dp{display:grid!important}' + H + '.die .dn,' + H + '.die .dh,' + H + '.die .db{display:none!important}' +
+          H + '.die .dp i.on{background:' + d.pip + '!important;box-shadow:none!important}' +
+          H + '#pdie .f{background:' + bg + '!important;border-radius:14%!important;box-shadow:inset 0 0 0 1px ' + d.edge + ',inset 0 0 8px rgba(0,0,0,.2)!important}' +
+          H + '#pdie .f i{display:block!important}' + H + '#pdie .f b{display:none!important}' +
+          H + '#pdie .f i.on{background:' + d.pip + '!important;box-shadow:none!important}' + H + '#pdie .f i.one.on{background:' + d.one + '!important}';
+      }
+    });
+    var st = document.createElement('style'); st.id = 'siteDiceCss'; st.textContent = s; document.head.appendChild(st);
+  })();
+  function diePrev(k) {       // kleine Vorschau: Würfelseite mit der 5
+    if (k === 'auto') return '<span class="dv auto">🎲</span>';
+    var d = SITE.DICE[k], st = 'background:linear-gradient(135deg,' + d.bg[0] + ',' + d.bg[1] + ');border-color:' + d.edge + (d.num ? ';box-shadow:0 0 8px ' + d.edge + ';color:#f4ffff;text-shadow:0 0 8px ' + d.pip : '');
+    if (d.num) return '<span class="dv num" style="' + st + '">5</span>';
+    var s = ''; for (var i = 0; i < 9; i++) s += '<i' + ([0, 2, 4, 6, 8].indexOf(i) >= 0 ? ' style="background:' + d.pip + '"' : '') + '></i>';
+    return '<span class="dv" style="' + st + '">' + s + '</span>';
+  }
+  var START = !/\.\./.test(script.getAttribute('src') || ''), PROF = 'html-games-profile';
+  // ---------- Profil: Name, Standard-Stil und Würfel (beim ersten Besuch der Startseite, später über den Namensknopf) ----------
   function askName(force) {
     return new Promise(function (res) {
       addCss();
       var old = document.getElementById('siteOv'); if (old) old.remove();
       var ov = document.createElement('div'); ov.id = 'siteOv'; ov.setAttribute('data-noi18n', '');
-      var cur = SITE.name();
-      ov.innerHTML = '<form class="bx"><div class="lg"><button type="button" data-l="de" class="alt' + (lang === 'de' ? ' on' : '') + '">🇩🇪 Deutsch</button><button type="button" data-l="en" class="alt' + (lang === 'en' ? ' on' : '') + '">🇬🇧 English</button></div>' +
-        '<h2>' + SITE.T('Wie heißt du?', 'What is your name?') + '</h2><p>' + SITE.T('Dein Name wird in allen Spielen und online verwendet. Du kannst ihn jederzeit unten links ändern.', 'Your name is used in all games and online. You can change it any time at the bottom left.') + '</p>' +
-        '<input id="siteName" maxlength="14" autocomplete="nickname" placeholder="Name">' +
-        '<div class="rw">' + (force && cur ? '<button type="button" class="alt" id="siteCancel">' + SITE.T('Abbrechen', 'Cancel') + '</button>' : '') + '<button type="submit">' + SITE.T('Los geht’s', 'Let’s go') + '</button></div></form>';
+      var cur = SITE.name(), st0 = window.SITE_STYLE ? SITE_STYLE.raw() : 'cyber', st = st0, dc = SITE.dice(), first = !get(PROF);
+      var STY = [['cyber', 'Cyber', 'linear-gradient(135deg,#05060b,#101a2c)', '#fcee09'], ['standard', 'Standard', 'linear-gradient(135deg,#7c5cff,#27d3c3)', '#fff'], ['dark', SITE.T('Dunkel', 'Dark'), 'linear-gradient(135deg,#1b1e27,#0b0d12)', '#cfd6e6'], ['anime', 'Japan', 'linear-gradient(135deg,#ffd9e6,#ffb3c7)', '#7a1c24']];
+      ov.innerHTML = '<form class="bx prof"><div class="lg"><button type="button" data-l="de" class="alt' + (lang === 'de' ? ' on' : '') + '">🇩🇪 Deutsch</button><button type="button" data-l="en" class="alt' + (lang === 'en' ? ' on' : '') + '">🇬🇧 English</button></div>' +
+        '<h2>' + (first ? SITE.T('Willkommen! Richte dein Profil ein', 'Welcome! Set up your profile') : SITE.T('Dein Profil', 'Your profile')) + '</h2><p>' + SITE.T('Name, Stil und Würfel gelten in allen Spielen. Du kannst sie jederzeit unten links über deinen Namen ändern.', 'Name, style and dice apply in all games. You can change them any time via your name at the bottom left.') + '</p>' +
+        '<label class="lb">' + SITE.T('Dein Name', 'Your name') + '</label><input id="siteName" maxlength="14" autocomplete="nickname" placeholder="Name">' +
+        '<label class="lb">' + SITE.T('Standard-Stil', 'Default style') + '</label><div class="tiles" id="siteSty">' + STY.map(function (s) { return '<button type="button" class="tl" data-v="' + s[0] + '"><span class="sv" style="background:' + s[2] + ';color:' + s[3] + '">Aa</span>' + s[1] + '</button>'; }).join('') + '</div>' +
+        '<small class="nt">' + SITE.T('Dunkel und Japan gibt es bisher nur in „Mensch ärgere dich nicht“; in den anderen Spielen gilt dann Cyber.', 'Dark and Japan currently exist only in “Ludo”; the other games then use Cyber.') + '</small>' +
+        '<label class="lb">' + SITE.T('Würfel', 'Dice') + '</label><div class="tiles" id="siteDc">' + ['auto'].concat(Object.keys(SITE.DICE)).map(function (k) { return '<button type="button" class="tl" data-v="' + k + '">' + diePrev(k) + (k === 'auto' ? SITE.T('Passend zum Stil', 'Match the style') : SITE.T(SITE.DICE[k].n[0], SITE.DICE[k].n[1])) + '</button>'; }).join('') + '</div>' +
+        '<div class="rw">' + (force && cur ? '<button type="button" class="alt" id="siteCancel">' + SITE.T('Abbrechen', 'Cancel') + '</button>' : '') + '<button type="submit">' + (first ? SITE.T('Los geht’s', 'Let’s go') : SITE.T('Speichern', 'Save')) + '</button></div></form>';
       document.body.appendChild(ov);
       var inp = ov.querySelector('#siteName'); inp.value = cur; setTimeout(function () { inp.focus(); inp.select(); }, 30);
-      ov.querySelector('.lg').onclick = function (e) { var b = e.target.closest('[data-l]'); if (!b || b.dataset.l === lang) return; var n = inp.value.trim(); if (n) SITE.setName(n); SITE.setLang(b.dataset.l); };
-      var c = ov.querySelector('#siteCancel'); if (c) c.onclick = function () { ov.remove(); res(cur); };
+      function mark() {
+        Array.prototype.forEach.call(ov.querySelectorAll('#siteSty .tl'), function (b) { b.classList.toggle('on', b.dataset.v === st); });
+        Array.prototype.forEach.call(ov.querySelectorAll('#siteDc .tl'), function (b) { b.classList.toggle('on', b.dataset.v === dc); });
+      }
+      mark();
+      ov.querySelector('#siteSty').onclick = function (e) { var b = e.target.closest('[data-v]'); if (!b) return; st = b.dataset.v; if (window.SITE_STYLE) SITE_STYLE.set(st); mark(); };      // Stil sofort zeigen
+      ov.querySelector('#siteDc').onclick = function (e) { var b = e.target.closest('[data-v]'); if (!b) return; dc = b.dataset.v; mark(); };
+      ov.querySelector('.lg').onclick = function (e) { var b = e.target.closest('[data-l]'); if (!b || b.dataset.l === lang) return; var n = inp.value.trim(); if (n) SITE.setName(n); SITE.setDice(dc); SITE.setLang(b.dataset.l); };
+      var c = ov.querySelector('#siteCancel'); if (c) c.onclick = function () { if (window.SITE_STYLE && st !== st0) SITE_STYLE.set(st0); ov.remove(); res(cur); };
       ov.querySelector('form').onsubmit = function (e) {
         e.preventDefault(); var n = inp.value.trim();
         if (!n) { inp.style.borderColor = '#ff5c7a'; inp.focus(); return; }
-        SITE.setName(n); ov.remove(); paintBtns(); res(n); document.dispatchEvent(new CustomEvent('site-name', { detail: n }));
+        SITE.setName(n); if (window.SITE_STYLE) SITE_STYLE.set(st); SITE.setDice(dc); set(PROF, '1');
+        ov.remove(); paintBtns(); res(n); document.dispatchEvent(new CustomEvent('site-name', { detail: n }));
       };
     });
   }
@@ -217,11 +284,11 @@
     if (box) {
       bLang = document.createElement('button'); bLang.title = SITE.T('Sprache: Deutsch / Englisch', 'Language: German / English'); bLang.setAttribute('data-noi18n', '');
       bLang.onclick = function () { SITE.setLang(lang === 'en' ? 'de' : 'en'); };
-      bName = document.createElement('button'); bName.title = SITE.T('Namen ändern', 'Change name'); bName.setAttribute('data-noi18n', '');
+      bName = document.createElement('button'); bName.title = SITE.T('Profil: Name, Stil und Würfel ändern', 'Profile: change name, style and dice'); bName.setAttribute('data-noi18n', '');
       bName.onclick = function () { askName(true); };
       box.appendChild(bLang); box.appendChild(bName); paintBtns();
     }
-    if (!SITE.name()) askName(false);
+    if (!SITE.name() || (START && !get(PROF))) askName(!!SITE.name());      // Profil: beim ersten Besuch der Startseite (oder wenn noch kein Name da ist)
     checkUpdate(); setInterval(checkUpdate, 5 * 60 * 1000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) checkUpdate(); });
   });

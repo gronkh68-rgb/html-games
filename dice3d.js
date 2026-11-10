@@ -125,7 +125,7 @@
   function lum(hex) { var n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return (.299 * r + .587 * g + .114 * b) / 255; }
   function shade(hex, f) { var n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255, m = f > 0 ? 255 : 0, a = Math.abs(f); return 'rgb(' + Math.round(r + (m - r) * a) + ',' + Math.round(g + (m - g) * a) + ',' + Math.round(b + (m - b) * a) + ')'; }
   // Würfelseite; hex = Spielerfarbe (oder null für den neutralen Würfel)
-  function faceTex(v, cyber, size, hex) {
+  function faceTex(v, cyber, size, hex, sk) {      // sk: festes Design aus dem Profil (Farbverlauf, Augenfarbe), sonst Spielerfarbe oder Elfenbein
     var cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
     var P = { 1: [[.5, .5]], 2: [[.28, .28], [.72, .72]], 3: [[.28, .28], [.5, .5], [.72, .72]], 4: [[.28, .28], [.72, .28], [.28, .72], [.72, .72]], 5: [[.28, .28], [.72, .28], [.5, .5], [.28, .72], [.72, .72]], 6: [[.28, .25], [.72, .25], [.28, .5], [.72, .5], [.28, .75], [.72, .75]] };
     if (cyber) {      // Cyber: große Zahl statt Augen, Leuchtrand mit Eckmarken
@@ -144,7 +144,8 @@
       var tc = new THREE.CanvasTexture(cv); tc.anisotropy = 4; return tc;
     }
     var pip;
-    if (hex) { var g2 = x.createLinearGradient(0, 0, size, size); g2.addColorStop(0, shade(hex, .18)); g2.addColorStop(1, shade(hex, -.12)); x.fillStyle = g2; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.28)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = lum(hex) > .62 ? '#16161c' : '#ffffff'; }
+    if (sk) { var g3 = x.createLinearGradient(0, 0, size, size); g3.addColorStop(0, sk.bg[0]); g3.addColorStop(1, sk.bg[1]); x.fillStyle = g3; x.fillRect(0, 0, size, size); x.strokeStyle = sk.edge; x.lineWidth = size * .035; x.strokeRect(size * .018, size * .018, size * .964, size * .964); pip = v === 1 ? sk.one : sk.pip; }
+    else if (hex) { var g2 = x.createLinearGradient(0, 0, size, size); g2.addColorStop(0, shade(hex, .18)); g2.addColorStop(1, shade(hex, -.12)); x.fillStyle = g2; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.28)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = lum(hex) > .62 ? '#16161c' : '#ffffff'; }
     else { var g = x.createLinearGradient(0, 0, size, size); g.addColorStop(0, '#fffdf4'); g.addColorStop(1, '#ece3c8'); x.fillStyle = g; x.fillRect(0, 0, size, size); x.strokeStyle = 'rgba(0,0,0,.18)'; x.lineWidth = size * .03; x.strokeRect(size * .015, size * .015, size * .97, size * .97); pip = null; }
     P[v].forEach(function (p) {
       x.beginPath(); x.arc(p[0] * size, p[1] * size, size * (v === 1 ? .12 : .085), 0, 7);
@@ -179,7 +180,7 @@
     st.textContent = '.dice-wrap{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:rgba(8,12,22,.55);border:2px solid rgba(255,255,255,.18);box-shadow:0 6px 20px rgba(0,0,0,.45)}' +
       '.dice-wrap canvas{display:block;width:100%;height:100%;touch-action:none}' +
       '.dice-wrap .dzoom{position:absolute;right:6px;top:6px;z-index:5;width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(20,24,42,.85);color:#fff;font:700 15px system-ui,sans-serif;cursor:pointer;line-height:1;padding:0}' +
-      '.dice-wrap.bare{background:transparent;border:0;box-shadow:none;border-radius:0}' +
+      '.dice-wrap.bare{background:transparent;border:0;box-shadow:none;border-radius:0}.dice-wrap.bare .dbtn{bottom:auto;top:4px}' +
       '.dice-embed{position:absolute;inset:0;pointer-events:none;z-index:60}' +
       '.dice-wrap .dh,.dice-embed .dh{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:3;pointer-events:none;background:rgba(10,14,30,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 10px;font:700 12px system-ui,sans-serif;text-align:center;display:none;width:88%}' +
       '.dice-wrap.big .dh,.dice-embed .dh{font-size:15px;padding:8px 14px;width:auto;max-width:92%}' +
@@ -190,6 +191,14 @@
     document.head.appendChild(st);
   }
   var cyberNow = function () { return document.documentElement.getAttribute('data-style') === 'cyber'; };
+  // Würfel-Design aus dem Profil (theme.js): 'auto' richtet sich nach dem Stil der Seite
+  function skinNow() {
+    var pref = window.SITE && SITE.dice ? SITE.dice() : 'auto', d = pref !== 'auto' && SITE.DICE ? SITE.DICE[pref] : null;
+    if (!d) return { key: cyberNow() ? 'c' : 's', neon: cyberNow(), color: true, sk: null };
+    if (d.num) return { key: 'neon', neon: true, color: true, sk: null };
+    if (d.player) return { key: 'pl', neon: false, color: true, sk: null };
+    return { key: pref, neon: false, color: false, sk: d };
+  }
   // Tablett-Bauteile: Filzboden, Holzrand, Abschussfeld, Zielhilfe und die Würfel. Lokale Koordinaten = Physik-Koordinaten.
   function mkRig(parent, bare) {      // bare: ohne Tablett (Würfel rollen direkt auf dem Spielbrett), nur eine feine Begrenzungslinie
     var R = { dice: [], shown: 0 }, geo = new THREE.BoxGeometry(1, 1, 1), mats = null, fontTried = false;
@@ -216,11 +225,11 @@
     R.color = null;
     R.setColor = function (hex) { hex = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex.toLowerCase() : null; if (hex !== R.color) { R.color = hex; R.mk(); R.skin(); } };      // Würfel in Spielerfarbe
     R.mk = function () {
-      var cy = cyberNow(), key = (cy ? 'c' : 's') + (R.color || '');
+      var S = skinNow(), cy = S.neon, col = S.color ? R.color : null, key = S.key + (col || '');
       if (mats && mats.key === key) return mats;
       mats = { key: key, list: FACE_V.map(function (v) {
-        var t = faceTex(v, cy, cy ? 256 : 128, R.color);
-        // Cyber: Zahl und Rand leuchten selbst (Emissive-Map), beim Liegenbleiben blitzt es auf
+        var t = faceTex(v, cy, cy ? 256 : 128, col, S.sk);
+        // Neon: Zahl und Rand leuchten selbst (Emissive-Map), beim Liegenbleiben blitzt es auf
         return new THREE.MeshStandardMaterial(cy ? { map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .75, roughness: .35, metalness: .3 } : { map: t, roughness: .55, metalness: 0 });
       }) };
       mats.cy = cy;
@@ -254,7 +263,7 @@
     var fxT = 0, fxRings = [], fxRaf = 0, fxDone = null;
     R.fxStop = function () { cancelAnimationFrame(fxRaf); fxRaf = 0; fxRings.forEach(function (m) { m.visible = false; }); if (mats && mats.cy) mats.list.forEach(function (m) { m.emissiveIntensity = .75; }); };
     R.land = function (n, done) {
-      if (!cyberNow()) return;
+      if (!(mats && mats.cy)) return;
       R.fxStop(); fxDone = done; fxT = performance.now();
       var col = R.color || '#00f0ff';
       for (var i = 0; i < n; i++) {
