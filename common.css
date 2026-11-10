@@ -47,3 +47,6 @@ select{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(
 .die .dn,.die .dh,.die .db{display:none}
 .die.roll{animation:shake .3s infinite}
 @keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+
+/* heller Browser: weißer Würfel braucht einen Rand, sonst verschwindet er auf der weißen Karte */
+@media (prefers-color-scheme:light){html:not([data-style]) .die{box-shadow:0 0 0 2px #b9bfd8,0 4px 14px rgba(0,0,0,.2)}}
