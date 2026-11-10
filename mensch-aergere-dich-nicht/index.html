@@ -17,8 +17,8 @@
 <script src="../net.js"></script>
 <style>
 .wrap{max-width:1500px}
-#diceDock.floatdock{position:fixed;left:12px;bottom:12px;height:min(28vh,240px);width:calc(min(28vh,240px)*.75);z-index:25}
-@media (max-width:760px){#diceDock.floatdock{height:min(20vh,170px);width:calc(min(20vh,170px)*.75);bottom:calc(var(--bar,0px) + 8px)}}
+/* Würfelfläche = das ganze Spielfeld (kein Tablett): die Würfel werden über das Brett geschnippt */
+#diceDock{position:absolute;inset:0;z-index:8}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
 #boardWrap{width:min(100%,calc(100vh - 150px));margin:0 auto;position:relative}
 /* physischer Würfel (optional): CSS-3D-Würfel über dem Brett */
@@ -215,7 +215,6 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
 </style>
 </head>
 <body>
-<div id="diceDock" class="floatdock" hidden></div>
 <div class="wrap">
   <div class="top"><a class="back" href="../">← Spiele</a><h1>Mensch ärgere dich nicht</h1></div>
 
@@ -274,7 +273,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
 
   <div id="game" hidden>
     <div class="layout">
-      <div id="boardWrap"><svg id="board" viewBox="0 0 550 550"></svg><div id="stage3d" hidden></div></div>
+      <div id="boardWrap"><svg id="board" viewBox="0 0 550 550"></svg><div id="stage3d" hidden></div><div id="diceDock" data-bare="1" hidden></div></div>
       <div class="side">
         <div class="panel">
           <div class="turn" id="turn"></div>
@@ -302,8 +301,8 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
             <button class="btn alt" id="camIso3">Schräg</button>
             <button class="btn alt" id="camTop3">Von oben</button>
             <button class="btn alt" id="follow3">Kamera folgt: aus</button>
-            <button class="btn alt" id="diceCam" title="Kamera nah ans Tablett fahren und wieder zurück">🔍 Tablett heranzoomen</button>
-            <button class="btn alt" id="autoCam" title="An: Die Kamera fährt bei deinem Wurf automatisch zum Tablett. Aus: Die Kamera bleibt, wie du sie eingestellt hast (das Tablett steht immer rechts neben dem Brett)">🎲 Würfel-Cam: aus</button>
+            <button class="btn alt" id="diceCam" title="Kamera von schräg oben über das ganze Brett fahren und wieder zurück">🔍 Würfelblick</button>
+            <button class="btn alt" id="autoCam" title="An: Die Kamera fährt bei deinem Wurf automatisch über das Brett. Aus: Die Kamera bleibt, wie du sie eingestellt hast (das Tablett steht immer rechts neben dem Brett)">🎲 Würfel-Cam: aus</button>
           </span>
         </div>
         <button class="btn alt" id="again">Neues Spiel</button>
@@ -381,6 +380,7 @@ const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
 let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe={},lastPhys=false;
 // Würfel-Tablett: in der 3D-Ansicht steht es als echtes Objekt neben dem Brett auf dem Tisch (Kamera fährt beim eigenen Wurf hin), in 2D als Dock
 const TRAY3={y:-.25,scale:.72,x:11.2,z:5.2};
+if(window.Dice3D&&Dice3D.setArea)Dice3D.setArea(7.5,7.5);      // Würfel rollen über das ganze (quadratische) Brett
 // Jeder Spieler hat sein eigenes Würfelfeld neben seiner Farbe (an der Ecke seines Startfelds, außen am Brett)
 const trayOf=p=>{const [bx,by]=[[0,0],[9,0],[9,9],[0,9]][p],sx=bx===0?-1:1,sz=by===0?-1:1;return {pos:[sx*TRAY3.x,TRAY3.y,sz*TRAY3.z],rotY:sz>0?0:Math.PI};};
 let camSave3=null,manual3=false,autoDice3=(()=>{try{return localStorage.getItem('mdn-autodice')==='1';}catch(e){return false;}})();      // Standard: Kamera wird nicht erzwungen
@@ -395,8 +395,8 @@ function focusTray3(on,manual,p){
   const p0=cam.position.clone(),t0=ctl.target.clone();
   if(on){
     camSave3={pos:p0.clone(),target:t0.clone()};
-    const g=DVe[p]&&DVe[p].R?DVe[p].R.group:null,th=g?g.rotation.y:0,off=(lx,ly,lz)=>new THREE.Vector3(lx*Math.cos(th)+lz*Math.sin(th),ly,-lx*Math.sin(th)+lz*Math.cos(th));
-    const c=g?g.position.clone():new THREE.Vector3(trayOf(p).pos[0],TRAY3.y,trayOf(p).pos[2]),to={pos:c.clone().add(off(0,17.5,9.5)),target:c.clone().add(off(0,0,.3))};
+    const g=DVe[0]&&DVe[0].R?DVe[0].R.group:null,th=g?g.rotation.y:0,off=(lx,ly,lz)=>new THREE.Vector3(lx*Math.cos(th)+lz*Math.sin(th),ly,-lx*Math.sin(th)+lz*Math.cos(th));
+    const c=new THREE.Vector3(0,.2,0),to={pos:c.clone().add(off(0,23,11)),target:c.clone().add(off(0,0,.6))};      // Blick von schräg oben auf das ganze Brett
     ctl.enabled=false;
     tw3(900,k=>{const e=k*k*(3-2*k);cam.position.lerpVectors(p0,to.pos,e);ctl.target.lerpVectors(t0,to.target,e);},'dicecam');
   }else if(camSave3){
@@ -406,14 +406,15 @@ function focusTray3(on,manual,p){
 }
 const DICEV=p=>{
   if(v3&&T3&&T3.scene){
-    p=(p==null||p<0)?(active[0]||0):p;
-    if(!DVe[p]){const tr=trayOf(p);DVe[p]=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:tr.pos,scale:TRAY3.scale,rotY:tr.rotY,focus:on=>focusTray3(on,false,p)});}
-    return DVe[p];
+    // Kein Tablett: Alle schnippen über das ganze Brett; die Fläche dreht sich so, dass "vorne" zur Kamera zeigt
+    if(!DVe[0])DVe[0]=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:[0,.22,0],scale:.8,rotY:0,bare:true,focus:on=>focusTray3(on,false,0)});
+    const v=DVe[0];if(v.R&&!v.busy&&!v._playing){const c=T3.camera.position;v.R.group.rotation.y=Math.atan2(c.x,c.z);v.R.group.updateMatrixWorld(true);}
+    return v;
   }
   return DVd||(DVd=Dice3D.view($('diceDock')));
 };
 const cancelDice=()=>{manual3=false;if(DVd)DVd.cancel();Object.keys(DVe).forEach(k=>DVe[k].cancel());if(T3&&camSave3)focusTray3(false,true);syncCamBtns();};
-function syncCamBtns(){const d=$('diceCam'),a=$('autoCam');if(d)d.textContent=manual3?'🔍 Tablett: nah':'🔍 Tablett heranzoomen';if(a)a.textContent='🎲 Würfel-Cam: '+(autoDice3?'an':'aus');}
+function syncCamBtns(){const d=$('diceCam'),a=$('autoCam');if(d)d.textContent=manual3?'🔍 Würfelblick: an':'🔍 Würfelblick';if(a)a.textContent='🎲 Würfel-Cam: '+(autoDice3?'an':'aus');}
 const myTray=()=>{if(netRole==='client')return mySlot;if(typeof cur==='number'&&isLocal(cur))return cur;const q=active.find(isLocal);return q==null?(active[0]||0):q;};
 async function toggleDiceCam(){
   if(!T3||!v3)return;
@@ -423,7 +424,7 @@ async function toggleDiceCam(){
   syncCamBtns();
 }
 const syncPhysBtn=()=>{const b=$('physBtn');if(b)b.hidden=(netRole==='client'?lastPhys:physOn());};      // die reine Animation braucht man beim echten Wurf nicht
-const syncDock=on=>{const d=$('diceDock'),want=on&&!v3;if(d.hidden===want)d.hidden=!want;if(on){if(v3)active.forEach(p=>DICEV(p).show());else DICEV().show();}syncPhysBtn();};
+const syncDock=on=>{const d=$('diceDock'),want=on&&!v3;if(d.hidden===want)d.hidden=!want;if(on)DICEV().show();syncPhysBtn();};
 const physOn=()=>($('diceMode')||{}).value==='phys';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pname=p=>names[p]?` (${esc(names[p])})`:'';

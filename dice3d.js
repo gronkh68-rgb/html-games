@@ -22,6 +22,8 @@
     loadP = Promise.all([window.THREE ? 0 : load(THREE_URL), import(CANNON_URL).then(function (m) { C = m; })]);
     return loadP;
   };
+  // Wurffläche anpassen (Halbbreite/-tiefe in Würfelkanten); vor dem ersten Würfel-Rig aufrufen. Standard: Tablett 4,3 x 6,2. Die Seite bestimmt es einheitlich für Host und Mitspieler.
+  D.setArea = function (tx, tz) { TX = tx; TZ = tz; ANCH_Z = TZ - 1.7; ASP = (TX * 2 + 2.8) / (TZ * 2 + 2.8); MAXP = Math.max(4.6, TZ * .72); };
   D.setCannon = function (m) { C = m; };          // für Tests ohne Netz
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
   function randQ() { var u = Math.random(), v = Math.random(), w = Math.random(); return [Math.sqrt(1 - u) * Math.sin(2 * Math.PI * v), Math.sqrt(1 - u) * Math.cos(2 * Math.PI * v), Math.sqrt(u) * Math.sin(2 * Math.PI * w), Math.sqrt(u) * Math.cos(2 * Math.PI * w)]; }
@@ -180,7 +182,7 @@
     st.textContent = '.dice-wrap{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:rgba(8,12,22,.55);border:2px solid rgba(255,255,255,.18);box-shadow:0 6px 20px rgba(0,0,0,.45)}' +
       '.dice-wrap canvas{display:block;width:100%;height:100%;touch-action:none}' +
       '.dice-wrap .dzoom{position:absolute;right:6px;top:6px;z-index:5;width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(20,24,42,.85);color:#fff;font:700 15px system-ui,sans-serif;cursor:pointer;line-height:1;padding:0}' +
-      '.dice-wrap.bare{background:transparent;border:0;box-shadow:none;border-radius:0}.dice-wrap.bare .dbtn{bottom:auto;top:4px}' +
+      '.dice-wrap.bare{background:transparent;border:0;box-shadow:none;border-radius:0;pointer-events:none}.dice-wrap.bare .dbtn{bottom:auto;top:4px}' +
       '.dice-embed{position:absolute;inset:0;pointer-events:none;z-index:60}' +
       '.dice-wrap .dh,.dice-embed .dh{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:3;pointer-events:none;background:rgba(10,14,30,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 10px;font:700 12px system-ui,sans-serif;text-align:center;display:none;width:88%}' +
       '.dice-wrap.big .dh,.dice-embed .dh{font-size:15px;padding:8px 14px;width:auto;max-width:92%}' +
@@ -426,9 +428,9 @@
       if (!renderer) return;
       var w = wrap.clientWidth || 200, h = wrap.clientHeight || 280;
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(w, h, false);
-      cam.aspect = w / h; var vf = cam.fov * Math.PI / 180, needH = (TZ + 1.4) * 2, needW = (TX + 1.4) * 2;
+      cam.aspect = w / h; var vf = cam.fov * Math.PI / 180, mg = bare ? 0 : 1.4, needH = (TZ + mg) * 2, needW = (TX + mg) * 2;
       var dist = Math.max(needH / (2 * Math.tan(vf / 2)), needW / (2 * Math.tan(vf / 2) * cam.aspect));
-      if (bare) cam.position.set(0, dist * .99, dist * .14); else cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
+      if (bare) cam.position.set(0, dist, .001); else cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
     }
     var ro = window.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe(wrap);
     // Es wird nur gezeichnet, wenn sich etwas bewegt (spart Leistung); sonst genau ein Bild pro Änderung
@@ -446,7 +448,7 @@
     env.once = once;
     env.pt = function (e) { var r = cv.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam); return ray.ray.intersectPlane(plane, tmp) ? [tmp.x, tmp.z] : null; };
     env.near = function (v3, rad) { return ray.ray.distanceToPoint(v3) < rad; };
-    env.listen = wrap; env.cursor = function (c) { wrap.style.cursor = c; };
+    env.listen = wrap; env.cursor = function (c) { wrap.style.cursor = c; if (bare) wrap.style.pointerEvents = c ? 'auto' : 'none'; };      // bare: die Fläche über dem Brett fängt nur beim Ziehen Eingaben ab, sonst bleibt das Brett bedienbar
     function bigRect() {
       var iw = window.innerWidth, ih = window.innerHeight, h = Math.min(ih * .92, 940), w = h * ASP;
       if (w > iw * .96) { w = iw * .96; h = w / ASP; }
