@@ -348,7 +348,6 @@
       '<div class="cg" id="cgTop"><a class="back" href="../">← Spiele</a><button class="btn alt" id="cgLeave">Beenden</button><div class="panel" id="cgInfo"></div></div>' +
       '<div class="cg panel" id="cgMsg"></div><div class="cg panel" id="cgSide"></div><div class="cg panel" id="cgLog"></div><div class="cg" id="cgActions"></div>' +
       '<div id="cgMenu"><div class="box"><h1>' + esc(G.title) + '</h1><p id="cgSub">' + esc(G.blurb || '') + '</p>' +
-      '<div class="row"><label>Dein Name</label><input id="cgName" maxlength="14" placeholder="Name"></div>' +
       '<div class="row"><label>Computer-Gegner</label><select id="cgBots"></select></div>' +
       '<div class="row"><button class="btn" id="cgLocal">Gegen Computer spielen</button></div>' +
       '<div class="row"><button class="btn alt" id="cgOnline">Online spielen</button></div>' +
@@ -356,8 +355,7 @@
       '<div id="cgOver" hidden><div class="box"><h2 id="cgOverT"></h2><p id="cgOverS"></p><div class="row"><button class="btn" id="cgAgain">Nochmal</button><button class="btn alt" id="cgBack">Zum Menü</button></div></div></div>';
     document.body.appendChild(root);
     var nb = $('cgBots'); for (var i = 1; i < G.maxSeats; i++) nb.innerHTML += '<option value="' + i + '"' + (i === G.defaultBots ? ' selected' : '') + '>' + i + '</option>';
-    try { $('cgName').value = localStorage.getItem('mp-name') || ''; } catch (e) {}
-    var myName = function () { var n = ($('cgName').value || '').trim().slice(0, 14) || 'Spieler'; try { localStorage.setItem('mp-name', n); } catch (e) {} return n; };
+    var myName = function () { return ((window.SITE && SITE.name()) || (function () { try { return localStorage.getItem('mp-name') || ''; } catch (e) { return ''; } })()).trim().slice(0, 14) || 'Spieler'; };      // Name aus dem Profil
 
     var S = { role: 'local', you: 0, engine: null, seatTypes: [], names: [], pending: null, stopped: false, table: null, lastView: null, pushQ: false, actSig: '' };
     var CANCEL = {}, L = null;

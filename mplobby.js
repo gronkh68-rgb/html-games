@@ -43,7 +43,7 @@
     ov.innerHTML =
       '<div class="mpbox">' +
       '<h2>' + esc(cfg.title) + ' online</h2>' +
-      '<div class="mprow"><label>Dein Name</label><input id="mpName" maxlength="14" placeholder="Name"></div>' +
+      '<div class="mprow mphint" style="margin:0 0 6px">👤 <b id="mpWho" style="color:var(--text,#eef0ff)"></b><button class="btn alt mpmini" id="mpProf" type="button">Profil</button></div>' +
       '<div class="mprow" id="mpTabs"><button class="btn" data-m="host">Raum erstellen</button><button class="btn alt" data-m="join">Beitreten</button></div>' +
       '<div id="mpHost" hidden>' +
       '  <div class="mpcode" id="mpCode">…</div>' +
@@ -61,7 +61,11 @@
       '<div class="mprow"><button class="btn alt" id="mpClose">Schließen</button></div>' +
       '</div>';
     document.body.appendChild(ov);
-    try { $('mpName').value = localStorage.getItem('mp-name') || ''; } catch (e) {}
+    // Der Name kommt aus dem Profil (theme.js) und gilt in allen Spielen
+    var profName = function () { return ((window.SITE && SITE.name()) || (function () { try { return localStorage.getItem('mp-name') || ''; } catch (e) { return ''; } })()).trim().slice(0, 14); };
+    var showWho = function () { $('mpWho').textContent = profName() || 'Spieler'; }; showWho();
+    document.addEventListener('site-name', showWho);
+    $('mpProf').onclick = function () { if (window.SITE && SITE.askName) SITE.askName(true); };
     var err = function (t) { $('mpErr').textContent = t || ''; };
     // Wiederbeitritt: eigene Kennung und letzten Raum merken
     var LASTK = 'mp-last-' + cfg.prefix;
@@ -72,7 +76,7 @@
     function updateRejoin() { var l = getLast(), show = !!l && L.role !== 'client'; $('mpRejoin').hidden = !show; if (show) $('mpRejoinCode').textContent = l.code; }
     L.hasRejoin = function () { return !!getLast(); };
     L.rejoin = function () { var l = getLast(); if (!l) return false; ov.hidden = false; showMode('join'); joinRoom(l.code); return true; };
-    var myName = function () { var n = ($('mpName').value || '').trim().slice(0, 14) || 'Spieler'; try { localStorage.setItem('mp-name', n); } catch (e) {} return n; };
+    var myName = function () { return profName() || 'Spieler'; };
     var dot = function (i) { return '<span class="mpdot" style="background:' + cfg.seats[i].color + '"></span>' + esc(cfg.seats[i].name); };
     var row = function (i, html) { return '<div class="mpslot"><span class="nm">' + dot(i) + '</span>' + html + '</div>'; };
 

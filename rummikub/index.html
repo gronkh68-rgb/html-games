@@ -3868,7 +3868,7 @@
                             
                             <div class="mode-section">
                                 <h3>🤖 Singleplayer</h3>
-                                <div class="input-group"><input type="text" id="playerName" placeholder="Dein Name" value="${esc(state.playerName)}" maxlength="12"></div>
+                                <input type="hidden" id="playerName" value="${esc(((window.SITE&&SITE.name())||state.playerName||'').slice(0,12))}">
                                 <div style="font-size:0.75rem;color:#78350f;margin-bottom:0.3rem;">Schwierigkeit:</div>
                                 <div class="ai-options">
                                     <div class="ai-option ${state.aiDifficulty === 'easy' ? 'selected' : ''}" onclick="setAIDifficulty('easy')"><span class="emoji">😊</span><span class="label">Leicht</span></div>

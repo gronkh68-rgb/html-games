@@ -216,7 +216,6 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
 
 <div id="lookBox"><div class="box"><h2>Figuren-Look</h2><p style="margin:0 0 10px;color:var(--muted);font-size:.9rem">Wähle für jede Farbe Ohren, Schwanz, Hut und Kleidung. Das siehst du im Japan-Stil (2D und 3D) und es wird gespeichert.</p><div id="lookTabs"></div><div id="lookSels"></div><div class="row" style="margin-top:12px"><button class="btn" id="lookDone">Fertig</button></div></div></div>
   <div id="setup" class="panel">
-    <div class="row"><label>Dein Name</label><input id="myName" maxlength="14" placeholder="Name"></div>
     <div class="row"><label for="diceMode">Würfel</label>
       <select id="diceMode"><option value="phys">Echter Wurf: Würfel per Maus ziehen und werfen (Physik)</option><option value="bag">Ausgeglichen: jeder Spieler hat seinen eigenen Würfel</option><option value="rand">Echter Zufall (ein gemeinsamer Würfel)</option></select></div>
     <p class="hint" id="diceHint" style="margin:-2px 0 8px;font-size:.8rem;color:var(--muted)">Ausgeglichen: Jeder Spieler würfelt aus einem eigenen Beutel mit 1 bis 6 (alle sechs Würfe je einmal). Nach höchstens 5 Würfen ohne 6 kommt sicher eine, und zwei Sechsen direkt hintereinander gibt es nicht. Online gilt die Einstellung des Hosts.</p>
@@ -948,7 +947,7 @@ let cReady=false,lastCur=-1,cRolling=false,cLand=false,rollAnim=null,joinedCode=
 function lobbyNote(t){['lobbyNote','lobbyNote2'].forEach(id=>{const e=$(id);if(!e)return;e.textContent=t;clearTimeout(e._t);e._t=setTimeout(()=>{e.textContent='';},3800);});}
 function joinBtnReset(){const b=$('joinBtn');b.disabled=false;b.textContent='Beitreten';b.classList.remove('busy');}
 const errMsg=t=>{$('setupErr').textContent=t||'';};
-function myNameVal(){const n=($('myName').value||'').trim().slice(0,14)||'Spieler';try{localStorage.setItem('mdn-name',n);}catch(e){}return n;}
+function myNameVal(){return (SITE.name()||'').slice(0,14)||'Spieler';}   // Name aus dem Profil
 
 // Meldungstexte vom Host nur mit <b> und den Farbpunkten zulassen
 function safeHtml(html){
@@ -1290,7 +1289,7 @@ $('winBtn').onclick=()=>{backToSetup();};
 $('again').onclick=()=>{if(netRole==='client'){goMenu('');}else backToSetup();};
 
 // Start: Name und Raumlink aus der Adresse
-try{$('myName').value=localStorage.getItem('mdn-name')||'';}catch(e){}
+
 {
   const q=new URLSearchParams(location.search).get('room');
   if(q){$('joinCode').value=q.toUpperCase().slice(0,5);showMode('join');}

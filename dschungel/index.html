@@ -146,10 +146,11 @@ const sleep=(ms,t=token)=>new Promise((res,rej)=>setTimeout(()=>t===token?res():
 const human=p=>p.type==='human';
 
 // ---------- Setup ----------
+const esc0=s=>String(s).replace(/[&<>"']/g,'');
 function buildSetup(){
   const def=['human','cpu','cpu','off'];
   $('slots').innerHTML=[0,1,2,3].map(i=>`<div class="slotrow"><span class="dot" style="background:${PCOL[i]}"></span>
-    <input id="nm${i}" maxlength="12" placeholder="${DEFNAME[i]}" value="">
+    <input id="nm${i}" maxlength="12" placeholder="${DEFNAME[i]}" value="${i===0?esc0((window.SITE&&SITE.name())||''):''}">
     <select id="ty${i}"><option value="human">Mensch</option><option value="cpu">Computer</option><option value="off">Aus</option></select></div>`).join('');
   def.forEach((d,i)=>$('ty'+i).value=d);
 }
