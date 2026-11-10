@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Tron</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+html,body{overscroll-behavior:none}
+body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.wrap{max-width:1200px;padding:10px 12px 56px}
+.top{margin-bottom:8px}
+#hud{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0 0 8px}
+#hud .pl{display:flex;align-items:center;gap:8px;padding:5px 12px;background:#0b111c;border:1px solid #1c2a3d;border-top:3px solid var(--c);
+  font:700 .9rem "Share Tech Mono",ui-monospace,monospace;color:#dff6ff;box-shadow:0 0 12px color-mix(in srgb,var(--c) 35%,transparent)}
+#hud .pl.dead{opacity:.45}
+#hud .pl b{font-size:1.15rem;color:var(--c);text-shadow:0 0 8px var(--c);min-width:1.2em;text-align:right}
+#hud .pl .bo{letter-spacing:2px;color:var(--c);font-size:.8rem}
+#hud .pl .bo i{font-style:normal;opacity:.2}
+#arenaWrap{position:relative;margin:0 auto;line-height:0;width:max-content;max-width:100%}
+#cv{display:block;background:#080c12;border:1px solid #00cfff;box-shadow:0 0 18px rgba(0,207,255,.45),inset 0 0 30px rgba(0,207,255,.08);touch-action:none}
+.ovl{position:absolute;inset:0;display:grid;place-items:center;line-height:1.4;padding:10px;background:rgba(4,8,14,.72);overflow:auto}
+.ovl .box{background:#0b111c;border:1px solid #1c2a3d;border-top:3px solid #00cfff;padding:16px 20px;width:min(430px,100%);box-shadow:0 0 26px rgba(0,207,255,.25);color:#dff6ff}
+.ovl h2{margin:0 0 10px;font:900 1.5rem Orbitron,"Segoe UI",sans-serif;letter-spacing:.14em;color:#00cfff;text-shadow:0 0 12px #00cfff;text-align:center}
+.ovl .row{margin:6px 0}
+.ovl .row label{min-width:120px;color:#8fb3c7;font:.85rem "Share Tech Mono",ui-monospace,monospace}
+.ovl select{flex:1;min-width:0;background:#080c12;color:#dff6ff;border:1px solid #1c2a3d;border-radius:0;padding:7px 8px}
+.ovl .go{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.nbtn{font:700 .95rem Orbitron,"Segoe UI",sans-serif;letter-spacing:.08em;padding:10px 18px;background:#00cfff;color:#04121a;border:0;cursor:pointer;box-shadow:0 0 14px rgba(0,207,255,.6)}
+.nbtn.alt{background:transparent;color:#00cfff;border:1px solid #00cfff;box-shadow:none}
+.nbtn:hover{filter:brightness(1.15)}
+#msg{background:transparent;pointer-events:none}
+#msg span{font:900 clamp(1.6rem,7vw,4rem) Orbitron,"Segoe UI",sans-serif;letter-spacing:.1em;color:var(--c,#00cfff);text-shadow:0 0 18px var(--c,#00cfff),0 0 4px #fff;text-align:center;animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(1.8);opacity:0}100%{transform:scale(1);opacity:1}}
+#bar{display:flex;gap:8px;justify-content:center;margin:10px 0 6px;flex-wrap:wrap}
+#bar .btn{padding:7px 14px;font-size:.85rem}
+.keys{color:var(--muted);font-size:.82rem;line-height:1.6;text-align:center;margin:6px 0 0}
+.keys b{color:var(--text)}
+#touch{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;grid-template-columns:1fr .8fr 1fr;gap:8px;
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(8,12,18,.96);border-top:1px solid #1c2a3d}
+#touch button{height:70px;font-size:1.8rem;background:#0b111c;color:#00cfff;border:1px solid #00cfff;touch-action:none;-webkit-tap-highlight-color:transparent}
+#touch button:active{background:#00cfff;color:#04121a}
+#touch #tB{color:#ff9a1f;border-color:#ff9a1f;font-size:1.4rem}
+@media (pointer:coarse){#touch{display:grid}body{padding-bottom:96px}.keys{display:none}}
+/* Stil-Leiste der Seite über die Touch-Leiste heben, damit sie die Lenkknöpfe nicht verdeckt */
+@media (pointer:coarse){#styleSwitch{bottom:calc(94px + env(safe-area-inset-bottom))!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1>Tron</h1></div>
+  <div id="hud"></div>
+  <div id="arenaWrap">
+    <canvas id="cv"></canvas>
+    <div class="ovl" id="msg" hidden><span id="msgT"></span></div>
+    <div class="ovl" id="menu">
+      <div class="box">
+        <h2>TRON</h2>
+        <div class="row"><label>Modus</label><select id="oMode"><option value="1">1 Spieler</option><option value="2">2 Spieler (eine Tastatur)</option></select></div>
+        <div class="row"><label>Computer-Gegner</label><select id="oBots"><option>0</option><option>1</option><option>2</option><option>3</option></select></div>
+        <div class="row"><label>Stärke</label><select id="oLvl"><option value="0">Leicht</option><option value="1">Mittel</option><option value="2">Schwer</option></select></div>
+        <div class="row"><label>Tempo</label><select id="oSpeed"><option value="0">Langsam</option><option value="1">Normal</option><option value="2">Schnell</option></select></div>
+        <div class="row"><label>Siegpunkte</label><select id="oGoal"><option>3</option><option>5</option><option>10</option></select></div>
+        <div class="row"><label>Turbo</label><select id="oBoost"><option value="1">An (3 pro Runde)</option><option value="0">Aus</option></select></div>
+        <div class="row"><label>Spur nach Crash</label><select id="oKeep"><option value="0">Verschwindet</option><option value="1">Bleibt stehen</option></select></div>
+        <div class="go"><button class="nbtn" id="start">Spiel starten</button></div>
+      </div>
+    </div>
+    <div class="ovl" id="end" hidden>
+      <div class="box">
+        <h2 id="endT"></h2>
+        <div class="go"><button class="nbtn" id="again">Nochmal spielen</button><button class="nbtn alt" id="toMenu">Zur Auswahl</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="bar">
+    <button class="btn alt" id="pauseBtn">Pause</button>
+    <button class="btn alt" id="quitBtn">Zur Auswahl</button>
+    <button class="btn alt" id="sndBtn">Ton: an</button>
+  </div>
+  <p class="keys" id="keys"></p>
+</div>
+<div id="touch"><button id="tL">⟲</button><button id="tB">⚡</button><button id="tR">⟳</button></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const T=window.T||((de)=>de);
+if(window.SITE)SITE.addDict({
+  'Modus':'Mode','1 Spieler':'1 player','2 Spieler (eine Tastatur)':'2 players (one keyboard)','Stärke':'Strength','Leicht':'Easy','Mittel':'Medium','Schwer':'Hard',
+  'Tempo':'Speed','Langsam':'Slow','Normal':'Normal','Schnell':'Fast','Siegpunkte':'Points to win','Turbo':'Boost','An (3 pro Runde)':'On (3 per round)',
+  'Spur nach Crash':'Trail after crash','Verschwindet':'Disappears','Bleibt stehen':'Stays','Pause':'Pause','Weiter':'Resume'
+});
+const COLS=['#00cfff','#ff9a1f','#39ff14','#ff2fa8'];
+const DX=[1,0,-1,0],DY=[0,1,0,-1];          // Richtungen: rechts, unten, links, oben
+const TICK=[92,70,52];                      // Millisekunden pro Feld je Tempo-Stufe
+const BOOST_N=3,BOOST_T=16;                 // Turbo-Ladungen pro Runde, Dauer in Halbschritten
+
+// ---------- Einstellungen ----------
+const O={mode:'1',bots:1,lvl:1,speed:1,goal:5,boost:1,keep:0};
+const OSEL={mode:'oMode',bots:'oBots',lvl:'oLvl',speed:'oSpeed',goal:'oGoal',boost:'oBoost',keep:'oKeep'};
+try{Object.assign(O,JSON.parse(localStorage.getItem('tron-opts')||'{}'));}catch(e){}
+for(const k in OSEL)$(OSEL[k]).value=String(O[k]);
+function readOpts(){
+  O.mode=$('oMode').value==='2'?'2':'1';
+  for(const k of ['bots','lvl','speed','goal','boost','keep'])O[k]=+$(OSEL[k]).value||0;
+  O.bots=Math.max(O.mode==='1'?1:0,Math.min(O.mode==='1'?3:2,O.bots));     // 2 bis 4 Fahrer insgesamt
+  $('oBots').value=String(O.bots);
+  try{localStorage.setItem('tron-opts',JSON.stringify(O));}catch(e){}
+}
+$('oMode').onchange=readOpts;$('oBots').onchange=readOpts;
+
+// ---------- Ton ----------
+let sndOn=true,AC=null;try{sndOn=localStorage.getItem('tron-sound')!=='0';}catch(e){}
+function beep(f,d,type,vol,slide){
+  if(!sndOn)return;
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();
+    const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;
+    o.type=type||'square';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+d);
+    g.gain.setValueAtTime(vol||.05,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d);
+  }catch(e){}
+}
+function syncSnd(){$('sndBtn').textContent=sndOn?T('Ton: an','Sound: on'):T('Ton: aus','Sound: off');}
+$('sndBtn').onclick=()=>{sndOn=!sndOn;try{localStorage.setItem('tron-sound',sndOn?'1':'0');}catch(e){}syncSnd();};syncSnd();
+
+// ---------- Zustand ----------
+const cv=$('cv'),ctx=cv.getContext('2d'),bgC=document.createElement('canvas'),trC=document.createElement('canvas'),tctx=trC.getContext('2d');
+let W=84,H=50,cs=10,grid=new Uint8Array(W*H),P=[],state='menu',paused=false;
+let sub=35,acc=0,simT=0,tickN=0,last=0,parts=[],shake=0,flowTok=0;
+let vis=new Uint8Array(W*H),que=new Int32Array(W*H);
+const free=(x,y)=>x>=0&&y>=0&&x<W&&y<H&&!grid[y*W+x];
+
+// ---------- Größe und Hintergrund ----------
+function pickGrid(){const port=innerWidth<innerHeight*.8;W=port?44:84;H=port?62:50;grid=new Uint8Array(W*H);vis=new Uint8Array(W*H);que=new Int32Array(W*H);}
+function layout(){
+  const dpr=Math.min(2,window.devicePixelRatio||1),wrap=$('arenaWrap'),top=wrap.getBoundingClientRect().top+scrollY;
+  const coarse=matchMedia('(pointer:coarse)').matches;
+  const aw=wrap.parentElement.clientWidth-2,ah=Math.max(240,innerHeight-top-(coarse?196:120));
+  cs=Math.max(3,Math.floor(Math.min(aw*dpr/W,ah*dpr/H)));
+  for(const c of [cv,bgC,trC]){c.width=W*cs;c.height=H*cs;}
+  cv.style.width=(W*cs/dpr)+'px';cv.style.height=(H*cs/dpr)+'px';
+  const b=bgC.getContext('2d');
+  b.fillStyle='#080c12';b.fillRect(0,0,bgC.width,bgC.height);
+  for(let x=0;x<=W;x++){b.fillStyle=x%4===0?'rgba(0,207,255,.16)':'rgba(0,207,255,.05)';b.fillRect(x*cs,0,1,H*cs);}
+  for(let y=0;y<=H;y++){b.fillStyle=y%4===0?'rgba(0,207,255,.16)':'rgba(0,207,255,.05)';b.fillRect(0,y*cs,W*cs,1);}
+  rebuild();
+}
+addEventListener('resize',layout);
+
+// ---------- Spuren zeichnen ----------
+const cx=v=>(v+.5)*cs;
+function poly(c,p,pts,n,dim){          // die ersten n Punkte als Leuchtlinie
+  if(n<1)return;
+  c.lineCap='round';c.lineJoin='round';
+  c.beginPath();c.moveTo(cx(pts[0][0]),cx(pts[0][1]));
+  for(let i=1;i<n;i++)c.lineTo(cx(pts[i][0]),cx(pts[i][1]));
+  if(n===1)c.lineTo(cx(pts[0][0])+.01,cx(pts[0][1]));
+  c.globalAlpha=dim?.28:1;c.strokeStyle=p.col;c.shadowColor=p.col;c.shadowBlur=dim?0:cs*.9;c.lineWidth=cs*.46;c.stroke();
+  c.shadowBlur=0;c.globalAlpha=dim?.12:.8;c.strokeStyle='#fff';c.lineWidth=cs*.14;c.stroke();c.globalAlpha=1;
+}
+function rebuild(){
+  tctx.clearRect(0,0,trC.width,trC.height);
+  for(const p of P){
+    if(p.alive)poly(tctx,p,p.path,p.path.length-1);
+    else if(O.keep)poly(tctx,p,p.path,p.path.length,true);
+  }
+}
+
+// ---------- Runde ----------
+function hud(){
+  $('hud').innerHTML=P.map(p=>`<div class="pl${p.alive||state!=='play'?'':' dead'}" style="--c:${p.col}"><span>${p.name}</span>${!p.bot&&O.boost?`<span class="bo">${'▮'.repeat(p.boost)}<i>${'▮'.repeat(BOOST_N-p.boost)}</i></span>`:''}<b>${p.score}</b></div>`).join('');
+}
+function say(t,col,ms){
+  const m=$('msg');m.hidden=!t;if(!t)return;
+  const s=$('msgT');s.textContent=t;s.style.setProperty('--c',col||'#00cfff');s.style.animation='none';void s.offsetWidth;s.style.animation='';
+  if(ms){const k=flowTok;setTimeout(()=>{if(k===flowTok&&s.textContent===t)m.hidden=true;},ms);}
+}
+function startMatch(){
+  readOpts();pickGrid();
+  P=[];
+  const humans=O.mode==='2'?2:1;
+  for(let i=0;i<humans+O.bots;i++){
+    const bot=i>=humans;
+    P.push({id:i,col:COLS[i],bot,score:0,name:bot?'CPU '+(i-humans+1):humans===1?T('Du','You'):T('Spieler ','Player ')+(i+1)});
+  }
+  $('menu').hidden=true;$('end').hidden=true;
+  sub=TICK[O.speed]/2;
+  startRound();
+}
+function startRound(){
+  const k=++flowTok;
+  grid.fill(0);parts=[];acc=0;simT=0;tickN=0;paused=false;syncPause();
+  const mx=W>>1,my=H>>1,gx=Math.round(W*.14),gy=Math.round(H*.14);
+  const S=[[gx,my,0],[W-1-gx,my,2],[mx,gy,1],[mx,H-1-gy,3]];
+  P.forEach((p,i)=>{
+    const s=S[i];
+    Object.assign(p,{x:s[0],y:s[1],d:s[2],alive:true,q:[],boost:O.boost?BOOST_N:0,bt:0,path:[[s[0],s[1]]],t0:0,dur:1});
+    grid[p.y*W+p.x]=p.id+1;
+  });
+  state='count';hud();layout();
+  const step=n=>{
+    if(k!==flowTok)return;
+    if(n>0){say(String(n));beep(440,.12,'square',.05);setTimeout(()=>step(n-1),650);}
+    else{say('GO','#39ff14',500);beep(880,.25,'square',.06);state='play';last=performance.now();}
+  };
+  step(3);
+}
+function endRound(w){
+  state='roundEnd';const k=++flowTok;
+  if(w){w.score++;say(P.length===2&&!w.bot&&O.mode==='1'?T('Runde gewonnen','Round won'):w.name+' '+T('gewinnt','wins'),w.col);beep(660,.3,'triangle',.07,990);}
+  else say(T('Unentschieden','Draw'),'#dff6ff');
+  hud();
+  setTimeout(()=>{
+    if(k!==flowTok)return;
+    if(w&&w.score>=O.goal){
+      state='matchEnd';say('');
+      $('endT').textContent=(!w.bot&&O.mode==='1'?T('Sieg','Victory'):w.name+' '+T('gewinnt','wins'));$('endT').style.color=w.col;$('endT').style.textShadow='0 0 12px '+w.col;
+      $('end').hidden=false;
+    }else startRound();
+  },1700);
+}
+function toMenu(){flowTok++;state='menu';paused=false;syncPause();say('');$('end').hidden=true;$('menu').hidden=false;}
+function syncPause(){$('pauseBtn').textContent=paused?T('Weiter','Resume'):T('Pause','Pause');}
+function togglePause(){
+  if(state!=='play')return;
+  paused=!paused;syncPause();say(paused?T('Pause','Paused'):'');
+}
+
+// ---------- Schritt ----------
+function kill(p){
+  p.alive=false;p.bt=0;
+  if(!O.keep)for(let i=0;i<grid.length;i++)if(grid[i]===p.id+1)grid[i]=0;
+  for(let i=0;i<46;i++){const a=Math.random()*6.283,v=(2+Math.random()*9)*cs;parts.push({x:cx(p.x),y:cx(p.y),vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:1,col:Math.random()<.3?'#fff':p.col});}
+  shake=1;beep(180,.45,'sawtooth',.09,40);
+}
+function subtick(){
+  tickN++;
+  const mv=P.filter(p=>p.alive&&(p.bt>0||tickN%2===0));
+  for(const p of mv){
+    if(p.bot)think(p);
+    if(p.q.length)p.d=p.q.shift();
+    p.nx=p.x+DX[p.d];p.ny=p.y+DY[p.d];
+  }
+  // Alle Züge gelten gleichzeitig: Wand, Spur oder dasselbe Zielfeld wie ein anderer Fahrer = Crash
+  const dead=mv.filter(p=>!free(p.nx,p.ny)||mv.some(o=>o!==p&&o.nx===p.nx&&o.ny===p.ny));
+  for(const p of mv){
+    if(dead.includes(p))continue;
+    const L=p.path.length;if(L>=2)poly(tctx,p,[p.path[L-2],p.path[L-1]],2);
+    p.x=p.nx;p.y=p.ny;grid[p.y*W+p.x]=p.id+1;p.path.push([p.x,p.y]);
+    if(p.bt>0){p.bt--;if(!p.bt&&!p.bot)hud();}
+    p.t0=simT;p.dur=p.bt>0?sub:(tickN%2===0?2*sub:sub);
+  }
+  if(dead.length){
+    dead.forEach(kill);rebuild();hud();
+    const al=P.filter(p=>p.alive);
+    if(al.length<=1)endRound(al[0]||null);
+  }
+}
+function useBoost(p){
+  if(!p||!p.alive||p.boost<=0||p.bt>0||state!=='play'||paused)return;
+  p.boost--;p.bt=BOOST_T;if(!p.bot){hud();beep(300,.3,'sawtooth',.05,1200);}
+}
+
+// ---------- Computer ----------
+// Zählt die Felder, die der Fahrer von (sx,sy) aus zuerst erreicht; mit Gegnern (opp) werden deren Felder abgezogen
+function area(p,sx,sy,opp){
+  vis.fill(0);
+  let h=0,t=0,mine=0,theirs=0,risk=0;
+  if(opp)for(const o of P){
+    if(o===p||!o.alive)continue;
+    for(let d=0;d<4;d++){
+      const x=o.x+DX[d],y=o.y+DY[d];
+      if(!free(x,y))continue;
+      if(x===sx&&y===sy){risk=1;continue;}        // der Gegner könnte dasselbe Feld nehmen
+      const i=y*W+x;if(!vis[i]){vis[i]=2;que[t++]=i;}
+    }
+  }
+  const s=sy*W+sx;vis[s]=1;que[t++]=s;
+  while(h<t){
+    const i=que[h++],o=vis[i],x=i%W,y=(i-x)/W;
+    if(o===1)mine++;else theirs++;
+    if(x>0&&!grid[i-1]&&!vis[i-1]){vis[i-1]=o;que[t++]=i-1;}
+    if(x<W-1&&!grid[i+1]&&!vis[i+1]){vis[i+1]=o;que[t++]=i+1;}
+    if(y>0&&!grid[i-W]&&!vis[i-W]){vis[i-W]=o;que[t++]=i-W;}
+    if(y<H-1&&!grid[i+W]&&!vis[i+W]){vis[i+W]=o;que[t++]=i+W;}
+  }
+  return mine-theirs*.6-risk*25;
+}
+function best(p,opts,opp){
+  let bd=opts[0],bs=-1e9;
+  for(const d of opts){
+    const sc=area(p,p.x+DX[d],p.y+DY[d],opp)+(d===p.d?.5:0);
+    if(sc>bs){bs=sc;bd=d;}
+  }
+  return bd;
+}
+function think(p){
+  const opts=[p.d,(p.d+3)%4,(p.d+1)%4].filter(d=>free(p.x+DX[d],p.y+DY[d]));
+  if(!opts.length)return;
+  let nd;
+  if(O.lvl===0){        // leicht: fährt meist geradeaus, reagiert spät und macht Fehler
+    if(opts.includes(p.d)&&Math.random()>.03){
+      nd=p.d;
+      if(!free(p.x+2*DX[p.d],p.y+2*DY[p.d])&&opts.length>1&&Math.random()<.7)nd=best(p,opts.filter(d=>d!==p.d),false);
+    }else nd=Math.random()<.2?opts[Math.floor(Math.random()*opts.length)]:best(p,opts,false);
+  }else nd=best(p,opts,O.lvl===2);     // mittel: größter freier Raum; schwer: Raum im Vergleich zu den Gegnern
+  if(nd!==p.d)p.q=[nd];
+  if(O.lvl>0&&p.boost>0&&!p.bt&&nd===p.d&&Math.random()<.012){
+    let ok=true;for(let k=1;k<=10&&ok;k++)ok=free(p.x+k*DX[p.d],p.y+k*DY[p.d]);
+    if(ok)useBoost(p);
+  }
+}
+
+// ---------- Eingabe ----------
+const human=i=>P.find(p=>!p.bot&&p.id===i);
+function steer(p,nd){          // absolute Richtung
+  if(!p||!p.alive||state!=='play'||paused)return;
+  const b=p.q.length?p.q[p.q.length-1]:p.d;
+  if(nd===b||nd===(b+2)%4||p.q.length>=2)return;
+  p.q.push(nd);beep(1200,.03,'square',.02);
+}
+function turn(p,s){            // relativ: -1 links, +1 rechts
+  if(!p)return;const b=p.q.length?p.q[p.q.length-1]:p.d;steer(p,(b+(s<0?3:1))%4);
+}
+const ARW={ArrowRight:0,ArrowDown:1,ArrowLeft:2,ArrowUp:3},WASD={KeyD:0,KeyS:1,KeyA:2,KeyW:3};
+addEventListener('keydown',e=>{
+  if(e.target&&/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName))return;
+  const c=e.code;
+  if(c==='KeyP'||c==='Escape'){togglePause();return;}
+  if(state==='menu'&&c==='Enter'){startMatch();return;}
+  if(state==='matchEnd'&&c==='Enter'){startMatch();return;}
+  if(state!=='play'&&state!=='count')return;
+  const two=O.mode==='2';
+  if(c in ARW){steer(human(two?1:0),ARW[c]);e.preventDefault();}
+  else if(c in WASD){steer(human(0),WASD[c]);e.preventDefault();}
+  else if(c==='Space'){useBoost(human(0));e.preventDefault();}
+  else if(c==='ShiftLeft'||c==='ShiftRight'){if(!two)useBoost(human(0));}
+  else if(c==='Enter'){if(two)useBoost(human(1));e.preventDefault();}
+});
+cv.addEventListener('pointerdown',e=>{
+  if(state!=='play')return;
+  const r=cv.getBoundingClientRect();turn(human(0),e.clientX-r.left<r.width/2?-1:1);e.preventDefault();
+});
+const tap=(id,fn)=>$(id).addEventListener('pointerdown',e=>{e.preventDefault();fn();});
+tap('tL',()=>turn(human(0),-1));tap('tR',()=>turn(human(0),1));tap('tB',()=>useBoost(human(0)));
+$('start').onclick=startMatch;$('again').onclick=startMatch;$('toMenu').onclick=toMenu;$('quitBtn').onclick=toMenu;$('pauseBtn').onclick=togglePause;
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play'&&!paused)togglePause();});
+$('keys').innerHTML=T('<b>Pfeiltasten</b> oder <b>WASD</b> lenken · <b>Leertaste</b> Turbo · <b>P</b> Pause · Maus/Touch: linke oder rechte Bildhälfte = links/rechts abbiegen<br>2 Spieler: <b>WASD + Leertaste</b> gegen <b>Pfeiltasten + Enter</b>',
+  '<b>Arrow keys</b> or <b>WASD</b> to steer · <b>Space</b> boost · <b>P</b> pause · mouse/touch: left or right half of the arena = turn left/right<br>2 players: <b>WASD + Space</b> versus <b>arrow keys + Enter</b>');
+
+// ---------- Bild ----------
+function draw(dt){
+  ctx.setTransform(1,0,0,1,0,0);
+  if(shake>0){shake=Math.max(0,shake-dt/350);ctx.translate((Math.random()-.5)*shake*cs*1.2,(Math.random()-.5)*shake*cs*1.2);}
+  ctx.drawImage(bgC,0,0);ctx.drawImage(trC,0,0);
+  for(const p of P){
+    if(!p.alive)continue;
+    const L=p.path.length,a=p.path[L-2]||p.path[L-1],b=p.path[L-1];
+    const f=state==='play'||state==='roundEnd'?Math.max(0,Math.min(1,(simT+acc-p.t0)/p.dur)):1;
+    const hx=a[0]+(b[0]-a[0])*f,hy=a[1]+(b[1]-a[1])*f;
+    poly(ctx,p,[a,[hx,hy]],2);
+    // Fahrzeug: heller Kopf, im Turbo größer
+    const r=cs*(p.bt>0?.62:.46);
+    ctx.shadowColor=p.col;ctx.shadowBlur=cs*(p.bt>0?2.4:1.4);ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(cx(hx),cx(hy),r,0,6.283);ctx.fill();ctx.shadowBlur=0;
+    if(state==='count'){      // Startmarkierung mit Fahrtrichtung
+      ctx.strokeStyle=p.col;ctx.lineWidth=Math.max(1,cs*.16);ctx.beginPath();ctx.arc(cx(hx),cx(hy),cs*1.6,0,6.283);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx(hx)+DX[p.d]*cs*2.2,cx(hy)+DY[p.d]*cs*2.2);ctx.lineTo(cx(hx)+DX[p.d]*cs*3.6,cx(hy)+DY[p.d]*cs*3.6);ctx.stroke();
+    }
+  }
+  if(parts.length){
+    ctx.globalCompositeOperation='lighter';
+    for(let i=parts.length-1;i>=0;i--){
+      const q=parts[i];q.l-=dt/700;if(q.l<=0){parts.splice(i,1);continue;}
+      q.x+=q.vx*dt/1000;q.y+=q.vy*dt/1000;q.vx*=.96;q.vy*=.96;
+      ctx.globalAlpha=q.l;ctx.fillStyle=q.col;ctx.fillRect(q.x-cs*.18,q.y-cs*.18,cs*.36,cs*.36);
+    }
+    ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  }
+}
+function frame(t){
+  requestAnimationFrame(frame);
+  const dt=Math.min(100,t-last);last=t;
+  if(state==='play'&&!paused){
+    acc+=dt*(P.some(p=>p.alive&&!p.bot)?1:3);       // ohne lebenden Menschen läuft der Rest der Runde im Schnelldurchlauf
+    while(acc>=sub&&state==='play'){acc-=sub;simT+=sub;subtick();}
+  }
+  draw(dt);
+}
+pickGrid();layout();hud();
+requestAnimationFrame(t=>{last=t;frame(t);});
+</script>
+</body>
+</html>
