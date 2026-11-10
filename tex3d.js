@@ -49,33 +49,43 @@
 
   // ---------- Holz ----------
   var WOODS = {
-    oak: { a: [196, 150, 96], b: [142, 98, 56], ring: [112, 74, 40], planks: 2 },
-    walnut: { a: [112, 74, 48], b: [72, 44, 28], ring: [46, 26, 16], planks: 2 },
-    dark: { a: [74, 52, 38], b: [44, 28, 20], ring: [26, 15, 10], planks: 2 }
+    oak: { a: [206, 168, 120], b: [152, 108, 66], ring: [108, 72, 42], planks: 2 },
+    walnut: { a: [128, 84, 54], b: [74, 44, 26], ring: [40, 22, 13], planks: 2 },
+    dark: { a: [86, 60, 42], b: [44, 28, 20], ring: [22, 12, 8], planks: 2 }
   };
   T3.woodKinds = Object.keys(WOODS);
   T3.wood = function (kind) {
     kind = WOODS[kind] ? kind : 'oak'; var key = 'w' + kind; if (cache[key]) return cache[key];
     var W = 1024, H = 512, P = WOODS[kind], c = canvas(W, H), x = c.getContext('2d'), im = x.createImageData(W, H), d = im.data, lum = new Float32Array(W * H);
-    var nw = mkNoise(7, 4, 6), nf = mkNoise(19, 8, 96), nr = mkNoise(31, 16, 40), nk = mkNoise(43, 5, 3), r = rng(17), plankH = H / P.planks;
-    var knots = []; for (var k = 0; k < 3; k++) knots.push({ x: r() * W, y: (k + .5) / 3 * H + (r() - .5) * 60, rx: 30 + r() * 26, ry: 12 + r() * 10 });
+    var nw = mkNoise(7, 3, 5), nw2 = mkNoise(13, 6, 14), nf = mkNoise(19, 3, 120), nf2 = mkNoise(29, 64, 40), np = mkNoise(31, 48, 100), nt = mkNoise(43, 2, 4), r = rng(17), plankH = H / P.planks;
+    var knots = []; for (var k = 0; k < 2; k++) knots.push({ x: r() * W, y: (k + .5) / 2 * H + (r() - .5) * 50, rx: 34 + r() * 20, ry: 11 + r() * 7 });
+    var sm = function (e0, e1, v) { var q = Math.max(0, Math.min(1, (v - e0) / (e1 - e0))); return q * q * (3 - 2 * q); };
+    var mix = function (a, b, q) { return a + (b - a) * q; };
     for (var j = 0; j < H; j++) {
-      var pi = Math.floor(j / plankH), jy = j - pi * plankH, po = pi * 137 + 40;       // jede Bohle hat ihren eigenen Versatz und Farbton
+      var pi = Math.floor(j / plankH), jy = j - pi * plankH, ph = jy / plankH, tone = (nt(pi * 1.7 + .3, 1) - .5) * .5;       // jede Bohle hat ihren eigenen Farbton
       for (var i = 0; i < W; i++) {
-        var u = i / W, ww = nw(u * 4 + pi * .7, (j / H) * 6) * 2.4;                    // sanftes Wellen der Jahresringe
-        var kn = 0; for (var q = 0; q < knots.length; q++) { var dx = (i - knots[q].x); if (dx > W / 2) dx -= W; if (dx < -W / 2) dx += W; var dy = j - knots[q].y, e = (dx * dx) / (knots[q].rx * knots[q].rx) + (dy * dy) / (knots[q].ry * knots[q].ry); if (e < 9) kn += Math.exp(-e * .45); }
-        var rings = (jy / plankH) * 9 + ww + kn * 1.7 + po * .01, ringV = Math.pow(.5 + .5 * Math.sin(rings * 6.283), 2.2);
-        var fine = nf(u * 8 + po, jy * .6) , pore = nr(u * 16, jy * .35);                // Poren und Streifen entlang der Faser
-        var t = Math.max(0, Math.min(1, ringV * .55 + (fine - .5) * .5 + (pore - .5) * .35 + .22 + (nk(u * 5, pi) - .5) * .3));
-        var rr = P.b[0] + (P.a[0] - P.b[0]) * t, gg = P.b[1] + (P.a[1] - P.b[1]) * t, bb = P.b[2] + (P.a[2] - P.b[2]) * t;
-        var dark = Math.min(1, kn * .5 + (pore < .3 ? (.3 - pore) * 1.2 : 0)); rr += (P.ring[0] - rr) * dark; gg += (P.ring[1] - gg) * dark; bb += (P.ring[2] - bb) * dark;
-        var seam = jy < 3 || jy > plankH - 4 ? .45 : 1; var k2 = (j * W + i) * 4; // Fuge zwischen den Bohlen
-        d[k2] = rr * seam; d[k2 + 1] = gg * seam; d[k2 + 2] = bb * seam; d[k2 + 3] = 255; lum[j * W + i] = (t - .5) * .8 - dark * .5 - (seam < 1 ? .4 : 0);
+        var u = i / W;
+        // Maserung: lange, ruhig geschwungene Linien (Wellen laufen langsam in x, schnell in y)
+        var warp = (nw(u * 3 + pi * 1.3, ph * 3) - .5) * 1.9 + (nw2(u * 6 + pi * .6, ph * 12) - .5) * .5;
+        var kn = 0, ke = 99;
+        for (var q = 0; q < knots.length; q++) { var dx = i - knots[q].x; if (dx > W / 2) dx -= W; if (dx < -W / 2) dx += W; var dy = j - knots[q].y, e = (dx * dx) / (knots[q].rx * knots[q].rx) + (dy * dy) / (knots[q].ry * knots[q].ry); if (e < 12) kn += Math.exp(-e * .35) * (dy > 0 ? 1 : -1) * 1.1; if (e < ke) ke = e; }
+        var v = ph * 5.5 + warp * 1.1 + kn, f = v - Math.floor(v);
+        var ring = Math.pow(f, 4.5);                                           // Jahresring: weich dunkler werdend, dann abrupt hell (Frühholz/Spätholz)
+        var stri = (nf(u * 3, jy * 2.4) - .5) * .15 + (nf2(u * 40, jy * .9) - .5) * .06;      // feine Streifen entlang der Faser
+        var pore = np(u * 48, jy * .55) > .86 ? .2 : 0;                           // kleine dunkle Poren
+        var tt = Math.max(0, Math.min(1, ring * .75 + stri + .12 + tone * .3));
+        var kd = ke < 1.2 ? (1.2 - ke) * .6 : 0;                                    // Ast: dunkle Mitte
+        var rr = mix(P.a[0], P.b[0], tt), gg = mix(P.a[1], P.b[1], tt), bb = mix(P.a[2], P.b[2], tt);
+        var dark = Math.min(.85, pore + kd); rr = mix(rr, P.ring[0], dark); gg = mix(gg, P.ring[1], dark); bb = mix(bb, P.ring[2], dark);
+        var edge = jy < 2 ? .35 : jy < 3 ? .6 : jy > plankH - 3 ? 1.12 : 1;       // Fuge zwischen den Bohlen mit heller Kante
+        var br = 1 + tone * .25, k2 = (j * W + i) * 4;
+        d[k2] = Math.min(255, rr * edge * br); d[k2 + 1] = Math.min(255, gg * edge * br); d[k2 + 2] = Math.min(255, bb * edge * br); d[k2 + 3] = 255;
+        lum[j * W + i] = (.5 - tt) * .9 - dark * .5 - (edge < 1 ? .5 : 0) + stri * .6;
       }
     }
     x.putImageData(im, 0, 0);
     var bc = canvas(W, H), bx = bc.getContext('2d'), bi = bx.createImageData(W, H);
-    for (var p = 0; p < W * H; p++) { var g = Math.max(0, Math.min(255, 128 + lum[p] * 240)); bi.data[p * 4] = bi.data[p * 4 + 1] = bi.data[p * 4 + 2] = g; bi.data[p * 4 + 3] = 255; }
+    for (var p = 0; p < W * H; p++) { var g = Math.max(0, Math.min(255, 128 + lum[p] * 200)); bi.data[p * 4] = bi.data[p * 4 + 1] = bi.data[p * 4 + 2] = g; bi.data[p * 4 + 3] = 255; }
     bx.putImageData(bi, 0, 0);
     return cache[key] = { map: mkTex(c), bump: mkTex(bc) };
   };
