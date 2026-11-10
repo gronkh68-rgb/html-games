@@ -18,13 +18,9 @@
   function apply(mode) {
     if (mode === true) mode = 'cyber';
     if (mode === false) mode = 'standard';
-    if (mode === 'anime') {
-      root.setAttribute('data-style', 'anime');
-      addLink('anime-fonts', 'https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
-      addLink('anime-css', base + 'anime.css?v=5');
-    } else if (mode === 'dark') {
+    if (mode === 'dark') {
       root.setAttribute('data-style', 'dark');
-      addLink('dark-css', base + 'dark.css?v=1');
+      addLink('dark-css', base + 'dark.css?v=2');
     } else if (mode === 'cyber') {
       root.setAttribute('data-style', 'cyber');
       addLink('cyber-fonts', 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@700;800&family=Share+Tech+Mono&display=swap');
@@ -37,14 +33,14 @@
     if (off) root.setAttribute('data-fx', 'off'); else root.removeAttribute('data-fx');
   }
 
-  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'anime' && window.ANIME_STYLE) return 'anime'; if (v === 'dark' && window.DARK_STYLE) return 'dark'; return 'cyber'; }
-  apply(current()); // Cyber ist die Voreinstellung; Anime gibt es nur auf Seiten mit window.ANIME_STYLE
+  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'dark' && window.DARK_STYLE) return 'dark'; return 'cyber'; }
+  apply(current()); // Cyber ist die Voreinstellung; Dunkel gibt es nur auf Seiten mit window.DARK_STYLE
   applyFx(get(FX) === 'off');
   if (get(RAIN) === 'off') root.setAttribute('data-rain', 'off');
   var repaint = null;
-  // Für das Profil: gespeicherten Stil lesen/setzen. Japan und Dunkel gibt es nur auf Seiten, die sie anbieten; sonst gilt dort Cyber.
+  // Für das Profil: gespeicherten Stil lesen/setzen. Dunkel gibt es nur auf Seiten, die es anbieten; sonst gilt dort Cyber.
   window.SITE_STYLE = {
-    raw: function () { var v = get(KEY); return v === 'standard' || v === 'anime' || v === 'dark' ? v : 'cyber'; },
+    raw: function () { var v = get(KEY); return v === 'standard' || v === 'dark' ? v : 'cyber'; },
     set: function (m) { set(KEY, m); apply(current()); if (repaint) repaint(); }
   };
 
@@ -61,31 +57,24 @@
     var b1 = document.createElement('button');
     var b2 = document.createElement('button');
     var b3 = document.createElement('button');
-    var b4 = document.createElement('button');
     var b5 = document.createElement('button');
-    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3); box.appendChild(b4); box.appendChild(b5);
+    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3); box.appendChild(b5);
     document.body.appendChild(box);
 
     function paint() {
       var st = root.getAttribute('data-style'), on = st === 'cyber';
-      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'anime' ? 'Stil: Japan' : (st === 'dark' ? 'Stil: Dunkel' : 'Stil: Standard'));
+      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'dark' ? 'Stil: Dunkel' : 'Stil: Standard');
       b1.title = 'Design umschalten (DEUKRO Cyber)';
       b2.hidden = !on;
       b2.textContent = root.getAttribute('data-fx') === 'off' ? 'Effekte: aus' : 'Effekte: an';
       b3.hidden = !(on && window.RAIN_OPTION);   // Regen gibt es nur in den 3D-Ansichten im Cyber-Stil
       b3.textContent = root.getAttribute('data-rain') === 'off' ? 'Regen: aus' : 'Regen: an';
-      b4.hidden = !window.ANIME_STYLE;
-      b4.textContent = st === 'anime' ? '🌸 Japan: an' : '🌸 Japan';
       b5.hidden = !window.DARK_STYLE;
       b5.textContent = st === 'dark' ? '🌑 Dunkel: an' : '🌑 Dunkel';
     }
     b1.onclick = function () {
       var st = root.getAttribute('data-style') || 'standard';
       var next = st === 'cyber' ? 'standard' : (st === 'standard' ? 'cyber' : 'cyber');
-      apply(next); set(KEY, next); paint();
-    };
-    b4.onclick = function () {
-      var next = root.getAttribute('data-style') === 'anime' ? 'cyber' : 'anime';
       apply(next); set(KEY, next); paint();
     };
     b5.onclick = function () {
@@ -107,7 +96,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.8.2';
+  var VERSION = '3.9.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -249,12 +238,12 @@
       var old = document.getElementById('siteOv'); if (old) old.remove();
       var ov = document.createElement('div'); ov.id = 'siteOv'; ov.setAttribute('data-noi18n', '');
       var cur = SITE.name(), st0 = window.SITE_STYLE ? SITE_STYLE.raw() : 'cyber', st = st0, dc = SITE.dice(), first = !get(PROF);
-      var STY = [['cyber', 'Cyber', 'linear-gradient(135deg,#05060b,#101a2c)', '#fcee09'], ['standard', 'Standard', 'linear-gradient(135deg,#7c5cff,#27d3c3)', '#fff'], ['dark', SITE.T('Dunkel', 'Dark'), 'linear-gradient(135deg,#1b1e27,#0b0d12)', '#cfd6e6'], ['anime', 'Japan', 'linear-gradient(135deg,#ffd9e6,#ffb3c7)', '#7a1c24']];
+      var STY = [['cyber', 'Cyber', 'linear-gradient(135deg,#05060b,#101a2c)', '#fcee09'], ['standard', 'Standard', 'linear-gradient(135deg,#7c5cff,#27d3c3)', '#fff'], ['dark', SITE.T('Dunkel', 'Dark'), 'linear-gradient(135deg,#1b1e27,#0b0d12)', '#cfd6e6']];
       ov.innerHTML = '<form class="bx prof"><div class="lg"><button type="button" data-l="de" class="alt' + (lang === 'de' ? ' on' : '') + '">🇩🇪 Deutsch</button><button type="button" data-l="en" class="alt' + (lang === 'en' ? ' on' : '') + '">🇬🇧 English</button></div>' +
         '<h2>' + (first ? SITE.T('Willkommen! Richte dein Profil ein', 'Welcome! Set up your profile') : SITE.T('Dein Profil', 'Your profile')) + '</h2><p>' + SITE.T('Name, Stil und Würfel gelten in allen Spielen. Du kannst sie jederzeit unten links über deinen Namen ändern.', 'Name, style and dice apply in all games. You can change them any time via your name at the bottom left.') + '</p>' +
         '<label class="lb">' + SITE.T('Dein Name', 'Your name') + '</label><input id="siteName" maxlength="14" autocomplete="nickname" placeholder="Name">' +
         '<label class="lb">' + SITE.T('Standard-Stil', 'Default style') + '</label><div class="tiles" id="siteSty">' + STY.map(function (s) { return '<button type="button" class="tl" data-v="' + s[0] + '"><span class="sv" style="background:' + s[2] + ';color:' + s[3] + '">Aa</span>' + s[1] + '</button>'; }).join('') + '</div>' +
-        '<small class="nt">' + SITE.T('Dunkel und Japan gibt es bisher nur in „Mensch ärgere dich nicht“; in den anderen Spielen gilt dann Cyber.', 'Dark and Japan currently exist only in “Ludo”; the other games then use Cyber.') + '</small>' +
+        '<small class="nt">' + SITE.T('Dunkel gibt es bisher auf der Startseite und in „Mensch ärgere dich nicht“; in den anderen Spielen gilt dann Cyber.', 'Dark currently exists on the start page and in “Ludo”; the other games then use Cyber.') + '</small>' +
         '<label class="lb">' + SITE.T('Würfel', 'Dice') + '</label><div class="tiles" id="siteDc">' + ['auto'].concat(Object.keys(SITE.DICE)).map(function (k) { return '<button type="button" class="tl" data-v="' + k + '">' + diePrev(k) + (k === 'auto' ? SITE.T('Passend zum Stil', 'Match the style') : SITE.T(SITE.DICE[k].n[0], SITE.DICE[k].n[1])) + '</button>'; }).join('') + '</div>' +
         '<div class="rw">' + (force && cur ? '<button type="button" class="alt" id="siteCancel">' + SITE.T('Abbrechen', 'Cancel') + '</button>' : '') + '<button type="submit">' + (first ? SITE.T('Los geht’s', 'Let’s go') : SITE.T('Speichern', 'Save')) + '</button></div></form>';
       document.body.appendChild(ov);

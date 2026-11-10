@@ -26,3 +26,12 @@ html[data-style="dark"] .cell.bc{fill:#12151c;stroke:var(--c);stroke-width:2.5}
 html[data-style="dark"] .basebox{fill-opacity:.1;stroke-opacity:.45}
 html[data-style="dark"] #board text{fill:rgba(255,255,255,.22)}
 html[data-style="dark"] .piece circle.main{stroke:#0d0f14;stroke-width:3}
+
+/* Startseite: flache dunkle Karten ohne Farbverläufe und Leuchten */
+html[data-style="dark"] body{background-image:none}
+html[data-style="dark"] header h1{background:none;-webkit-background-clip:border-box;background-clip:border-box;color:#e8ebf2;letter-spacing:0}
+html[data-style="dark"] .game{background:#141821;border:1px solid #2a2f3b;border-radius:12px}
+html[data-style="dark"] .game:hover,html[data-style="dark"] .game:focus-visible{background:#1c212c;border-color:#4c7cf0;box-shadow:none;transform:translateY(-2px)}
+html[data-style="dark"] .game .icon{background:#1c212c;border:1px solid #2a2f3b;border-radius:10px}
+html[data-style="dark"] .game .play{color:#9db8f5}
+html[data-style="dark"] .menu button{background:#141821;border:1px solid #2a2f3b;border-radius:8px;color:#e8ebf2}
