@@ -66,7 +66,52 @@ html[data-style="cyber"] .center{background:radial-gradient(circle,#1a0d2e,#0503
 .tok.hop{animation:hop .16s ease-out}
 @keyframes hop{50%{transform:translate(-50%,-80%) scale(1.15)}}
 .tok.out{display:none}
-.hs{font-size:.95em;letter-spacing:-2px}
+.fld .cb{overflow:visible;position:relative;z-index:1}
+.hs{display:flex;width:100%;height:100%;align-items:center;justify-content:center;gap:2%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.9))}
+.hs svg{width:min(40%,calc(94%/var(--n,4)));height:auto;flex:none;animation:hsin .45s cubic-bezier(.3,1.6,.5,1)}
+.hs.pal svg{width:58%}
+.fld.left .hs,.fld.right .hs{flex-direction:column}
+.fld.left .hs svg,.fld.right .hs svg{width:auto;height:min(40%,calc(94%/var(--n,4)))}
+.fld.left .hs.pal svg,.fld.right .hs.pal svg{height:auto;width:118%}
+.fld.built{box-shadow:inset 0 0 0 2px rgba(60,255,140,.55)}.fld.built.palace{box-shadow:inset 0 0 0 2px rgba(255,200,87,.8)}
+@keyframes hsin{from{transform:translateY(-140%) scale(1.6);opacity:0}to{transform:none;opacity:1}}
+/* Besitzkarte */
+.deed{width:min(250px,100%);margin:0 auto 10px;background:#fff8ea;color:#2a0d08;border-radius:10px;border:2px solid #2a0d08;box-shadow:0 6px 18px rgba(0,0,0,.5);overflow:hidden;font-size:.86rem;text-align:left}
+.deed .dh{padding:10px 8px;text-align:center;font-weight:900;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7);border-bottom:2px solid #2a0d08;line-height:1.15}
+.deed .dh small{display:block;font-weight:700;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;opacity:.9}
+.deed .dh .ic{font-size:1.7rem;display:block;line-height:1.1}
+.deed table{width:100%;border-collapse:collapse}.deed td{padding:2px 10px}.deed td:last-child{text-align:right;font-weight:800;white-space:nowrap}
+.deed tr.hi td{background:rgba(255,190,60,.45)}
+.deed .df{border-top:1px solid rgba(42,13,8,.3);margin-top:4px;padding:5px 10px;display:flex;justify-content:space-between;font-size:.78rem}
+.deed .dm{background:#7a1010;color:#fff;text-align:center;font-weight:900;letter-spacing:.1em;padding:3px}
+.deed svg{width:1.05em;height:1.05em;vertical-align:-.15em}
+.minis{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.mini{width:19px;height:26px;border-radius:3px;background:#fff8ea;border:1px solid #1a0508;position:relative;cursor:pointer;overflow:hidden;font-size:11px;line-height:1;display:grid;place-items:end center;color:#1a0508;font-weight:900;padding-bottom:1px}
+.mini::before{content:'';position:absolute;left:0;right:0;top:0;height:9px;background:var(--g);border-bottom:1px solid #1a0508}
+.mini.sp{place-items:center;font-size:12px;padding:0}.mini.sp::before{display:none}
+.mini.m{filter:grayscale(1) brightness(.6)}
+.mini:hover{outline:2px solid #ffd23f}
+.mini .pl{color:#b8860b}
+/* Aktionskarten: zwei Stapel auf dem Brett, gezogene Karte fliegt in die Mitte und dreht sich um */
+.center{position:relative}
+.deck{position:absolute;width:15%;aspect-ratio:5/7;border-radius:7px;border:2px solid #14070a;display:grid;place-items:center;text-align:center;font-weight:900;font-size:clamp(.45rem,.95vw,.8rem);line-height:1.1;color:#ffe9c9;cursor:default;
+  box-shadow:2px 2px 0 #f3e3c4,3px 3px 0 #14070a,5px 5px 0 #f3e3c4,6px 6px 0 #14070a,9px 10px 14px rgba(0,0,0,.55)}
+.deck .ic{font-size:2.1em;display:block}
+.deck.fate{left:7%;top:7%;transform:rotate(-14deg);background:repeating-linear-gradient(45deg,#3b1466,#3b1466 6px,#4a1c80 6px,#4a1c80 12px)}
+.deck.pact{right:8%;bottom:8%;transform:rotate(-14deg);background:repeating-linear-gradient(45deg,#7a0d16,#7a0d16 6px,#96131f 6px,#96131f 12px)}
+.deck.act{animation:deckp .5s ease-out}
+@keyframes deckp{40%{filter:brightness(1.8);box-shadow:0 0 26px #ffd23f}}
+#acard{position:absolute;left:50%;top:50%;width:min(44%,270px);aspect-ratio:5/7;margin:0;transform-style:preserve-3d;z-index:6;pointer-events:none;display:none}
+#acard .af,#acard .ab{position:absolute;inset:0;border-radius:12px;border:3px solid #14070a;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 14px 34px rgba(0,0,0,.65)}
+#acard .ab{display:grid;place-items:center;font-size:3rem}
+#acard.fate .ab{background:repeating-linear-gradient(45deg,#3b1466,#3b1466 8px,#4a1c80 8px,#4a1c80 16px)}
+#acard.pact .ab{background:repeating-linear-gradient(45deg,#7a0d16,#7a0d16 8px,#96131f 8px,#96131f 16px)}
+#acard .af{transform:rotateY(180deg);background:#fff4e0;color:#3a1406;display:flex;flex-direction:column;overflow:hidden;text-align:center}
+#acard .af .ah{padding:7px 6px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#fff;font-size:clamp(.6rem,1.1vw,.85rem)}
+#acard.fate .af .ah{background:#4a1c80}#acard.pact .af .ah{background:#96131f}
+#acard .af .ai{font-size:clamp(1.6rem,4vw,3rem);line-height:1.2;margin-top:6%}
+#acard .af .at{flex:1;display:flex;align-items:center;justify-content:center;padding:4px 10px 10px;font-weight:700;font-size:clamp(.62rem,1.25vw,.98rem);line-height:1.25}
+#acard .af .aw{font-size:.7em;padding:0 6px 6px;opacity:.75;font-weight:700}
 .plist{display:flex;flex-direction:column;gap:6px}
 .pr2{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:2px solid transparent;background:rgba(255,255,255,.04)}
 .pr2.turn{border-color:#ffd23f;background:rgba(255,210,63,.1)}
@@ -165,10 +210,59 @@ function view(g,s){
 let V=null,inp=null,hintTxt='',lastDice=0,lastCard=0,shownPos=null,animT=0;
 const nameOf=i=>i===V.me?T('Du','You'):esc(V.names[i]);
 const DF=['','⚀','⚁','⚂','⚃','⚄','⚅'];
+const HSVG='<svg viewBox="0 0 20 20"><path d="M3 9.5h14V18H3z" fill="#2fe07a" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M1.2 10 10 2l8.8 8z" fill="#0f9a4b" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+const PSVG='<svg viewBox="0 0 34 22"><path d="M3 10h28v11H3z" fill="#e0182a" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 10V3l4 3 4-4 3 4 3-5 3 5 3-4 4 4 4-3v7z" fill="#ffc857" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="14" y="14" width="6" height="7" fill="#5a0a12"/></svg>';
+const housesHtml=h=>h===5?'<span class="hs pal">'+PSVG+'</span>':h?'<span class="hs" style="--n:'+h+'">'+HSVG.repeat(h)+'</span>':'';
+// Besitzkarte (wie die Karten im Brettspiel); v = aktueller Stand für Markierungen, lang für Dialoge vom Host
+function deedHtml(fi,lang,v){
+  const f=F[fi],l=lang||SITE.lang,t=(d,e)=>l==='en'?e:d,nm=esc(f.n[l]||f.n.de),h=v?v.houses[fi]:-1,o=v?v.own[fi]:-1;
+  if(!f.price)return '';
+  let s='<div class="deed">';
+  if(f.t==='st'){
+    const full=o>=0&&v&&F.every(x=>x.t!=='st'||x.g!==f.g||v.own[x.i]===o);
+    const row=(k,lab,val)=>`<tr${h===k||(k===-1&&h===0&&full)||(k===-2&&h===0&&!full&&o>=0)?' class="hi"':''}><td>${lab}</td><td>${val} 💀</td></tr>`;
+    s+=`<div class="dh" style="background:${GROUPS[f.g].c}"><small>${esc(GROUPS[f.g].n[l]||'')}</small>${nm}</div><table>`
+      +row(-2,t('Miete','Rent'),f.rent[0])+row(-1,t('mit ganzer Farbgruppe','with full colour set'),f.rent[0]*2)
+      +[1,2,3,4].map(k=>row(k,HSVG.repeat(k),f.rent[k])).join('')+row(5,PSVG+' '+t('Palast','Palace'),f.rent[5])
+      +`</table><div class="df"><span>${t('Haus','House')}: <b>${f.hc}</b></span><span>${t('Hypothek','Mortgage')}: <b>${f.price/2}</b></span><span>${t('Preis','Price')}: <b>${f.price}</b></span></div>`;
+  }else{
+    s+=`<div class="dh" style="background:${f.t==='ferry'?'#1b1b22':'#4a4f5a'}"><span class="ic">${f.ico}</span>${nm}</div><table>`
+      +(f.t==='ferry'?[1,2,3,4].map(k=>`<tr><td>${k} ${t(k>1?'Portale/Fähren':'Portal/Fähre',k>1?'portals/rides':'portal/ride')}</td><td>${25*Math.pow(2,k-1)} 💀</td></tr>`).join('')
+        :`<tr><td>${t('1 Werk','1 works')}</td><td>4 × 🎲</td></tr><tr><td>${t('2 Werke','2 works')}</td><td>10 × 🎲</td></tr>`)
+      +`</table><div class="df"><span>${t('Hypothek','Mortgage')}: <b>${f.price/2}</b></span><span>${t('Preis','Price')}: <b>${f.price}</b></span></div>`;
+  }
+  if(v&&v.mort[fi])s+=`<div class="dm">${t('HYPOTHEK','MORTGAGED')}</div>`;
+  return s+'</div>';
+}
+window.HTdeed=deedHtml;
+function minisHtml(p){
+  return F.filter(f=>V.own[f.i]===p).map(f=>{const h=V.houses[f.i];
+    return f.t==='st'?`<span class="mini${V.mort[f.i]?' m':''}" data-mf="${f.i}" style="--g:${GROUPS[f.g].c}" title="${esc(tx(f.n))}">${h===5?'<span class="pl">♛</span>':h||''}</span>`
+      :`<span class="mini sp${V.mort[f.i]?' m':''}" data-mf="${f.i}" title="${esc(tx(f.n))}">${f.ico}</span>`;}).join('');
+}
+// ---------- Aktionskarten (2D) ----------
+let acT=0,acAnim=null;
+function deckPos(kind){const d=document.querySelector('.deck.'+kind),c=$('center');if(!d||!c)return {x:0,y:0};const a=d.getBoundingClientRect(),b=c.getBoundingClientRect();return {x:a.left+a.width/2-(b.left+b.width/2),y:a.top+a.height/2-(b.top+b.height/2)};}
+function showCard2D(card){
+  const el=$('acard');if(!el)return;
+  const cd=(card.kind==='fate'?HT.FATE:HT.PACT)[card.idx],dk=document.querySelector('.deck.'+card.kind);
+  clearTimeout(acT);if(acAnim)acAnim.cancel();
+  el.className=card.kind;
+  el.innerHTML=`<div class="ab">${card.kind==='fate'?'📖':'📋'}</div><div class="af"><div class="ah">${esc(tx(HT.DECKN[card.kind]))}</div><div class="ai">${card.kind==='fate'?'📖':'📋'}</div><div class="at">${esc(tx(cd.d))}</div><div class="aw">${V&&card.p!=null?nameOf(card.p):''}</div></div>`;
+  el.style.display='block';
+  if(dk){dk.classList.remove('act');void dk.offsetWidth;dk.classList.add('act');}
+  const p=deckPos(card.kind),P='perspective(900px) translate(-50%,-50%) ';
+  const from=P+`translate(${p.x}px,${p.y}px) rotate(-14deg) scale(.34) rotateY(0deg)`,to=P+'translate(0,0) rotate(0deg) scale(1) rotateY(180deg)';
+  el.style.transform=to;
+  if(el.animate){
+    acAnim=el.animate([{transform:from},{transform:P+`translate(${p.x*.5}px,${p.y*.5-30}px) rotate(-6deg) scale(.8) rotateY(90deg)`,offset:.55},{transform:to}],{duration:900,easing:'cubic-bezier(.3,.7,.3,1)'});
+    acT=setTimeout(()=>{acAnim=el.animate([{transform:to,opacity:1},{transform:from,opacity:.2}],{duration:550,easing:'ease-in'});acAnim.onfinish=()=>{el.style.display='none';};},5200);
+  }else acT=setTimeout(()=>{el.style.display='none';},5200);
+}
 function fieldHtml(i){
   const f=F[i],o=V.own[i],h=V.houses[i];
   let s='';
-  if(f.t==='st')s+=`<div class="cb" style="background:${GROUPS[f.g].c}">${h===5?'<span class="hs">🏰</span>':h?'<span class="hs">'+'🏠'.repeat(h)+'</span>':''}</div><div class="nm">${esc(tx(f.n))}</div><div class="pr">${o>=0?'':f.price}</div>`;
+  if(f.t==='st')s+=`<div class="cb" style="background:${GROUPS[f.g].c}">${housesHtml(h)}</div><div class="nm">${esc(tx(f.n))}</div><div class="pr">${o>=0?'':f.price}</div>`;
   else if(f.t==='go'||f.t==='jail'||f.t==='free'||f.t==='gojail')s+=`<div class="ic">${f.ico}</div><div class="nm">${esc(tx(f.n))}</div>`;
   else s+=`<div class="nm"><span class="ic">${f.ico}</span>${esc(tx(f.n))}</div>${f.price?`<div class="pr">${o>=0?'':f.price}</div>`:f.amt?`<div class="pr">−${f.amt}</div>`:''}`;
   if(o>=0)s+=`<div class="own" style="background:${COLORS[o]}"></div>`;
@@ -176,21 +270,24 @@ function fieldHtml(i){
 }
 function render(v,prev){
   V=v;$('setup').hidden=true;$('game').hidden=false;
-  document.querySelectorAll('.fld').forEach(e=>{const i=+e.dataset.f;const k=V.own[i]+'|'+V.houses[i]+'|'+V.mort[i];if(e._k!==k||!e._l||e._l!==SITE.lang){e.innerHTML=fieldHtml(i);e._k=k;e._l=SITE.lang;}e.classList.toggle('mort',!!V.mort[i]);e.classList.toggle('corner',i%10===0);});
+  document.querySelectorAll('.fld').forEach(e=>{const i=+e.dataset.f;const k=V.own[i]+'|'+V.houses[i]+'|'+V.mort[i];if(e._k!==k||!e._l||e._l!==SITE.lang){e.innerHTML=fieldHtml(i);e._k=k;e._l=SITE.lang;}e.classList.toggle('mort',!!V.mort[i]);e.classList.toggle('built',V.houses[i]>0);e.classList.toggle('palace',V.houses[i]===5);e.classList.toggle('corner',i%10===0);});
   // Mitte: Würfel, Karte, Topf
   let c='';
   if(V.dice){const fresh=V.dice.seq!==lastDice;c+=`<div class="dice"><span class="${fresh?'spin':''}">${DF[V.dice.a]}</span><span class="${fresh?'spin':''}">${DF[V.dice.b]}</span></div><div style="font-size:.85rem">${nameOf(V.dice.p)}: ${V.dice.a+V.dice.b}${V.dice.a===V.dice.b?' · '+T('Pasch!','Doubles!'):''}</div>`;if(fresh){lastDice=V.dice.seq;}}
-  if(V.card&&Date.now()-(V.card._t||0)<1e9){const cd=(V.card.kind==='fate'?HT.FATE:HT.PACT)[V.card.idx];c+=`<div class="cardv" ${V.card.seq!==lastCard?'':'style="animation:none"'}><b>${V.card.kind==='fate'?'📖 '+tx(HT.DECKN.fate):'📋 '+tx(HT.DECKN.pact)}</b>${esc(tx(cd.d))}</div>`;lastCard=V.card.seq;}
+  if(V.card&&V.card.seq!==lastCard){        // neu gezogene Karte: vom Stapel in die Mitte (nicht beim ersten Bild nach Laden/Umschalten)
+    if(prev&&lastCard!==-1){if(use3d&&window.HT3D&&HT3D.ready)HT3D.card(V.card,(V.card.kind==='fate'?HT.FATE:HT.PACT)[V.card.idx],nameOf(V.card.p).replace(/&[a-z#0-9]+;/g,''));else showCard2D(V.card);}
+    lastCard=V.card.seq;
+  }else if(!V.card)lastCard=0;
   if(V.auc){c+=`<div class="cardv" style="border-color:#ffd23f">🔨 ${T('Versteigerung','Auction')}: <b style="display:inline;color:inherit">${esc(tx(F[V.auc.f].n))}</b><br>${T('Höchstgebot','Highest bid')}: ${V.auc.bid}${V.auc.lead>=0?' ('+nameOf(V.auc.lead)+')':''}</div>`;}
   if(V.opts.pot)c+=`<div class="pot">🐷 ${T('Spardose','Piggy bank')}: ${V.pot} 💀</div>`;
   if(V.opts.rounds)c+=`<div class="pot">${T('Runde','Round')} ${Math.min(V.round+1,V.opts.rounds)} / ${V.opts.rounds}</div>`;
-  if(!$('cdyn')){$('center').classList.add('hb');$('center').innerHTML=`<img class="logoimg" src="img/logo.svg" alt="Helluva Boss"><div class="tyc">TYCOON</div><div id="cdyn" style="display:flex;flex-direction:column;align-items:center;gap:6px"></div><div class="cr">${T('Inoffizielles Fan-Spiel, nicht kommerziell. Helluva Boss © Vivienne Medrano / SpindleHorse Toons','Unofficial non-commercial fan game. Helluva Boss © Vivienne Medrano / SpindleHorse Toons')}</div>`;}
+  if(!$('cdyn')){$('center').classList.add('hb');$('center').innerHTML=`<img class="logoimg" src="img/logo.svg" alt="Helluva Boss"><div class="tyc">TYCOON</div><div id="cdyn" style="display:flex;flex-direction:column;align-items:center;gap:6px"></div><div class="deck fate"><span><span class="ic">📖</span>${esc(tx(HT.DECKN.fate))}</span></div><div class="deck pact"><span><span class="ic">📋</span>${esc(tx(HT.DECKN.pact))}</span></div><div id="acard"></div><div class="cr">${T('Inoffizielles Fan-Spiel, nicht kommerziell. Helluva Boss © Vivienne Medrano / SpindleHorse Toons','Unofficial non-commercial fan game. Helluva Boss © Vivienne Medrano / SpindleHorse Toons')}</div>`;}
   $('cdyn').innerHTML=c;
   $('c3d').innerHTML=c;
   renderTokens(prev);
   if(use3d&&window.HT3D&&HT3D.ready)HT3D.update(V,inp);
   // Spieler
-  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk" style="background:${COLORS[i]};color:#16080c;border-radius:50%;width:28px;height:28px;display:inline-grid;place-items:center;font-weight:900;font-size:1rem">${CHARS[i].charAt(0)}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b>${V.types[i]!=='cpu'?' <small style="display:inline">('+CHARS[i]+')</small>':''}<small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Knast','in jail'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small></div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
+  $('plist').innerHTML=V.names.map((n,i)=>{const props=V.own.filter(o=>o===i).length;return `<div class="pr2${V.cur===i&&!V.over?' turn':''}${V.out[i]?' out':''}"><span class="tk" style="background:${COLORS[i]};color:#16080c;border-radius:50%;width:28px;height:28px;display:inline-grid;place-items:center;font-weight:900;font-size:1rem">${CHARS[i].charAt(0)}</span><div><b style="color:${COLORS[i]}">${nameOf(i)}${V.types[i]==='cpu'?' 🤖':''}</b>${V.types[i]!=='cpu'?' <small style="display:inline">('+CHARS[i]+')</small>':''}<small>${props} ${T('Felder','fields')}${V.jail[i]>=0?' · ⛓️ '+T('im Knast','in jail'):''}${V.free[i]?' · 🎫'+V.free[i]:''} · ${T('Vermögen','worth')} ${V.worth[i]}</small>${V.out[i]?'':'<div class="minis">'+minisHtml(i)+'</div>'}</div><span class="cash">${V.cash[i]} 💀</span></div>`;}).join('');
   renderActs();
   // Banner
   const b=$('hkBanner'),my=V.cur===V.me&&!V.over;
@@ -286,13 +383,13 @@ function showField(fi){
   if(!V)return;const f=F[fi],o=V.own[f.i];
   let h=`<h2>${f.t==='st'?'<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:'+GROUPS[f.g].c+'"></span> ':f.ico+' '}${esc(tx(f.n))}</h2>`;
   if(f.price){h+=`<p>${T('Preis','Price')}: <b>${f.price} 💀</b> · ${T('Besitzer','Owner')}: <b>${o>=0?TOKENS[o]+' '+nameOf(o):T('niemand','nobody')}</b>${V.mort[f.i]?' · '+T('Hypothek','mortgaged'):''}</p>`;
-    if(f.t==='st')h+=`<table class="rt"><tr><td>${T('Grundmiete','Base rent')}</td><td>${f.rent[0]}</td></tr><tr><td>${T('mit ganzer Farbgruppe','with full colour set')}</td><td>${f.rent[0]*2}</td></tr>${[1,2,3,4].map(k=>`<tr><td>${'🏠'.repeat(k)}</td><td>${f.rent[k]}</td></tr>`).join('')}<tr><td>🏰 ${T('Palast','Palace')}</td><td>${f.rent[5]}</td></tr><tr><td>${T('Hauspreis','House price')}</td><td>${f.hc}</td></tr><tr><td>${T('Hypothek','Mortgage')}</td><td>${f.price/2}</td></tr></table>`;
-    else h+=`<p>${tx(L2(HTE.rentInfo(f,'de'),HTE.rentInfo(f,'en')))}</p>`;}
+    h+=deedHtml(f.i,null,V);}
   else h+=`<p>${f.t==='tax'?T('Zahle ','Pay ')+f.amt+' 💀':f.t==='fate'||f.t==='pact'?T('Ziehe eine Karte.','Draw a card.'):f.t==='go'?T('Wer hier vorbeikommt, kassiert 200.','Passing here pays 200.'):f.t==='gojail'?T('Ab in den Knast!','Off to jail!'):f.t==='jail'?T('Nur zu Besuch, wenn du nicht eingesperrt bist.','Just visiting unless you are locked up.'):V.opts.pot?T('Hier gibt es Loonas Spardose.','Loona’s piggy bank is paid out here.'):T('Hier passiert nichts.','Nothing happens here.')}</p>`;
   h+=`<div class="row"><button class="btn alt" onclick="document.getElementById('fi').hidden=true">${T('Schließen','Close')}</button></div>`;
   $('fiB').innerHTML=h;$('fi').hidden=false;
 }
 $('board').addEventListener('click',e=>{const el=e.target.closest('.fld');if(el)showField(+el.dataset.f);});
+$('plist').addEventListener('click',e=>{const el=e.target.closest('[data-mf]');if(el)showField(+el.dataset.mf);});
 $('fi').addEventListener('click',e=>{if(e.target.id==='fi')$('fi').hidden=true;});
 // ---------- Eingabe ----------
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,phase:spec.phase,opts:spec.opts,need:spec.need};hintTxt='';K.apply();}else res(null);});}

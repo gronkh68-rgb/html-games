@@ -164,6 +164,7 @@
       var mort = new THREE.Mesh(new THREE.PlaneGeometry(p.w - .1, p.d - .1), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .66 })); mort.rotation.x = -Math.PI / 2; mort.position.y = TOP + .01; mort.visible = false; g.add(mort); mortM.push(mort);
       var hg = new THREE.Group(); hg.position.set(0, TOP, -p.d / 2 + .5); g.add(hg); houseG.push(hg);
     }
+    buildDecks();
     // aktives Feld
     ringMesh = new THREE.Mesh(new THREE.RingGeometry(.5, .62, 32), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: .9, side: THREE.DoubleSide })); ringMesh.rotation.x = -Math.PI / 2; ringMesh.visible = false; scene.add(ringMesh);
     // Glut aus dem Boden
@@ -177,7 +178,8 @@
       if (!down) return; var mv = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t; down = null;
       if (mv > 8 || dt > 600) return;
       var b = r.domElement.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); ray.setFromCamera(mouse, camera);
-      var h = ray.intersectObjects(fieldTop, false)[0]; if (h && api.onField) api.onField(h.object.userData.field);
+      var dl = []; Object.keys(deedG).forEach(function (k) { dl = dl.concat(deedG[k].children); });
+      var h = ray.intersectObjects(fieldTop.concat(dl), false)[0]; if (h && api.onField) api.onField(h.object.userData.field);
     });
     addEventListener('resize', function () { if (active) H.resize(); });
     if (window.ResizeObserver) new ResizeObserver(function () { if (active) H.resize(); }).observe(host);
@@ -225,18 +227,137 @@
   }
 
   // ---------- Häuser ----------
-  function buildHouses(i, n) {
+  var HM = null;
+  function houseMats() {
+    return HM || (HM = {
+      body: new THREE.MeshStandardMaterial({ color: 0x35e07a, roughness: .4, emissive: 0x18a04e, emissiveIntensity: .85 }),
+      roof: new THREE.MeshStandardMaterial({ color: 0x0c7a3a, roughness: .5, emissive: 0x06431f, emissiveIntensity: .6 }),
+      pal: new THREE.MeshStandardMaterial({ color: 0xff2a3c, roughness: .35, emissive: 0xb00f1c, emissiveIntensity: .8 }),
+      gold: new THREE.MeshStandardMaterial({ color: 0xffc857, roughness: .3, metalness: .6, emissive: 0x8a5a00, emissiveIntensity: .7 }),
+      base: new THREE.MeshStandardMaterial({ color: 0xfff2d8, roughness: .6, emissive: 0x4a4030 }),
+      edge: new THREE.LineBasicMaterial({ color: 0xffffff })
+    });
+  }
+  function outlined(geo, mat) { var m = new THREE.Mesh(geo, mat); m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), houseMats().edge)); return m; }
+  function buildHouses(i, n, anim) {
     var g = houseG[i]; while (g.children.length) g.remove(g.children[0]);
     if (!n) return;
-    var p = fpos(i), gm = new THREE.MeshStandardMaterial({ color: 0x2fbf6a, roughness: .5 }), rm = new THREE.MeshStandardMaterial({ color: 0xc1121f, roughness: .5 }), gold = new THREE.MeshStandardMaterial({ color: 0xffc857, roughness: .3, metalness: .6, emissive: 0x442200 });
-    if (n === 5) {
-      var b = new THREE.Mesh(new THREE.BoxGeometry(.9, .45, .4), gold); b.position.y = .22; g.add(b);
-      [-.3, 0, .3].forEach(function (x) { var t = new THREE.Mesh(new THREE.ConeGeometry(.14, .4, 6), gold); t.position.set(x, .65, 0); g.add(t); });
+    var M = houseMats(), p = fpos(i);
+    // heller Sockel im Farbband, damit sich die Gebäude vom dunklen Brett abheben
+    var base = new THREE.Mesh(new THREE.BoxGeometry(p.w - .14, .05, .62), M.base); base.position.y = .025; g.add(base);
+    if (n === 5) {      // Palast: roter Bau mit goldenen Türmen
+      var b = outlined(new THREE.BoxGeometry(1.05, .55, .5), M.pal); b.position.y = .32; g.add(b);
+      [-.42, 0, .42].forEach(function (x, k) {
+        var tw2 = outlined(new THREE.BoxGeometry(.2, k === 1 ? .5 : .32, .2), M.gold); tw2.position.set(x, .6 + (k === 1 ? .25 : .16), 0); g.add(tw2);
+        var c = new THREE.Mesh(new THREE.ConeGeometry(.19, .32, 4), M.pal); c.rotation.y = Math.PI / 4; c.position.set(x, .6 + (k === 1 ? .66 : .48), 0); g.add(c);
+      });
     } else {
-      var xs = [-.54, -.18, .18, .54];
-      for (var k = 0; k < n; k++) { var h = new THREE.Mesh(new THREE.BoxGeometry(.28, .22, .28), gm); h.position.set(xs[k], .11, 0); g.add(h); var ro = new THREE.Mesh(new THREE.ConeGeometry(.24, .2, 4), rm); ro.rotation.y = Math.PI / 4; ro.position.set(xs[k], .32, 0); g.add(ro); }
+      var xs = [-.51, -.17, .17, .51];
+      for (var k = 0; k < n; k++) {
+        var h = outlined(new THREE.BoxGeometry(.29, .32, .36), M.body); h.position.set(xs[k], .21, 0); g.add(h);
+        var ro = new THREE.Mesh(new THREE.ConeGeometry(.28, .26, 4), M.roof); ro.rotation.y = Math.PI / 4; ro.scale.z = 1.2; ro.position.set(xs[k], .5, 0); g.add(ro);
+      }
     }
+    if (anim) { g.scale.setScalar(.01); tween(520, function (q) { var e = q < .7 ? q / .7 * 1.25 : 1.25 - (q - .7) / .3 * .25; g.scale.setScalar(Math.max(.01, e)); g.position.y = TOP + (1 - q) * 1.2; }, 'house' + i); }
+    else { g.scale.setScalar(1); g.position.y = TOP; }
   }
+
+  // ---------- Besitzkarten auf dem Tisch (neben dem Würfelfeld jedes Spielers) ----------
+  var deedG = {}, deedTexC = {};
+  function deedTexture(i, mort) {
+    var key = i + (mort ? 'm' : ''); if (deedTexC[key]) return deedTexC[key];
+    var f = api.F[i], w = 256, h = 348, c = canvas(w, h), x = c.getContext('2d');
+    x.fillStyle = '#fff8ea'; x.fillRect(0, 0, w, h);
+    var st = f.t === 'st', bh = 112; x.fillStyle = st ? api.GROUPS[f.g].c : f.t === 'ferry' ? '#1b1b22' : '#4a4f5a'; x.fillRect(0, 0, w, bh);
+    x.textAlign = 'center';
+    if (!st) glyph(x, f.t, w / 2, 34, 22);
+    x.shadowColor = 'rgba(0,0,0,.8)'; x.shadowBlur = 5;
+    drawFit(x, tr(f.n), w / 2, st ? 8 : 56, w * .9, st ? bh - 16 : bh - 60, 34, 15, 900, '#ffffff'); x.shadowBlur = 0;
+    x.fillStyle = '#2a0d08'; x.fillRect(0, bh, w, 5);
+    x.font = '700 24px system-ui,sans-serif'; x.textAlign = 'left';
+    var rows = st ? [['Miete', f.rent[0]], ['1 Haus', f.rent[1]], ['2', f.rent[2]], ['3', f.rent[3]], ['4', f.rent[4]], ['Palast', f.rent[5]]] : f.t === 'ferry' ? [['1', 25], ['2', 50], ['3', 100], ['4', 200]] : [['1', '4 x W'], ['2', '10 x W']];
+    rows.forEach(function (rw, k) { var y = bh + 40 + k * 32; x.textAlign = 'left'; x.fillText(rw[0], 18, y); x.textAlign = 'right'; x.fillText(String(rw[1]), w - 18, y); });
+    x.textAlign = 'center'; x.font = '900 26px system-ui,sans-serif'; x.fillStyle = '#7a1010'; x.fillText(String(f.price), w / 2, h - 14);
+    if (mort) { x.fillStyle = 'rgba(0,0,0,.62)'; x.fillRect(0, 0, w, h); x.fillStyle = '#ff8a8a'; x.font = '900 46px system-ui,sans-serif'; x.fillText('HYP', w / 2, h / 2 + 16); }
+    x.strokeStyle = '#2a0d08'; x.lineWidth = 8; x.strokeRect(4, 4, w - 8, h - 8);
+    return (deedTexC[key] = tex(c));
+  }
+  var DW = 1.3, DH = 1.77, deedGeo = null;
+  function deedOrigin(p) { var s = SPOTS[p % 6]; return p % 6 < 4 ? { x: s[0] + (s[0] > 0 ? 1 : -1) * 4.1, z: s[1], dir: s[0] > 0 ? 1 : -1 } : { x: 4.0, z: s[1], dir: 1 }; }
+  function buildDeeds(p, V) {
+    var g = deedG[p]; if (!g) { g = deedG[p] = new THREE.Group(); scene.add(g); }
+    var list = []; for (var i = 0; i < 40; i++) if (V.own[i] === p) list.push(i);
+    var key = list.map(function (i) { return i + (V.mort[i] ? 'm' : ''); }).join(',') + (V.out[p] ? 'x' : '') + '|' + V.me + '|' + V.n;
+    if (g._k === key) return; var old = g._ids || {}; g._k = key; g._ids = {};
+    while (g.children.length) g.remove(g.children[0]);
+    if (V.out[p]) return;
+    deedGeo = deedGeo || new THREE.PlaneGeometry(DW, DH);
+    // Eigene Karten liegen vorn vor dem Brett (im Standardbild sichtbar), die der anderen neben ihrem Würfelfeld
+    var mine = p === V.me, slots = [], o = deedOrigin(p), k2;
+    if (mine) { var xs = []; for (k2 = 0; k2 < 13; k2++) { var xx = -8.28 + k2 * 1.38; if (V.n < 5 || Math.abs(xx) > 3.5) xs.push(xx); } for (k2 = 0; k2 < 40; k2++) slots.push([xs[k2 % xs.length], 10.6 + Math.floor(k2 / xs.length) * .66, Math.floor(k2 / xs.length)]); }
+    else { var rowsN = Math.ceil(list.length / 4), z0 = o.z - ((rowsN - 1) * .66 + DH) / 2 + DH / 2; for (k2 = 0; k2 < 40; k2++) slots.push([o.x + o.dir * (k2 % 4) * (DW + .08), z0 + Math.floor(k2 / 4) * .66, Math.floor(k2 / 4)]); }
+    list.forEach(function (fi, k) {      // Reihen überlappen: von jeder Karte bleibt der Kopf mit Farbe und Name sichtbar
+      var s = slots[k], m = new THREE.Mesh(deedGeo, new THREE.MeshBasicMaterial({ map: deedTexture(fi, !!V.mort[fi]) }));
+      m.rotation.x = -Math.PI / 2; m.position.set(s[0], -.08 + s[2] * .012, s[1]); m.userData.field = fi; g.add(m); g._ids[fi] = 1;
+      if (!old[fi] && g._init) { var y1 = m.position.y; tween(600, function (q) { var e = 1 - Math.pow(1 - q, 3); m.position.y = y1 + (1 - e) * 5; m.rotation.z = (1 - e) * 2.2; }, 'deed' + fi); }
+    });
+    g._init = true;
+  }
+
+  // ---------- Aktionskarten: zwei Stapel auf dem Brett, gezogene Karte fliegt zur Kamera und dreht sich um ----------
+  var decks = {}, flyCard = null, cardTok = 0, DECKC = { fate: ['#3b1466', '#4a1c80'], pact: ['#7a0d16', '#96131f'] }, CW3 = 2.0, CH3 = 2.8;
+  function backTexture(kind) {
+    var w = 256, h = 358, c = canvas(w, h), x = c.getContext('2d'), cs = DECKC[kind];
+    x.fillStyle = cs[0]; x.fillRect(0, 0, w, h); x.strokeStyle = cs[1]; x.lineWidth = 10;
+    for (var k = -h; k < w + h; k += 28) { x.beginPath(); x.moveTo(k, 0); x.lineTo(k + h, h); x.stroke(); }
+    x.strokeStyle = '#f3e3c4'; x.lineWidth = 6; x.strokeRect(12, 12, w - 24, h - 24);
+    glyph(x, kind, w / 2, h * .4, 44);
+    x.textAlign = 'center'; drawFit(x, tr(HT.DECKN[kind]), w / 2, h * .62, w * .8, 70, 30, 14, 900, '#ffe9c9');
+    return tex(c);
+  }
+  function faceTexture(kind, cd, who) {
+    var w = 512, h = 716, c = canvas(w, h), x = c.getContext('2d'), cs = DECKC[kind];
+    x.fillStyle = '#fff4e0'; x.fillRect(0, 0, w, h);
+    x.fillStyle = cs[1]; x.fillRect(0, 0, w, 96); x.textAlign = 'center';
+    drawFit(x, tr(HT.DECKN[kind]).toUpperCase(), w / 2, 14, w * .86, 68, 46, 20, 900, '#ffffff');
+    x.save(); x.translate(w / 2, 190); x.strokeStyle = cs[0]; x.fillStyle = cs[0]; x.restore();
+    var gx = canvas(160, 160), g2 = gx.getContext('2d'); glyph(g2, kind, 80, 80, 54); x.globalCompositeOperation = 'source-over';
+    x.fillStyle = cs[0]; x.beginPath(); x.arc(w / 2, 196, 78, 0, 7); x.fill(); x.drawImage(gx, w / 2 - 80, 116);
+    drawFit(x, tr(cd.d), w / 2, 296, w * .84, 320, 46, 22, 700, '#3a1406');
+    if (who) drawFit(x, who, w / 2, h - 80, w * .8, 50, 28, 16, 700, 'rgba(58,20,6,.7)');
+    x.strokeStyle = '#14070a'; x.lineWidth = 12; x.strokeRect(6, 6, w - 12, h - 12);
+    return tex(c);
+  }
+  function buildDecks() {
+    [['fate', -2.9, -2.9], ['pact', 2.9, 2.9]].forEach(function (d) {
+      var side = new THREE.MeshStandardMaterial({ color: 0xf3e3c4, roughness: .8 }), top = new THREE.MeshBasicMaterial({ map: backTexture(d[0]) });
+      var m = new THREE.Mesh(new THREE.BoxGeometry(CW3, .36, CH3), [side, side, top, side, side, side]); m.position.set(d[1], .3, d[2]); m.rotation.y = .3; scene.add(m); decks[d[0]] = m;
+    });
+  }
+  H.card = function (card, cd, who) {
+    if (!H.ready || !decks[card.kind]) return;
+    var my = ++cardTok, dk = decks[card.kind];
+    if (flyCard) { scene.remove(flyCard); flyCard = null; }
+    var g = flyCard = new THREE.Group(), geo = new THREE.PlaneGeometry(CW3, CH3);
+    var front = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: faceTexture(card.kind, cd, who), depthTest: false, transparent: true })); front.renderOrder = 50; g.add(front);
+    var back = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: backTexture(card.kind), depthTest: false, transparent: true })); back.rotation.y = Math.PI; back.renderOrder = 50; g.add(back);
+    // Start: verdeckt auf dem Stapel; Ziel: vor der Kamera, Vorderseite zum Betrachter (folgt der Kamera, solange sie gezeigt wird)
+    var p0 = dk.position.clone(); p0.y = .52; var q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, -dk.rotation.y));
+    var goal = function () { var d = new THREE.Vector3(); camera.getWorldDirection(d); return camera.position.clone().add(d.multiplyScalar(9)); };
+    g.position.copy(p0); g.quaternion.copy(q0); scene.add(g);
+    var lift = p0.clone(); lift.y = 3.2;
+    tween(260, function (k) { g.position.lerpVectors(p0, lift, k); }, 'acard').then(function () {
+      if (my !== cardTok) return;
+      return tween(700, function (k) { var e = k * k * (3 - 2 * k); g.position.lerpVectors(lift, goal(), e); g.quaternion.copy(q0).slerp(camera.quaternion, e); }, 'acard');
+    }).then(function () {
+      if (my !== cardTok) return;
+      return tween(4300, function () { g.position.copy(goal()); g.quaternion.copy(camera.quaternion); }, 'acard');
+    }).then(function () {
+      if (my !== cardTok) return;
+      var a = g.position.clone(), qa = g.quaternion.clone();
+      return tween(550, function (k) { var e = k * k; g.position.lerpVectors(a, p0, e); g.quaternion.copy(qa).slerp(q0, e); front.material.opacity = back.material.opacity = 1 - e * .6; }, 'acard');
+    }).then(function () { if (my === cardTok && flyCard === g) { scene.remove(g); flyCard = null; } });
+  };
 
   // ---------- Update ----------
   H.update = function (V, inp) {
@@ -247,7 +368,7 @@
       var o = V.own[i], bar = ownBar[i];
       if (o >= 0) { bar.visible = true; bar.material.color.set(colorOf(o)); } else bar.visible = false;
       mortM[i].visible = !!V.mort[i];
-      var key = V.houses[i]; if (houseG[i]._k !== key) { houseG[i]._k = key; buildHouses(i, key); }
+      var key = V.houses[i]; if (houseG[i]._k !== key) { var first = houseG[i]._k === undefined; houseG[i]._k = key; buildHouses(i, key, !first); }
     }
     // Figuren bewegen
     var m = V.move;
@@ -257,8 +378,8 @@
       else if (!m || m.p !== q || m.seq === moveSeq) { if (shown[q] !== V.pos[q] && !tw.some(function (t) { return t.key === 'tok' + q; })) { shown[q] = V.pos[q]; tokens[q].position.copy(tokenSpot(q, V.pos[q], V.n)); } }
     }
     if (m && m.seq !== moveSeq) moveSeq = m.seq;
-    // Würfelfelder
-    for (var v = 0; v < V.n; v++) H.view(v).show();
+    // Würfelfelder und Besitzkarten
+    for (var v = 0; v < V.n; v++) { H.view(v).show(); buildDeeds(v, V); }
   };
   function tick(now) {
     runTw(now);

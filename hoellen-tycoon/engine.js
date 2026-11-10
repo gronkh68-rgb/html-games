@@ -193,11 +193,12 @@
   async function offerBuy(p, f) {
     var g = G(), x = F[f];
     if (g.cash[p] >= x.price) {
-      var i = await K.ask(p, { k: 'dlg', ico: x.t === 'st' ? '🏚️' : x.ico, title: L2(x.n.de + ' kaufen?', 'Buy ' + x.n.en + '?'), html: L2('Preis: <b>' + S(x.price) + '</b> · Du hast ' + S(g.cash[p]) + '.' + rentInfo(x, 'de'), 'Price: <b>' + S(x.price) + '</b> · You have ' + S(g.cash[p]) + '.' + rentInfo(x, 'en')), btns: [L2('Kaufen für ' + x.price, 'Buy for ' + x.price), g.opts.auction ? L2('Nicht kaufen (Versteigerung)', 'Don’t buy (auction)') : L2('Nicht kaufen', 'Don’t buy')] }, function () { return aiBuy(g, p, f) ? 0 : 1; });
+      var i = await K.ask(p, { k: 'dlg', ico: x.t === 'st' ? '🏚️' : x.ico, title: L2(x.n.de + ' kaufen?', 'Buy ' + x.n.en + '?'), html: L2('Preis: <b>' + S(x.price) + '</b> · Du hast ' + S(g.cash[p]) + '.' + deed(f, 'de', x), 'Price: <b>' + S(x.price) + '</b> · You have ' + S(g.cash[p]) + '.' + deed(f, 'en', x)), btns: [L2('Kaufen für ' + x.price, 'Buy for ' + x.price), g.opts.auction ? L2('Nicht kaufen (Versteigerung)', 'Don’t buy (auction)') : L2('Nicht kaufen', 'Don’t buy')] }, function () { return aiBuy(g, p, f) ? 0 : 1; });
       if (i === 0) { g.cash[p] -= x.price; g.own[f] = p; say2(p, nm(p) + ' kauft ' + x.n.de + ' für ' + S(x.price) + '.', nm(p) + ' buys ' + x.n.en + ' for ' + S(x.price) + '.', 'Du kaufst ' + x.n.de + ' für ' + S(x.price) + '.', 'You buy ' + x.n.en + ' for ' + S(x.price) + '.'); K.fx({ k: 'cash', p: p, n: -x.price }); K.sfx('coin'); K.push(); return; }
     }
     if (g.opts.auction) await auction(f, p);
   }
+  function deed(f, l, x) { return window.HTdeed ? '<div style="margin-top:10px">' + window.HTdeed(f, l) + '</div>' : rentInfo(x, l); }      // Besitzkarte im Kaufdialog
   function rentInfo(x, l) {
     var de = l === 'de';
     if (x.t === 'st') return '<br><small>' + (de ? 'Miete: ' : 'Rent: ') + x.rent[0] + ' · ' + (de ? 'mit Farbgruppe ' : 'with colour set ') + x.rent[0] * 2 + ' · ' + (de ? 'Häuser: ' : 'houses: ') + x.rent.slice(1, 5).join(' / ') + ' · ' + (de ? 'Palast: ' : 'palace: ') + x.rent[5] + ' · ' + (de ? 'Hauspreis: ' : 'house price: ') + x.hc + '</small>';
