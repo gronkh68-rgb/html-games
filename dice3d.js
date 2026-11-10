@@ -65,7 +65,8 @@
   };
 
   // ---------- Simulation ----------
-  D.simulate = async function (params) {
+  // obs (optional): feste Hindernisse [x, z, Radius, Höhe] in Tablett-Koordinaten (z. B. Spielfiguren und Mittelobjekte), an denen die Würfel abprallen
+  D.simulate = async function (params, obs) {
     await D.ready();
     var n = params.dice.length, world = new C.World({ gravity: new C.Vec3(0, G, 0) });
     world.allowSleep = false; world.solver.iterations = 24;
@@ -73,9 +74,15 @@
     world.addContactMaterial(new C.ContactMaterial(mDie, mFloor, { friction: .3, restitution: .5 }));      // Boden: federt spürbar
     world.addContactMaterial(new C.ContactMaterial(mDie, mWall, { friction: .1, restitution: .8 }));       // Ränder: sehr federnd wie Gummibanden
     world.addContactMaterial(new C.ContactMaterial(mDie, mDie, { friction: .22, restitution: .5 }));
+    var mObs = new C.Material('obs'); world.addContactMaterial(new C.ContactMaterial(mDie, mObs, { friction: .35, restitution: .42 }));
     function wall(hx, hy, hz, x, y, z, mat) { var b = new C.Body({ mass: 0, material: mat || mWall }); b.addShape(new C.Box(new C.Vec3(hx, hy, hz))); b.position.set(x, y, z); world.addBody(b); }
     wall(TX + 2, .5, TZ + 2, 0, -.5, 0, mFloor);         // Boden (Oberkante y=0)
     wall(.5, 5, TZ + 2, TX + .5, 5, 0); wall(.5, 5, TZ + 2, -TX - .5, 5, 0); wall(TX + 2, 5, .5, 0, 5, TZ + .5); wall(TX + 2, 5, .5, 0, 5, -TZ - .5); wall(TX + 2, .5, TZ + 2, 0, 10.5, 0);   // Wände und Decke
+    (obs || []).forEach(function (o) {      // Figur = große Kugel unten und kleinere oben (kegelartig)
+      var b = new C.Body({ mass: 0, material: mObs }), r = o[2];
+      b.addShape(new C.Sphere(r), new C.Vec3(0, r, 0)); if (o[3] > r * 2.2) { b.addShape(new C.Sphere(r * .72), new C.Vec3(0, o[3] - r * .72, 0)); if (o[3] > r * 3.4) b.addShape(new C.Sphere(r * .85), new C.Vec3(0, (r + o[3]) / 2 - r * .1, 0)); }
+      b.position.set(o[0], 0, o[1]); world.addBody(b);
+    });
     var bodies = params.dice.map(function (d) {
       var b = new C.Body({ mass: 1, material: mDie, linearDamping: .06, angularDamping: .10 });
       b.addShape(new C.Box(new C.Vec3(HALF, HALF, HALF)));
@@ -207,11 +214,11 @@
     R.group = new THREE.Group(); parent.add(R.group);
     var floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95 });
     var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; floor.visible = !bare; R.group.add(floor);
-    if (bare) { var ol = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-TX, -TZ], [TX, -TZ], [TX, TZ], [-TX, TZ]].map(function (a) { return new THREE.Vector3(a[0], .03, a[1]); })), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .22 })); R.group.add(ol); }
     var rimMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: .55 }), RT = .8, RH = 1.15;
     function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; m.visible = !bare; R.group.add(m); }
     rim(TX * 2 + RT * 2, RT, 0, -TZ - RT / 2); rim(TX * 2 + RT * 2, RT, 0, TZ + RT / 2); rim(RT, TZ * 2, -TX - RT / 2, 0); rim(RT, TZ * 2, TX + RT / 2, 0);
     var padMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide });
+    if (bare) padMat.opacity = 0;      // ohne Tablett kein Startring: das Spielfeld selbst ist die Fläche
     R.pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); R.pad.rotation.x = -Math.PI / 2; R.pad.position.set(0, .04, ANCH_Z); R.pad.visible = false; R.group.add(R.pad);
     // Zielhilfe: Gummiband, Griff und Punktreihe in Schussrichtung
     R.aimG = new THREE.Group(); R.aimG.visible = false; R.group.add(R.aimG);
@@ -348,7 +355,7 @@
               var ang = base0 + rnd(-.04, .04), vx2 = Math.cos(ang) * speed, vz2 = Math.sin(ang) * speed;
               // Drehung: Rollen in Schussrichtung plus zufälliges Taumeln aus der Hand
               var w = [vz2 * 1.0 + rnd(-9, 9) + spin[i][0] * 1.5, rnd(-8, 8) + spin[i][1] * 1.5, -vx2 * 1.0 + rnd(-9, 9) + spin[i][2] * 1.5];
-              dice.push({ p: [ax + off(i) + pull.x * .22, .9, az + pull.z * .22], q: q0[i].slice(), v: [vx2, rnd(-1.5, .5), vz2], w: w });
+              dice.push({ p: [ax + off(i) + pull.x * .22, env.bare ? 2.6 : .9, az + pull.z * .22], q: q0[i].slice(), v: [vx2, env.bare ? rnd(-5, -2) : rnd(-1.5, .5), vz2], w: w });
             }
             res({ dice: dice });
           }
@@ -412,7 +419,7 @@
     wrap.appendChild(cv); wrap.appendChild(hint); host.appendChild(wrap);
     var bare = !!(host.dataset && host.dataset.bare); if (bare) wrap.classList.add('bare');      // data-bare: Würfelfläche liegt direkt über dem Spielbrett
     var zb = document.createElement('button'); zb.className = 'dzoom'; if (bare) zb.style.display = 'none'; zb.textContent = '⤢'; zb.title = 'Würfelfeld vergrößern / verkleinern'; wrap.appendChild(zb); zb.onclick = function () { V.zoom(!V.zoomed); zb.textContent = V.zoomed ? '⤡' : '⤢'; };
-    var env = { host: host, wrap: wrap, R: null }, V;
+    var env = { host: host, wrap: wrap, R: null, bare: bare }, V;
     var renderer, scene, cam, ray, plane, tmp = null, raf = 0, anim = 0, visible = true, backdrop = null, zoomed = false;
     function build() {
       if (renderer) return;
@@ -486,7 +493,7 @@
     var overlay = document.createElement('div'); overlay.className = 'dice-embed'; overlay.setAttribute('data-noi18n', '');
     var hint = document.createElement('div'); hint.className = 'dh'; overlay.appendChild(hint);
     var st = o.stage; st.appendChild(overlay);      // die Position der Bühne bleibt unverändert (ihr Stil legt sie fest)
-    var env = { host: st, wrap: overlay, R: null }, ray = null, pl = null, tmp = null, S = o.scale || 1;
+    var env = { host: st, wrap: overlay, R: null, bare: !!o.bare }, ray = null, pl = null, tmp = null, S = o.scale || 1;
     env.ready = function () {
       return D.ready().then(function () {
         if (env.R) return;

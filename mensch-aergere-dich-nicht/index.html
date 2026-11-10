@@ -19,6 +19,7 @@
 .wrap{max-width:1500px}
 /* Würfelfläche = das ganze Spielfeld (kein Tablett): die Würfel werden über das Brett geschnippt */
 #diceDock{position:absolute;inset:0;z-index:8}
+#tronFx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;mix-blend-mode:screen}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
 #boardWrap{width:min(100%,calc(100vh - 150px));margin:0 auto;position:relative}
 /* physischer Würfel (optional): CSS-3D-Würfel über dem Brett */
@@ -380,7 +381,7 @@ const isHuman=p=>cfg[p]==='human'||cfg[p]==='remote';
 let names=[],netRole='local',netPhase={k:'idle'},remoteRoll=null,remoteThrow=null,mySlot=-1,canRollNet=false,clientDrag=false,throwId=0,lastTid=0,DVd=null,DVe={},lastPhys=false;
 // Würfel-Tablett: in der 3D-Ansicht steht es als echtes Objekt neben dem Brett auf dem Tisch (Kamera fährt beim eigenen Wurf hin), in 2D als Dock
 const TRAY3={y:-.25,scale:.72,x:11.2,z:5.2};
-if(window.Dice3D&&Dice3D.setArea)Dice3D.setArea(7.5,7.5);      // Würfel rollen über das ganze (quadratische) Brett
+if(window.Dice3D&&Dice3D.setArea)Dice3D.setArea(7.7,7.7);      // Würfel rollen über das ganze (quadratische) Brett: 1 Feld = 1,4 Einheiten, in 2D wie in 3D
 // Jeder Spieler hat sein eigenes Würfelfeld neben seiner Farbe (an der Ecke seines Startfelds, außen am Brett)
 const trayOf=p=>{const [bx,by]=[[0,0],[9,0],[9,9],[0,9]][p],sx=bx===0?-1:1,sz=by===0?-1:1;return {pos:[sx*TRAY3.x,TRAY3.y,sz*TRAY3.z],rotY:sz>0?0:Math.PI};};
 let camSave3=null,manual3=false,autoDice3=(()=>{try{return localStorage.getItem('mdn-autodice')==='1';}catch(e){return false;}})();      // Standard: Kamera wird nicht erzwungen
@@ -406,10 +407,9 @@ function focusTray3(on,manual,p){
 }
 const DICEV=p=>{
   if(v3&&T3&&T3.scene){
-    // Kein Tablett: Alle schnippen über das ganze Brett; die Fläche dreht sich so, dass "vorne" zur Kamera zeigt
-    if(!DVe[0])DVe[0]=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:[0,.22,0],scale:.8,rotY:0,bare:true,focus:on=>focusTray3(on,false,0)});
-    const v=DVe[0];if(v.R&&!v.busy&&!v._playing){const c=T3.camera.position;v.R.group.rotation.y=Math.atan2(c.x,c.z);v.R.group.updateMatrixWorld(true);}
-    return v;
+    // Kein Tablett: Das Spielfeld selbst ist die Wurffläche, alle werfen von derselben Seite
+    if(!DVe[0])DVe[0]=Dice3D.embed({scene:T3.scene,camera:T3.camera,dom:T3.r.domElement,stage:$('stage3d'),pos:[0,.22,0],scale:1.1/1.4,rotY:0,bare:true,focus:on=>focusTray3(on,false,0)});
+    return DVe[0];
   }
   return DVd||(DVd=Dice3D.view($('diceDock')));
 };
@@ -591,7 +591,22 @@ function placePiece(p,i,front){
 function placeAll(){active.forEach(p=>{for(let i=0;i<4;i++)placePiece(p,i)});}
 function setMsg(t){$('msg').innerHTML=t;}
 function chip(p){return `<span class="chip" style="background:${COLORS[p].c}"></span>`;}
+function tron2d(color){
+  const wrap=$('boardWrap');if(!wrap||v3)return;
+  let fx=$('tronFx');if(!fx){fx=document.createElementNS(NS,'svg');fx.id='tronFx';fx.setAttribute('viewBox','0 0 550 550');wrap.appendChild(fx);}
+  const col=color;
+  for(let i=0;i<3;i++){
+    const pts=tronPath().map(([c,r])=>cx(c)+','+cx(r)),pl=document.createElementNS(NS,'polyline');
+    pl.setAttribute('points',pts.join(' '));pl.setAttribute('fill','none');pl.setAttribute('stroke',col);pl.setAttribute('stroke-width','5');pl.setAttribute('stroke-linecap','square');pl.setAttribute('stroke-linejoin','miter');pl.style.filter='drop-shadow(0 0 6px '+col+')';
+    fx.appendChild(pl);const L=pl.getTotalLength();pl.setAttribute('stroke-dasharray',L);
+    if(pl.animate){
+      pl.animate([{strokeDashoffset:L,opacity:1},{strokeDashoffset:0,opacity:1,offset:.5},{strokeDashoffset:0,opacity:1,offset:.7},{strokeDashoffset:0,opacity:0}],{duration:2800,delay:i*170,fill:'both',easing:'ease-in-out'}).onfinish=()=>pl.remove();
+    }else setTimeout(()=>pl.remove(),2800);
+  }
+  const b=$('board');b.style.transition='background-color 2s ease';b.style.backgroundColor='color-mix(in srgb,'+col+' 9%,#05080d)';
+}
 function showTurn(p){
+  if(CY()&&window.lastTron2d!==p){window.lastTron2d=p;tron2d(COLORS[p].c);}
   SITE.diceMine(netRole==='client'?p===mySlot:isLocal(p));   // Würfel-Design aus dem Profil nur für die eigenen Würfe
   const t=$('turn');
   t.textContent=`${COLORS[p].n}${names[p]?' ('+names[p]+')':''} ist dran${isHuman(p)?'':' (PC)'}`;
@@ -746,7 +761,7 @@ async function doRoll(p){
   let v;
   if(phys){
     const par=Dice3D.clean(tp,1)||Dice3D.autoParams(1);
-    const r=await Dice3D.simulate(par);
+    const r=await Dice3D.simulate(par,diceObstacles());
     v=r.v[0];throwId++;
     netPhase={k:'rolling',p,v,track:r.track,tid:throwId};netPush();      // alle Geräte spielen dieselbe Bahn ab
     await DICEV(p).play(r.track,{color:COLORS[p].c,mine:isLocal(p)});
@@ -934,6 +949,13 @@ function backToSetup(){
 $('start').onclick=startGame;
 $('again').onclick=backToSetup;
 $('winBtn').onclick=backToSetup;
+// Feste Hindernisse für den Würfelwurf: alle Spielfiguren und (außer im Cyber-Stil, wo sie flach ist) die Säule in der Mitte. 1 Feld = 1,4 Einheiten.
+function diceObstacles(){
+  const o=[];
+  active.forEach(p=>{for(let i=0;i<4;i++){const [c,r]=cellOf(p,i);o.push([(c-5)*1.4,(r-5)*1.4,.3,.85]);}});
+  o.push([0,0,.5,.9]);      // Kugel/Säule in der Mitte
+  return o;
+}
 const rollClick=()=>{
   if(netRole==='client'){if(canRollNet){canRollNet=false;$('rollBtn').disabled=true;if(clientDrag){clientDrag=false;DICEV(mySlot).stopDrag();}sendHost({t:'roll'});}}
   else if(rollWait)rollWait();
@@ -1495,11 +1517,11 @@ function build3(){
   const {scene}=T3;
   if(T3.group)scene.remove(T3.group);
   for(const k in T3.pm)scene.remove(T3.pm[k].g);
-  T3.pm={};T3.bases={};T3.tw=[];
+  T3.pm={};T3.bases={};T3.tw=[];T3.tileM=[];T3.plateM=null;
   const G=new THREE.Group();T3.group=G;scene.add(G);
   // Grundplatte
   const plate=new THREE.Mesh(new THREE.BoxGeometry(11.6*S3,.3,11.6*S3),new THREE.MeshStandardMaterial(CY()?{color:0x0a0d16,roughness:.6,metalness:.5,emissive:0x03121a}:AN()?{color:0x6b4226,roughness:.6}:DK()?{color:0x161a23,roughness:.85}:{color:0xc89a5a,roughness:.7}));
-  plate.position.y=-.1;G.add(plate);
+  plate.position.y=-.1;G.add(plate);T3.plateM=plate.material;
   if(CY()){
     const pe=new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),new THREE.LineBasicMaterial({color:0x00f0ff}));pe.position.copy(plate.position);G.add(pe);
     // Leuchtrahmen am Rand: schmale, helle Leiste (Bloom macht den Schein) und weiter innen eine dünne gestrichelte Zierlinie
@@ -1514,7 +1536,7 @@ function build3(){
   const tile=(c,r,h,color,emis,eI,edge,rad=.48,kind)=>{
     const g=new THREE.CylinderGeometry(rad,rad,h,CY()?8:24);g.rotateY(Math.PI/8);
     let mt,lc=edge,lo=1;
-    if(CY())mt=new THREE.MeshStandardMaterial({color,emissive:emis,emissiveIntensity:eI,roughness:.45,metalness:.5});
+    if(CY()){mt=new THREE.MeshStandardMaterial({color,emissive:emis,emissiveIntensity:eI,roughness:.45,metalness:.5});if(kind==='track')T3.tileM.push(mt);}
     else if(AN()){
       const col=kind==='track'?0xf5ecd7:kind==='lane'?mixW(color,.15):kind==='bc'?mixW(color,.55):color;
       mt=new THREE.MeshStandardMaterial({color:col,roughness:.7});lc=0x7a1c24;lo=.7;
@@ -1554,14 +1576,10 @@ function build3(){
   [0,1,2,3].forEach(p=>LANE[p].forEach(([c,r])=>{const cc=pc3(p);tile(c,r,.2,0x10131c,cc,.35,cc,.44,'lane');}));
   // Mitte: Server-Turm (Cyber) oder kleine Holzsäule (Standard)
   T3.rings=[];T3.spin=null;T3.tint=[];
-  if(CY()){   // flaches Hologramm-Emblem statt Turm: bleibt unter Figurenhöhe und verdeckt nichts
-    const disc=new THREE.Mesh(new THREE.CylinderGeometry(.42,.46,.06,8),new THREE.MeshBasicMaterial({color:0x00f0ff,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false}));
-    disc.rotation.y=Math.PI/8;disc.position.y=.12;G.add(disc);T3.tint.push(disc.material);
-    const dot=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.09,8),new THREE.MeshBasicMaterial({color:0xe8ffff}));dot.position.y=.15;G.add(dot);
-    [[.58,.72,Math.PI*1.5,0x00f0ff],[.8,.9,Math.PI*1.2,0xff2fa8],[1.0,1.06,Math.PI*1.6,0x00f0ff]].forEach(([ri,ro,arc,col],i)=>{
-      const ring=new THREE.Mesh(new THREE.RingGeometry(ri,ro,48,1,0,arc),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.9,side:THREE.DoubleSide,depthWrite:false}));
-      ring.rotation.x=-Math.PI/2;ring.position.y=.13+i*.01;ring.userData.s=(i%2?1:-1)*(.8+i*.3);G.add(ring);T3.rings.push(ring);T3.tint.push(ring.material);
-    });
+  if(CY()){   // Mitte: dieselbe leuchtende Kugel wie im Standard-Stil, auf einem niedrigen dunklen Sockel; sie nimmt die Farbe des Spielers am Zug an
+    const ped=new THREE.Mesh(new THREE.CylinderGeometry(.34,.5,.4,24),new THREE.MeshStandardMaterial({color:0x0a0d16,roughness:.45,metalness:.6,emissive:0x03121a}));ped.position.set(0,.2,0);G.add(ped);
+    const pe=new THREE.LineSegments(new THREE.EdgesGeometry(ped.geometry,40),new THREE.LineBasicMaterial({color:0x00f0ff}));pe.position.copy(ped.position);G.add(pe);
+    const knob=new THREE.Mesh(new THREE.SphereGeometry(.34,24,18),new THREE.MeshStandardMaterial({color:0xd9b24a,emissive:0xd9b24a,emissiveIntensity:.75,roughness:.3,metalness:.2}));knob.position.set(0,.65,0);G.add(knob);T3.tint.push(knob.material);
   }else if(AN()){
     const rd=new THREE.MeshStandardMaterial({color:0xc4262e,roughness:.5}),bk=new THREE.MeshStandardMaterial({color:0x14101e,roughness:.5}),st=new THREE.MeshStandardMaterial({color:0x8a8590,roughness:.9});
     const pd=new THREE.Mesh(new THREE.CylinderGeometry(.5,.6,.34,10),st);pd.position.y=.17;G.add(pd);
@@ -1647,8 +1665,53 @@ function mark3(p,moves){
   if(p==null)return;
   moves.forEach(m=>{const pm=T3.pm[p+'-'+m.i];if(pm)pm.can=true;});
 }
+// Tron-Linien: Bei jedem Farbwechsel (neuer Spieler am Zug) ziehen farbige Lichtspuren in rechten Winkeln übers Brett; danach färbt sich das Feld sanft ein.
+function tronPath(){
+  const D=[[1,0],[0,1],[-1,0],[0,-1]],rnd=n=>1+Math.floor(Math.random()*n);
+  let di=Math.floor(Math.random()*4),c,r;
+  if(di===0){c=-1;r=rnd(9);}else if(di===1){r=-1;c=rnd(9);}else if(di===2){c=11;r=rnd(9);}else{r=11;c=rnd(9);}
+  const pts=[[c,r]];let len=0;
+  while(len<26){
+    const run=2+Math.floor(Math.random()*4);c+=D[di][0]*run;r+=D[di][1]*run;len+=run;
+    c=Math.max(-1,Math.min(11,c));r=Math.max(-1,Math.min(11,r));pts.push([c,r]);
+    if(c<=-1||c>=11||r<=-1||r>=11)break;
+    di=(di+(Math.random()<.5?1:3))%4;
+  }
+  return pts;
+}
+function tronSweep3(color){
+  if(!T3||!T3.group)return;
+  const col=new THREE.Color(color),G=new THREE.Group();T3.scene.add(G);
+  const box=T3.box||(T3.box=new THREE.BoxGeometry(1,1,1)),mat=c=>new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false});
+  const th=.1,trails=[0,1,2].map(i=>{
+    const pts=tronPath().map(([c,r])=>[(c-5)*S3,(r-5)*S3]),segs=[];let tot=0;
+    for(let k=1;k<pts.length;k++){const a=pts[k-1],b=pts[k],l=Math.hypot(b[0]-a[0],b[1]-a[1]),m=new THREE.Mesh(box,mat(col));m.visible=false;G.add(m);segs.push({a,b,l,s0:tot,m});tot+=l;}
+    const head=new THREE.Mesh(box,mat(0xffffff));head.scale.set(.22,.22,.22);head.visible=false;G.add(head);
+    return {segs,tot,head,delay:i*170};
+  });
+  tw3(2800,k=>{
+    const el=k*2800,fade=el>1900?Math.max(0,1-(el-1900)/900):1;
+    trails.forEach(t=>{
+      const s=Math.max(0,Math.min(1,(el-t.delay)/1250))*t.tot;
+      t.segs.forEach(sg=>{
+        const v=Math.max(0,Math.min(sg.l,s-sg.s0));sg.m.visible=v>0;if(v<=0)return;
+        const dx=Math.sign(sg.b[0]-sg.a[0]),dz=Math.sign(sg.b[1]-sg.a[1]);
+        sg.m.scale.set(dx?v+th:th,.05,dz?v+th:th);sg.m.position.set(sg.a[0]+dx*v/2,.31,sg.a[1]+dz*v/2);sg.m.material.opacity=fade*.95;
+      });
+      const hs=t.segs.find(sg=>s>=sg.s0&&s<=sg.s0+sg.l+.001);
+      if(hs&&s<t.tot&&fade>0){const v=s-hs.s0,dx=Math.sign(hs.b[0]-hs.a[0]),dz=Math.sign(hs.b[1]-hs.a[1]);t.head.visible=true;t.head.position.set(hs.a[0]+dx*v,.32,hs.a[1]+dz*v);}else t.head.visible=false;
+    });
+  },'tronL').then(()=>{T3.scene.remove(G);G.traverse(o=>{if(o.material)o.material.dispose();});});
+  // Feld sanft einfärben (verzögert, damit es zum Durchlauf der Linien passt)
+  setTimeout(()=>{
+    if(!T3||!T3.tileM)return;
+    const fromT=T3.tileM.map(m=>m.emissive.clone()),toT=new THREE.Color(0x0a2a3c).lerp(col,.5),fromP=T3.plateM?T3.plateM.emissive.clone():null,toP=new THREE.Color(0x03121a).lerp(col.clone().multiplyScalar(.5),.55);
+    tw3(2200,k=>{const e=k*k*(3-2*k);T3.tileM.forEach((m,i)=>m.emissive.copy(fromT[i]).lerp(toT,e));if(T3.plateM&&fromP)T3.plateM.emissive.copy(fromP).lerp(toP,e);},'tronT');
+  },700);
+}
 function turn3(p){
   if(!T3)return;
+  if(CY()&&T3.lastTron!==p){T3.lastTron=p;tronSweep3(pc3(p));}
   for(const k in T3.pm)T3.pm[k].mine=T3.pm[k].p===p;
   $('stage3d').style.setProperty('--pc',COLORS[p].c);
   if(!T3.follow)return;
