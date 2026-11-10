@@ -283,7 +283,7 @@
     return (deedTexC[key] = tex(c));
   }
   var DW = 1.3, DH = 1.77, deedGeo = null;
-  function deedOrigin(p) { var s = SPOTS[p % 6]; return p % 6 < 4 ? { x: s[0] + (s[0] > 0 ? 1 : -1) * 4.1, z: s[1], dir: s[0] > 0 ? 1 : -1 } : { x: 4.0, z: s[1], dir: 1 }; }
+  function deedOrigin(p) { var s = SPOTS[p % 6]; return p % 6 < 4 ? { x: (s[0] > 0 ? 1 : -1) * 11.2, z: s[1], dir: s[0] > 0 ? 1 : -1 } : { x: -2.1, z: s[1] > 0 ? 17 : -13.5, dir: 1 }; }      // Kartenplatz je Spieler rund ums Brett
   function buildDeeds(p, V) {
     var g = deedG[p]; if (!g) { g = deedG[p] = new THREE.Group(); scene.add(g); }
     var list = []; for (var i = 0; i < 40; i++) if (V.own[i] === p) list.push(i);
@@ -294,7 +294,7 @@
     deedGeo = deedGeo || new THREE.PlaneGeometry(DW, DH);
     // Eigene Karten liegen vorn vor dem Brett (im Standardbild sichtbar), die der anderen neben ihrem Würfelfeld
     var mine = p === V.me, slots = [], o = deedOrigin(p), k2;
-    if (mine) { var xs = []; for (k2 = 0; k2 < 13; k2++) { var xx = -8.28 + k2 * 1.38; if (V.n < 5 || Math.abs(xx) > 3.5) xs.push(xx); } for (k2 = 0; k2 < 40; k2++) slots.push([xs[k2 % xs.length], 10.6 + Math.floor(k2 / xs.length) * .66, Math.floor(k2 / xs.length)]); }
+    if (mine) { var xs = []; for (k2 = 0; k2 < 13; k2++) { var xx = -8.28 + k2 * 1.38; xs.push(xx); } for (k2 = 0; k2 < 40; k2++) slots.push([xs[k2 % xs.length], 10.6 + Math.floor(k2 / xs.length) * .66, Math.floor(k2 / xs.length)]); }
     else { var rowsN = Math.ceil(list.length / 4), z0 = o.z - ((rowsN - 1) * .66 + DH) / 2 + DH / 2; for (k2 = 0; k2 < 40; k2++) slots.push([o.x + o.dir * (k2 % 4) * (DW + .08), z0 + Math.floor(k2 / 4) * .66, Math.floor(k2 / 4)]); }
     list.forEach(function (fi, k) {      // Reihen überlappen: von jeder Karte bleibt der Kopf mit Farbe und Name sichtbar
       var s = slots[k], m = new THREE.Mesh(deedGeo, new THREE.MeshBasicMaterial({ map: deedTexture(fi, !!V.mort[fi]) }));
@@ -329,7 +329,7 @@
     return tex(c);
   }
   function buildDecks() {
-    [['fate', -2.9, -2.9], ['pact', 2.9, 2.9]].forEach(function (d) {
+    [['fate', -5.3, -4.7], ['pact', 5.3, 4.7]].forEach(function (d) {
       var side = new THREE.MeshStandardMaterial({ color: 0xf3e3c4, roughness: .8 }), top = new THREE.MeshBasicMaterial({ map: backTexture(d[0]) });
       var m = new THREE.Mesh(new THREE.BoxGeometry(CW3, .36, CH3), [side, side, top, side, side, side]); m.position.set(d[1], .3, d[2]); m.rotation.y = .3; scene.add(m); decks[d[0]] = m;
     });
@@ -379,7 +379,8 @@
     }
     if (m && m.seq !== moveSeq) moveSeq = m.seq;
     // Würfelfelder und Besitzkarten
-    for (var v = 0; v < V.n; v++) { H.view(v).show(); buildDeeds(v, V); }
+    H.view(0).show();
+    for (var v = 0; v < V.n; v++) buildDeeds(v, V);
   };
   function tick(now) {
     runTw(now);
@@ -401,8 +402,7 @@
     var p0 = camera.position.clone(), t0 = controls.target.clone();
     if (on) {
       camSave = { pos: p0.clone(), target: t0.clone() };
-      var s = SPOTS[p % 6], th = s[2], off = function (lx, ly, lz) { return new THREE.Vector3(lx * Math.cos(th) + lz * Math.sin(th), ly, -lx * Math.sin(th) + lz * Math.cos(th)); };
-      var c = new THREE.Vector3(s[0], 0, s[1]), to = { pos: c.clone().add(off(0, 14, 7.5)), target: c.clone().add(off(0, 0, .3)) };
+      var to = { pos: new THREE.Vector3(0, 21, 10), target: new THREE.Vector3(0, 0, .8) };      // Blick von schräg oben auf die Brettmitte
       controls.enabled = false;
       tween(900, function (k) { var e = k * k * (3 - 2 * k); camera.position.lerpVectors(p0, to.pos, e); controls.target.lerpVectors(t0, to.target, e); }, 'dicecam');
     } else if (camSave) {
@@ -411,8 +411,9 @@
     } else controls.enabled = true;
   }
   H.view = function (p) {
-    if (!views[p]) { var s = SPOTS[p % 6]; views[p] = Dice3D.embed({ scene: scene, camera: camera, dom: r.domElement, stage: host, pos: [s[0], -.1, s[1]], scale: .6, rotY: s[2], focus: function (on) { focusTray(on, false, p); } }); }
-    return views[p];
+    // Kein Tablett: Alle schnippen die Würfel auf die Brettmitte (eine gemeinsame Würfelfläche)
+    if (!views[0]) views[0] = Dice3D.embed({ scene: scene, camera: camera, dom: r.domElement, stage: host, pos: [0, .13, 0], scale: .9, rotY: 0, bare: true, focus: function (on) { focusTray(on, false, 0); } });
+    return views[0];
   };
   H.cancelDice = function () { manual = false; Object.keys(views).forEach(function (k) { views[k].cancel(); }); if (camSave) focusTray(false, true); };
   H.toggleAuto = function () { autoDice = !autoDice; try { localStorage.setItem('ht-autodice', autoDice ? '1' : '0'); } catch (e) { } return autoDice; };

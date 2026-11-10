@@ -179,6 +179,7 @@
     st.textContent = '.dice-wrap{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:rgba(8,12,22,.55);border:2px solid rgba(255,255,255,.18);box-shadow:0 6px 20px rgba(0,0,0,.45)}' +
       '.dice-wrap canvas{display:block;width:100%;height:100%;touch-action:none}' +
       '.dice-wrap .dzoom{position:absolute;right:6px;top:6px;z-index:5;width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(20,24,42,.85);color:#fff;font:700 15px system-ui,sans-serif;cursor:pointer;line-height:1;padding:0}' +
+      '.dice-wrap.bare{background:transparent;border:0;box-shadow:none;border-radius:0}' +
       '.dice-embed{position:absolute;inset:0;pointer-events:none;z-index:60}' +
       '.dice-wrap .dh,.dice-embed .dh{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:3;pointer-events:none;background:rgba(10,14,30,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:6px 10px;font:700 12px system-ui,sans-serif;text-align:center;display:none;width:88%}' +
       '.dice-wrap.big .dh,.dice-embed .dh{font-size:15px;padding:8px 14px;width:auto;max-width:92%}' +
@@ -190,13 +191,14 @@
   }
   var cyberNow = function () { return document.documentElement.getAttribute('data-style') === 'cyber'; };
   // Tablett-Bauteile: Filzboden, Holzrand, Abschussfeld, Zielhilfe und die Würfel. Lokale Koordinaten = Physik-Koordinaten.
-  function mkRig(parent) {
+  function mkRig(parent, bare) {      // bare: ohne Tablett (Würfel rollen direkt auf dem Spielbrett), nur eine feine Begrenzungslinie
     var R = { dice: [], shown: 0 }, geo = new THREE.BoxGeometry(1, 1, 1), mats = null, fontTried = false;
     R.group = new THREE.Group(); parent.add(R.group);
     var floorMat = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: .95 });
-    var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; R.group.add(floor);
+    var floor = new THREE.Mesh(new THREE.PlaneGeometry(TX * 2 + .3, TZ * 2 + .3), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = .01; floor.receiveShadow = true; floor.visible = !bare; R.group.add(floor);
+    if (bare) { var ol = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-TX, -TZ], [TX, -TZ], [TX, TZ], [-TX, TZ]].map(function (a) { return new THREE.Vector3(a[0], .03, a[1]); })), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .22 })); R.group.add(ol); }
     var rimMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: .55 }), RT = .8, RH = 1.15;
-    function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; R.group.add(m); }
+    function rim(w, d, x, z) { var m = new THREE.Mesh(geo, rimMat); m.scale.set(w, RH, d); m.position.set(x, RH / 2, z); m.castShadow = m.receiveShadow = true; m.visible = !bare; R.group.add(m); }
     rim(TX * 2 + RT * 2, RT, 0, -TZ - RT / 2); rim(TX * 2 + RT * 2, RT, 0, TZ + RT / 2); rim(RT, TZ * 2, -TX - RT / 2, 0); rim(RT, TZ * 2, TX + RT / 2, 0);
     var padMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide });
     R.pad = new THREE.Mesh(new THREE.RingGeometry(.9, 1.1, 40), padMat); R.pad.rotation.x = -Math.PI / 2; R.pad.position.set(0, .04, ANCH_Z); R.pad.visible = false; R.group.add(R.pad);
@@ -397,7 +399,8 @@
     var wrap = document.createElement('div'); wrap.className = 'dice-wrap'; wrap.setAttribute('data-noi18n', '');
     var cv = document.createElement('canvas'), hint = document.createElement('div'); hint.className = 'dh';
     wrap.appendChild(cv); wrap.appendChild(hint); host.appendChild(wrap);
-    var zb = document.createElement('button'); zb.className = 'dzoom'; zb.textContent = '⤢'; zb.title = 'Würfelfeld vergrößern / verkleinern'; wrap.appendChild(zb); zb.onclick = function () { V.zoom(!V.zoomed); zb.textContent = V.zoomed ? '⤡' : '⤢'; };
+    var bare = !!(host.dataset && host.dataset.bare); if (bare) wrap.classList.add('bare');      // data-bare: Würfelfläche liegt direkt über dem Spielbrett
+    var zb = document.createElement('button'); zb.className = 'dzoom'; if (bare) zb.style.display = 'none'; zb.textContent = '⤢'; zb.title = 'Würfelfeld vergrößern / verkleinern'; wrap.appendChild(zb); zb.onclick = function () { V.zoom(!V.zoomed); zb.textContent = V.zoomed ? '⤡' : '⤢'; };
     var env = { host: host, wrap: wrap, R: null }, V;
     var renderer, scene, cam, ray, plane, tmp = null, raf = 0, anim = 0, visible = true, backdrop = null, zoomed = false;
     function build() {
@@ -408,7 +411,7 @@
       var dl = new THREE.DirectionalLight(0xffffff, .75); dl.position.set(-4, 14, 6); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024);
       var sc = dl.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 10; sc.bottom = -10; sc.near = 1; sc.far = 40; scene.add(dl);
       var sp = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: .38 })); sp.rotation.x = -Math.PI / 2; sp.position.y = .03; sp.receiveShadow = true; scene.add(sp);
-      env.R = mkRig(scene); env.R.mk(); resize();
+      env.R = mkRig(scene, bare); env.R.mk(); resize();
     }
     function resize() {
       if (!renderer) return;
@@ -416,7 +419,7 @@
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(w, h, false);
       cam.aspect = w / h; var vf = cam.fov * Math.PI / 180, needH = (TZ + 1.4) * 2, needW = (TX + 1.4) * 2;
       var dist = Math.max(needH / (2 * Math.tan(vf / 2)), needW / (2 * Math.tan(vf / 2) * cam.aspect));
-      cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
+      if (bare) cam.position.set(0, dist * .99, dist * .14); else cam.position.set(0, dist * .93, dist * .37); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix(); once();
     }
     var ro = window.ResizeObserver ? new ResizeObserver(resize) : null; if (ro) ro.observe(wrap);
     // Es wird nur gezeichnet, wenn sich etwas bewegt (spart Leistung); sonst genau ein Bild pro Änderung
@@ -442,7 +445,7 @@
     }
     function applyBig() { var b = bigRect(); wrap.style.cssText = 'position:fixed;z-index:900;left:' + b.left + 'px;top:' + b.top + 'px;width:' + b.width + 'px;height:' + b.height + 'px;inset:auto'; wrap.style.left = b.left + 'px'; wrap.style.top = b.top + 'px'; }
     env.focus = function (on) {      // Kamerafahrt als Vergrößerung des Fensters
-      if (!renderer || on === zoomed) return;
+      if (!renderer || on === zoomed || bare) return;
       var first = wrap.getBoundingClientRect(); zoomed = on;
       if (on) {
         if (!backdrop) { backdrop = document.createElement('div'); backdrop.id = 'diceBackdrop'; }
@@ -477,7 +480,7 @@
       return D.ready().then(function () {
         if (env.R) return;
         ray = new THREE.Raycaster(); pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); tmp = new THREE.Vector3();
-        env.R = mkRig(o.scene); env.R.mk();
+        env.R = mkRig(o.scene, o.bare); env.R.mk();
         var g = env.R.group; g.position.set(o.pos[0], o.pos[1], o.pos[2]); g.scale.setScalar(S); g.rotation.y = o.rotY || 0; g.updateMatrixWorld(true);
         new MutationObserver(function () { env.R.skin(); env.R.mk(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-style'] });
       });
