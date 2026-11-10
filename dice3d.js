@@ -192,8 +192,8 @@
   }
   var cyberNow = function () { return document.documentElement.getAttribute('data-style') === 'cyber'; };
   // Würfel-Design aus dem Profil (theme.js): 'auto' richtet sich nach dem Stil der Seite
-  function skinNow() {
-    var pref = window.SITE && SITE.dice ? SITE.dice() : 'auto', d = pref !== 'auto' && SITE.DICE ? SITE.DICE[pref] : null;
+  function skinNow(mine) {
+    var pref = mine !== false && window.SITE && SITE.dice ? SITE.dice() : 'auto', d = pref !== 'auto' && SITE.DICE ? SITE.DICE[pref] : null;
     if (!d) return { key: cyberNow() ? 'c' : 's', neon: cyberNow(), color: true, sk: null };
     if (d.num) return { key: 'neon', neon: true, color: true, sk: null };
     if (d.player) return { key: 'pl', neon: false, color: true, sk: null };
@@ -222,10 +222,10 @@
       floorMat.color.set(cy ? 0x0b1626 : 0x1f6b4d); floorMat.emissive.set(cy ? 0x001a24 : 0x000000);
       rimMat.color.set(cy ? 0x0e2a45 : 0x6b4a2b); rimMat.emissive.set(cy ? 0x06202f : 0x000000); padMat.color.set(R.color || (cy ? 0x00f0ff : 0xffe08a));      // Abschussring in Spielerfarbe
     };
-    R.color = null;
+    R.color = null; R.mine = true;      // mine: eigener Wurf (Profil-Design) oder Wurf eines anderen (Standard-Design)
     R.setColor = function (hex) { hex = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex.toLowerCase() : null; if (hex !== R.color) { R.color = hex; R.mk(); R.skin(); } };      // Würfel in Spielerfarbe
     R.mk = function () {
-      var S = skinNow(), cy = S.neon, col = S.color ? R.color : null, key = S.key + (col || '');
+      var S = skinNow(R.mine), cy = S.neon, col = S.color ? R.color : null, key = S.key + (col || '');
       if (mats && mats.key === key) return mats;
       mats = { key: key, list: FACE_V.map(function (v) {
         var t = faceTex(v, cy, cy ? 256 : 128, col, S.sk);
@@ -299,7 +299,7 @@
     V.drag = function (n, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
+        var R = env.R; R.mine = true; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
         if (opts.zoom !== false) V.zoom(true);
         var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = R.dice.map(function () { return randQ(); }), spin = R.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), t0 = performance.now(), last = t0;
         var base = opts.hint || (window.SITE ? SITE.T('Würfel nach unten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice down, aim and release to shoot') : 'Pull down, aim, release');
@@ -362,7 +362,7 @@
     V.play = function (track, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        var R = env.R; R.mine = opts.mine !== false; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
         V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); R.aimG.visible = false; R.pad.visible = false; R.ensure(track.n); R.shown = track.n; R.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); env.anim(1);
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {

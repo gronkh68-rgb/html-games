@@ -591,6 +591,7 @@ function placeAll(){active.forEach(p=>{for(let i=0;i<4;i++)placePiece(p,i)});}
 function setMsg(t){$('msg').innerHTML=t;}
 function chip(p){return `<span class="chip" style="background:${COLORS[p].c}"></span>`;}
 function showTurn(p){
+  SITE.diceMine(netRole==='client'?p===mySlot:isLocal(p));   // Würfel-Design aus dem Profil nur für die eigenen Würfe
   const t=$('turn');
   t.textContent=`${COLORS[p].n}${names[p]?' ('+names[p]+')':''} ist dran${isHuman(p)?'':' (PC)'}`;
   t.style.setProperty('--pc',COLORS[p].c);
@@ -747,7 +748,7 @@ async function doRoll(p){
     const r=await Dice3D.simulate(par);
     v=r.v[0];throwId++;
     netPhase={k:'rolling',p,v,track:r.track,tid:throwId};netPush();      // alle Geräte spielen dieselbe Bahn ab
-    await DICEV(p).play(r.track,{color:COLORS[p].c});
+    await DICEV(p).play(r.track,{color:COLORS[p].c,mine:isLocal(p)});
   }else if(PHYS){
     PD.start();await sleep(700,t);
     v=rollValue(p);
@@ -1246,7 +1247,7 @@ function applySnap(s,you){
   lastPhys=!!s.phys;syncDock(lastPhys);
   // Würfel: während des Wurfs animieren, danach das Ergebnis zeigen
   if(ph.k==='rolling'&&ph.track){
-    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV(ph.p).play(ph.track,{color:COLORS[ph.p]?COLORS[ph.p].c:null}).then(()=>dieDone(v));}
+    if(ph.tid!==lastTid){lastTid=ph.tid;cRolling=false;clearInterval(rollAnim);const v=ph.v;DICEV(ph.p).play(ph.track,{color:COLORS[ph.p]?COLORS[ph.p].c:null,mine:ph.p===mySlot}).then(()=>dieDone(v));}
   }else if(ph.k==='rolling'){
     if(s.phys){}else if(!cRolling){cRolling=true;cLand=false;clearInterval(rollAnim);if(PHYS)PD.start();else{let k=0;rollAnim=setInterval(()=>dieFrame(k++%rollFrames),45);}}
     if(!s.phys&&PHYS&&ph.v&&!cLand){cLand=true;const v=ph.v;PD.land(v).then(()=>dieDone(v));}

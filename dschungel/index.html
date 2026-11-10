@@ -210,6 +210,7 @@ function renderScores(){
 const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 function showTurn(){
   const p=P[cur];
+  if(window.SITE&&SITE.diceMine)SITE.diceMine(p.type==='human');   // Würfel-Design aus dem Profil nur für Menschen an diesem Gerät
   $('turn').textContent=`${p.name} ist dran`;
   document.body.style.setProperty('--pc',p.col);$('board').style.setProperty('--pc',p.col);
   document.querySelectorAll('.tok').forEach((g,k)=>g.classList.toggle('act',k===cur));

@@ -642,6 +642,7 @@ function say(t,keep=true){
     $('log').innerHTML=logLines.slice(-8).reverse().map(l=>`<div>${l}</div>`).join('');}
 }
 function showTurn(p){
+  if(window.SITE&&SITE.diceMine)SITE.diceMine(isMe(p));   // Würfel-Design aus dem Profil nur für die eigenen Würfe
   const b=$('banner');
   b.innerHTML=`${PLAYERS[p].n} ist dran<small>${isMe(p)?'Du bist an der Reihe':(cfg[p]==='cpu'?'Computer':(names[p]?esc(names[p]):'Mitspieler'))}</small>`;
   b.style.setProperty('--pc',hexCss(PLAYERS[p].c));

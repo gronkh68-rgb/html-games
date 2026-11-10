@@ -12,7 +12,7 @@ html[data-style="cyber"] body::after{
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
              radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5));
 }
-html[data-style="cyber"] #styleSwitch button{
+html[data-style="cyber"] #styleSwitch button,html[data-style="cyber"] #styleSwitch select{
   font-family:var(--ui);text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-size:11px;
   background:#0b0e16;color:var(--text);border:1px solid #3a3d18;border-radius:0;
   clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);

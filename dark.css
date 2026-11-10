@@ -14,7 +14,7 @@ html[data-style="dark"] .btn:hover:not(:disabled){background:#4c7cf0;transform:n
 html[data-style="dark"] .btn.alt{background:#1c212c;color:#e8ebf2;border:1px solid #2a2f3b}
 html[data-style="dark"] .btn.alt:hover:not(:disabled){background:#252b38}
 html[data-style="dark"] select,html[data-style="dark"] input{border-radius:8px;border:1px solid #2a2f3b;background:#0b0d12;color:#e8ebf2}
-html[data-style="dark"] #styleSwitch button{background:#141821;color:#cfd5e4;border:1px solid #2a2f3b;border-radius:8px}
+html[data-style="dark"] #styleSwitch button,html[data-style="dark"] #styleSwitch select{background:#141821;color:#cfd5e4;border:1px solid #2a2f3b;border-radius:8px}
 
 /* Mensch ärgere dich nicht: flaches dunkles Brett */
 html[data-style="dark"] #board{background:#0d0f14;border:2px solid #2a2f3b;border-radius:14px;box-shadow:none}

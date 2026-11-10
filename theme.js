@@ -20,7 +20,7 @@
     if (mode === false) mode = 'standard';
     if (mode === 'dark') {
       root.setAttribute('data-style', 'dark');
-      addLink('dark-css', base + 'dark.css?v=2');
+      addLink('dark-css', base + 'dark.css?v=3');
     } else if (mode === 'cyber') {
       root.setAttribute('data-style', 'cyber');
       addLink('cyber-fonts', 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@700;800&family=Share+Tech+Mono&display=swap');
@@ -48,39 +48,33 @@
     var css = document.createElement('style');
     css.textContent =
       '#styleSwitch{position:fixed;left:8px;bottom:8px;z-index:500;display:flex;gap:6px;font:600 12px system-ui,sans-serif}' +
-      '#styleSwitch button{font:inherit;color:#fff;background:rgba(20,22,40,.82);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 10px;cursor:pointer}' +
-      '#styleSwitch button:hover{border-color:#fff}';
+      '#styleSwitch button,#styleSwitch select{font:inherit;color:#fff;background:rgba(20,22,40,.82);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 10px;cursor:pointer}' +
+      '#styleSwitch select{padding-right:6px;max-width:150px}#styleSwitch select option{background:#14162a;color:#fff;text-transform:none;letter-spacing:0}' +
+      '#styleSwitch button:hover,#styleSwitch select:hover{border-color:#fff}';
     document.head.appendChild(css);
 
     var box = document.createElement('div');
     box.id = 'styleSwitch';
-    var b1 = document.createElement('button');
+    // Stil-Auswahl als Aufklappmenü mit allen Stilen; Dunkel ist nur auf Seiten wählbar, die es anbieten
+    var b1 = document.createElement('select');
+    b1.title = 'Stil wählen'; b1.setAttribute('aria-label', 'Stil wählen');
+    [['cyber', 'Stil: Cyber'], ['standard', 'Stil: Standard'], ['dark', window.DARK_STYLE ? 'Stil: Dunkel' : 'Stil: Dunkel (hier nicht verfügbar)']].forEach(function (s) {
+      var o = document.createElement('option'); o.value = s[0]; o.textContent = s[1]; if (s[0] === 'dark' && !window.DARK_STYLE) o.disabled = true; b1.appendChild(o);
+    });
     var b2 = document.createElement('button');
     var b3 = document.createElement('button');
-    var b5 = document.createElement('button');
-    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3); box.appendChild(b5);
+    box.appendChild(b1); box.appendChild(b2); box.appendChild(b3);
     document.body.appendChild(box);
 
     function paint() {
       var st = root.getAttribute('data-style'), on = st === 'cyber';
-      b1.textContent = st === 'cyber' ? 'Stil: Cyber' : (st === 'dark' ? 'Stil: Dunkel' : 'Stil: Standard');
-      b1.title = 'Design umschalten (DEUKRO Cyber)';
+      b1.value = st || 'standard';
       b2.hidden = !on;
       b2.textContent = root.getAttribute('data-fx') === 'off' ? 'Effekte: aus' : 'Effekte: an';
       b3.hidden = !(on && window.RAIN_OPTION);   // Regen gibt es nur in den 3D-Ansichten im Cyber-Stil
       b3.textContent = root.getAttribute('data-rain') === 'off' ? 'Regen: aus' : 'Regen: an';
-      b5.hidden = !window.DARK_STYLE;
-      b5.textContent = st === 'dark' ? '🌑 Dunkel: an' : '🌑 Dunkel';
     }
-    b1.onclick = function () {
-      var st = root.getAttribute('data-style') || 'standard';
-      var next = st === 'cyber' ? 'standard' : (st === 'standard' ? 'cyber' : 'cyber');
-      apply(next); set(KEY, next); paint();
-    };
-    b5.onclick = function () {
-      var next = root.getAttribute('data-style') === 'dark' ? 'cyber' : 'dark';
-      apply(next); set(KEY, next); paint();
-    };
+    b1.onchange = function () { var next = b1.value; set(KEY, next); apply(current()); paint(); };
     b2.onclick = function () {
       var off = root.getAttribute('data-fx') !== 'off';
       applyFx(off); set(FX, off ? 'off' : 'on'); paint();
@@ -96,7 +90,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.9.0';
+  var VERSION = '3.10.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -128,7 +122,7 @@
   }
   // Allgemeine Begriffe, die auf vielen Seiten vorkommen (Lobby, Umschalter, Knöpfe)
   SITE.addDict({
-    '← Spiele': '← Games', 'Spielen →': 'Play →', 'Ton: an': 'Sound: on', 'Ton: aus': 'Sound: off', 'Stil: Cyber': 'Style: Cyber', 'Stil: Standard': 'Style: Standard', 'Stil: Japan': 'Style: Japan', 'Stil: Dunkel': 'Style: Dark',
+    '← Spiele': '← Games', 'Spielen →': 'Play →', 'Ton: an': 'Sound: on', 'Ton: aus': 'Sound: off', 'Stil: Cyber': 'Style: Cyber', 'Stil: Standard': 'Style: Standard', 'Stil: Japan': 'Style: Japan', 'Stil: Dunkel': 'Style: Dark', 'Stil: Dunkel (hier nicht verfügbar)': 'Style: Dark (not available here)', 'Stil wählen': 'Choose style',
     'Effekte: an': 'Effects: on', 'Effekte: aus': 'Effects: off', 'Regen: an': 'Rain: on', 'Regen: aus': 'Rain: off', '🌸 Japan: an': '🌸 Japan: on', '🌑 Dunkel': '🌑 Dark', '🌑 Dunkel: an': '🌑 Dark: on',
     'Dein Name': 'Your name', 'Raum erstellen': 'Create room', 'Beitreten': 'Join', 'Link kopieren': 'Copy link', 'Kopiert': 'Copied', 'Öffentlich (in der Spieleliste)': 'Public (in the game list)', 'Privat (nur mit Code)': 'Private (code only)',
     'Plätze': 'Seats', 'Spiel starten': 'Start game', 'Zuletzt gespielt in Raum': 'Last played in room', 'Wieder beitreten': 'Rejoin', 'Offene Spiele': 'Open games', 'Suche …': 'Searching …', 'Mit Code beitreten': 'Join with code',
@@ -199,7 +193,10 @@
   };
   SITE.dice = function () { var v = get(DICEK); return v && SITE.DICE[v] ? v : 'auto'; };
   SITE.setDice = function (v) { if (v !== 'auto' && !SITE.DICE[v]) v = 'auto'; set(DICEK, v); applyDice(); document.dispatchEvent(new CustomEvent('site-dice', { detail: v })); };
-  function applyDice() { var v = SITE.dice(); if (v === 'auto') root.removeAttribute('data-dice'); else root.setAttribute('data-dice', v); }
+  // Das Design gilt nur für die eigenen Würfe: Spiele melden mit SITE.diceMine(false), wenn gerade jemand anderes würfelt
+  var diceMine = true;
+  SITE.diceMine = function (m) { diceMine = m !== false; applyDice(); };
+  function applyDice() { var v = SITE.dice(); if (v === 'auto' || !diceMine) root.removeAttribute('data-dice'); else root.setAttribute('data-dice', v); }
   applyDice();
   // Flache Würfel (.die) und der Animationswürfel (#pdie) im gewählten Design, unabhängig vom Stil der Seite
   (function () {

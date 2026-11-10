@@ -66,7 +66,7 @@
     };
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
     K.fxLocal = function (d) {
-      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col }); return; }
+      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col, mine: d.p === K.ME }); return; }
       if (cfg.fx) cfg.fx(d);
     };
     K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
