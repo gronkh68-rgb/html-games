@@ -50,7 +50,17 @@
       '#styleSwitch{position:fixed;left:8px;bottom:8px;z-index:500;display:flex;gap:6px;font:600 12px system-ui,sans-serif}' +
       '#styleSwitch button,#styleSwitch select{font:inherit;color:#fff;background:rgba(20,22,40,.82);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 10px;cursor:pointer}' +
       '#styleSwitch select{padding-right:6px;max-width:150px}#styleSwitch select option{background:#14162a;color:#fff;text-transform:none;letter-spacing:0}' +
-      '#styleSwitch button:hover,#styleSwitch select:hover{border-color:#fff}';
+      '#styleSwitch button:hover,#styleSwitch select:hover{border-color:#fff}' +
+      '#styleSwitch [hidden]{display:none!important}#styleSwitch #styleGear{display:none}' +
+      /* Kleine Bildschirme (Handy): nur ein Zahnrad unten links, die Einstellungen klappen erst beim Antippen auf und verdecken nichts */
+      '@media (max-width:700px),(max-height:520px){' +
+      '#styleSwitch>*:not(#styleGear){display:none}' +
+      '#styleSwitch.open>*:not(#styleGear){display:inline-block}' +
+      'html #styleSwitch button#styleGear{display:block;width:32px;height:32px;padding:0;font-size:17px;line-height:1;text-align:center;letter-spacing:0;text-transform:none;opacity:.8}' +
+      'html #styleSwitch.open button#styleGear{opacity:1;border-color:#fff}' +
+      '#styleSwitch.open{flex-direction:column-reverse;align-items:flex-start;gap:6px;max-width:calc(100vw - 16px)}' +
+      '#styleSwitch.open.top{flex-direction:column}' +
+      '}';
     document.head.appendChild(css);
 
     var box = document.createElement('div');
@@ -64,6 +74,10 @@
     var b2 = document.createElement('button');
     var b3 = document.createElement('button');
     box.appendChild(b1); box.appendChild(b2); box.appendChild(b3);
+    var gear = document.createElement('button'); gear.id = 'styleGear'; gear.type = 'button'; gear.textContent = '\u2699'; gear.setAttribute('data-noi18n', '');
+    gear.title = 'Einstellungen'; gear.setAttribute('aria-label', 'Einstellungen'); box.insertBefore(gear, box.firstChild);
+    gear.onclick = function (e) { e.stopPropagation(); box.classList.toggle('open'); box.classList.toggle('top', box.getBoundingClientRect().top < innerHeight / 2); };
+    document.addEventListener('click', function (e) { if (!box.contains(e.target)) box.classList.remove('open'); });
     document.body.appendChild(box);
 
     function paint() {
@@ -90,7 +104,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.12.1';
+  var VERSION = '3.12.2';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
