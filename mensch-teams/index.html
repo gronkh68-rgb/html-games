@@ -14,12 +14,14 @@
 <script src="../hostkit.js"></script>
 <script src="../dice3d.js"></script>
 <script src="engine.js"></script>
+<script src="view3d.js"></script>
 <style>
 .wrap{max-width:1400px}
 .hk-layout{grid-template-columns:minmax(0,1fr) 310px}
 .bw{width:min(100%,calc(100vh - 170px));min-width:320px;margin:0 auto}
 .bw.wide{width:100%;max-width:1150px}
 .modbox{fill:rgba(0,0,0,.45);stroke:#ffd23f;stroke-width:2.5}
+.dirA{pointer-events:none;animation:dirflow 1.6s ease-in-out infinite}@keyframes dirflow{0%,100%{opacity:.3}45%{opacity:1}}
 #svg{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 45%,#2b3a55,#141c2e);border:3px solid #0b1424;border-radius:18px;transition:border-color .3s,box-shadow .3s}
 #svg.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.3),0 0 40px rgba(255,210,63,.25)}
 html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1a2e,#04070d);border-color:#00f0ff55}
@@ -38,6 +40,8 @@ html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1
 .tm b{margin-left:auto}
 .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:3px}.bar i{display:block;height:100%;background:#3ddc84}
 #diceDock{height:300px;width:225px;margin:0 auto;position:relative}
+#stage3d{position:relative;width:100%;height:min(74vh,760px);min-height:360px;border-radius:14px;overflow:hidden;border:2px solid #0b1424;background:#07090f}
+#stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
 </style>
 </head>
 <body>
@@ -50,10 +54,12 @@ html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1
         <div id="hkBanner"></div>
         <div id="hkStatus"></div>
         <div class="bw"><svg id="svg" viewBox="0 0 800 800"></svg></div>
+        <div id="stage3d" hidden></div>
       </div>
       <div class="hk-side">
         <div id="diceDock"></div>
         <div class="panel"><div id="teams"></div></div>
+        <div class="panel"><div class="row" style="margin:0"><button class="btn alt" id="v3d" style="flex:1">🧊 3D-Ansicht</button><button class="btn alt" id="cam3" style="flex:none" hidden title="Ansicht zurücksetzen">⟲</button></div></div>
         <div class="panel"><div id="hkLog"></div></div>
         <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
         <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
@@ -128,6 +134,16 @@ function layout(n,P,map){
   return LAY[key]={ring,start,lane,house};
 }
 const pcPt=(L,p,pos,i)=>L.eight?(pos<0?L.base[p][i]:pos<L.len?L.cells[MTE.eightCell(p,pos)]:L.house[p%2===0?0:1][pos-L.len]):(pos<0?L.house[p][i]:pos<80?L.ring[(L.start[p]+pos)%80]:L.lane[p][pos-80]);
+// Richtungspfeile: vor dem Startfeld jedes Sitzes laufen Pfeile in dessen Laufrichtung, am Hauseingang zeigt ein Pfeil hinein
+function arrowsOf(v){
+  const L=layout(v.n,v.P,v.map),R=MTE.len({map:v.map,P:v.P,n:v.n}),out=[];
+  for(let p=0;p<v.n;p++){
+    const c=seatColor(p,v.n);
+    [1,3,5,7,9,11].forEach((k,j)=>{const a=pcPt(L,p,k,0),b=pcPt(L,p,k+1,0);out.push({x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,a:Math.atan2(b[1]-a[1],b[0]-a[0]),c,ph:j,s:1});});
+    if(v.map!=='eight'||p<2){const a=pcPt(L,p,R-1,0),b=pcPt(L,p,R,0);out.push({x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,a:Math.atan2(b[1]-a[1],b[0]-a[0]),c:v.map==='eight'?TEAMC[teamOf(p,v.n)]:c,ph:6,s:1.5});}
+  }
+  return out;
+}
 let builtKey='';
 function buildEight(v){
   const L=layoutEight();let h='<g id="bg">';
@@ -135,9 +151,10 @@ function buildEight(v){
   L.cells.forEach((pt,i)=>{if(i===MTE.EDUP)return;h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="${i===MTE.ECEN?13:11}" fill="rgba(255,255,255,${i===MTE.ECEN?.2:.12})"/>`;});
   for(let p=0;p<4;p++){const c=seatColor(p,4),s=MTE.ESEAT[p].s,pt=L.cells[s],d=MTE.ESEAT[p].d;
     h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="13" fill="${c}" stroke="#fff" stroke-width="2"/>`;
-    const nx=L.cells[(s+d+MTE.EN)%MTE.EN];h+=`<text class="lbl" x="${(pt[0]+nx[0])/2}" y="${(pt[1]+nx[1])/2+4}" style="font-size:11px;fill:#fff;opacity:.85">${d>0?'↻':'↺'}</text>`;
+
     L.base[p].forEach(b=>{h+=`<circle class="fld" cx="${b[0]}" cy="${b[1]}" r="11" fill="${c}" fill-opacity=".22" stroke="${c}"/>`;});}
   [0,1].forEach(tm=>{const c=TEAMC[tm];L.house[tm].forEach((pt,q)=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="${c}" fill-opacity=".34" stroke="${c}"/>`;});});
+  arrowsOf(v).forEach(a=>{h+=`<path class="dirA" style="animation-delay:${a.ph*.22}s" d="M-5,-6 L5,0 L-5,6 L-2,0 Z" fill="${a.c}" stroke="#fff" stroke-width=".7" transform="translate(${a.x},${a.y}) rotate(${a.a*180/Math.PI}) scale(${a.s*1.9})"/>`;});
   h+='</g><g id="mid"></g><g id="tg"></g><g id="pcs">';
   for(let p=0;p<4;p++)for(let i=0;i<4;i++)h+=`<g class="pcg" id="pg-${p}-${i}"><circle class="pc" data-p="${p}" data-i="${i}" r="10" fill="${seatColor(p,4)}"/><circle r="3.4" fill="${TEAMC[teamOf(p,4)]}" stroke="#fff" stroke-width="1" pointer-events="none"/></g>`;
   h+='</g><g id="lbls"></g>';
@@ -205,7 +222,50 @@ function render(v,prev){
   v._m=mine;
   $('hkStatus').textContent=hintTxt||(v.log[0]?tx(v.log[0]):'');
   $('hkLog').innerHTML=v.log.slice(1,60).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+  sync3d();
 }
+// ---------- 3D-Ansicht ----------
+function fields3d(v){
+  const L=layout(v.n,v.P,v.map),pts=[],key=(v.map||'ring')+v.n+'-'+v.P;let loop=null;
+  if(v.map==='eight'){
+    L.cells.forEach((c,i)=>{if(i===MTE.EDUP)return;pts.push({x:c[0],y:c[1],k:i===MTE.ECEN?'center':'track'});});
+    for(let p=0;p<4;p++){const c=L.cells[MTE.ESEAT[p].s];pts.push({x:c[0],y:c[1],k:'start',c:seatColor(p,4)});L.base[p].forEach(b=>pts.push({x:b[0],y:b[1],k:'base',c:seatColor(p,4)}));}
+    [0,1].forEach(tm=>L.house[tm].forEach(h=>pts.push({x:h[0],y:h[1],k:'house',c:TEAMC[tm]})));
+    loop=L.cells.slice();
+  }else{
+    L.ring.forEach(pt=>pts.push({x:pt[0],y:pt[1],k:'track'}));
+    for(let p=0;p<v.n;p++){const c=L.ring[L.start[p]];pts.push({x:c[0],y:c[1],k:'start',c:seatColor(p,v.n)});L.lane[p].forEach(h=>pts.push({x:h[0],y:h[1],k:'lane',c:seatColor(p,v.n)}));L.house[p].forEach(h=>pts.push({x:h[0],y:h[1],k:'base',c:seatColor(p,v.n)}));}
+  }
+  const pieces=[];for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++)pieces.push({p,i,c:seatColor(p,v.n),tc:TEAMC[teamOf(p,v.n)]});
+  return {key,pts,loop,closed:true,pieces,arrows:arrowsOf(v)};
+}
+let use3d=false,loading3=false;
+try{use3d=localStorage.getItem('mt-3d')==='1';}catch(e){}
+const CDN3='https://cdn.jsdelivr.net/npm/three@0.128.0/',LIBS3=['build/three.min.js','examples/js/controls/OrbitControls.js'];
+const loadLibs3=()=>window.THREE&&THREE.OrbitControls?Promise.resolve():LIBS3.reduce((pr,u)=>pr.then(()=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=CDN3+u;s.onload=res;s.onerror=()=>rej(new Error(u));document.head.appendChild(s);})),Promise.resolve());
+function sync3d(){
+  if(!use3d||!V||!window.MT3D||!MT3D.ready)return;
+  const L=layout(V.n,V.P,V.map);
+  MT3D.update(V,fields3d(V),(p,pos,i)=>pcPt(L,p,pos,i),!!inp&&!V.over?inp.opts:null);
+}
+async function set3d(on){
+  if(on&&!(window.MT3D&&MT3D.ready)){
+    if(loading3)return;loading3=true;$('v3d').textContent=T('Lade 3D …','Loading 3D …');
+    try{await loadLibs3();MT3D.init($('stage3d'),{
+      onTarget:k=>{if(inp)answer(k);},
+      onPiece:(p,i)=>{if(!inp)return;const k=inp.opts.findIndex(o=>o.q===p&&o.i===i);if(k>=0)answer(k);else{hintTxt=T('Diese Figur kann gerade nicht ziehen.','This piece cannot move right now.');K.apply();}}});}
+    catch(e){loading3=false;$('v3d').textContent=T('3D nicht verfügbar','3D unavailable');return;}
+    loading3=false;
+  }
+  use3d=on;try{localStorage.setItem('mt-3d',on?'1':'0');}catch(e){}
+  $('stage3d').hidden=!on;$('svg').parentNode.hidden=on;$('cam3').hidden=!on;
+  $('v3d').textContent=on?T('🧊 2D-Ansicht','🧊 2D view'):T('🧊 3D-Ansicht','🧊 3D view');
+  if(window.MT3D&&MT3D.ready){MT3D.setActive(on);if(on){MT3D.resize();builtKey3=null;}}
+  if(on&&K&&K.V)K.apply();
+}
+let builtKey3=null;
+$('v3d').onclick=()=>set3d(!use3d);
+$('cam3').onclick=()=>MT3D.camReset();
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,v:spec.v,opts:spec.opts};hintTxt='';K.apply();}else res(null);});}
 function answer(k){if(!inp)return;const r=inp.res;inp=null;hintTxt='';K.apply();r(k);}
 $('svg').addEventListener('click',e=>{
@@ -250,6 +310,7 @@ K=HK.init({
 MTE.bind(K);
 K.sndBtn($('snd'));
 $('start').onclick=()=>K.startLocal(readOpts().n-1);
+if(use3d){use3d=false;setTimeout(()=>set3d(true),0);}
 $('again').onclick=()=>K.exit(true);
 </script>
 </body>
