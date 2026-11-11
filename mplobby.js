@@ -156,7 +156,16 @@
         var full = function (why) { try { conn.send({ t: 'full', why: why }); } catch (e) {} setTimeout(function () { try { conn.close(); } catch (e) {} }, 400); };
         if (L.playing) {
           var ri = -1;
-          if (cfg.rejoin && m.rid) L.seats.forEach(function (s, k) { if (ri < 0 && s.away && s.rid === m.rid) ri = k; });
+          if (cfg.rejoin) {
+            // 1) dieselbe Kennung: der Platz ist frei geworden ('away') oder die alte Verbindung hängt noch (Seite neu geladen, Handy gesperrt) -> übernehmen
+            if (m.rid) L.seats.forEach(function (s, k) { if (ri < 0 && s.rid === m.rid && (s.away || s.type === 'remote')) ri = k; });
+            // 2) gleicher Name auf einem freien Platz (zurück von einem anderen Gerät)
+            var nq = String(m.name || '').trim().toLowerCase();
+            if (ri < 0 && nq) L.seats.forEach(function (s, k) { if (ri < 0 && s.away && s.was && String(s.was).trim().toLowerCase() === nq) ri = k; });
+            // 3) sonst der erste freie Platz: so kann man jemanden mit dem Raumcode einladen, der den Platz übernimmt
+            if (ri < 0) L.seats.forEach(function (s, k) { if (ri < 0 && s.away) ri = k; });
+            if (ri >= 0 && L.seats[ri].type === 'remote' && L.seats[ri].conn) { var oc = L.seats[ri].conn; oc.slot = undefined; try { oc.close(); } catch (e) {} }      // alte, hängende Verbindung beenden
+          }
           if (ri < 0) { full('Das Spiel läuft schon' + (cfg.rejoin ? ' und dein alter Platz ist nicht mehr frei' : '')); return; }
           L.seats[ri] = { type: 'remote', name: String(m.name || 'Spieler').slice(0, 14), conn: conn, rid: m.rid }; conn.slot = ri;
           try { conn.send({ t: 'welcome', slot: ri }); } catch (e) {}
@@ -187,7 +196,7 @@
       conn.slot = undefined;
       if (!L.playing) { L.seats[i] = { type: 'open' }; broadcastLobby(); return; }
       var old = L.seats[i];
-      L.seats[i] = { type: cfg.bots ? 'cpu' : 'left', name: '', rid: cfg.rejoin ? old.rid : undefined, away: !!(cfg.rejoin && old.rid) };
+      L.seats[i] = { type: cfg.bots ? 'cpu' : 'left', name: '', rid: cfg.rejoin ? old.rid : undefined, away: !!cfg.rejoin, was: old.name };
       if (cfg.onSeatDrop) cfg.onSeatDrop(i);
       if (L.backup && L.backup.seat === i) L.backup = null;
       setTimeout(ensureBackup, 300);
@@ -377,6 +386,7 @@
       broadcastLobby(true); ov.hidden = false; showMode('host'); renderHost();
     };
     L.leave = function () {
+      var wasIn = L.role === 'client' && L.playing;
       L.leaving = true;
       if (L.role === 'host') {
         L.seats.forEach(function (s) { if (s.conn) try { if (!L.handedOver) s.conn.send({ t: 'kicked', why: 'Der Host hat den Raum geschlossen' }); s.conn.close(); } catch (e) {} });
@@ -388,7 +398,41 @@
       L.backup = null; L.migrating = false; L.handedOver = false; L.snapData = null; L.lastSnap = null;
       try { if (L.standby && L.standby.room) L.standby.room.close(); } catch (e) {} L.standby = null; L.standbySeats = null; L.leaving = false;
       $('mpJoinForm').hidden = false; $('mpLobby').hidden = true; $('mpJoinBtn').disabled = false;
+      if (wasIn && L.showRejoin) L.showRejoin();      // aus Versehen gegangen? Sofort den Weg zurück anbieten
     };
+    // ---------- Raumcode im Spiel (zum Einladen) und Wiederbeitritt-Leiste ----------
+    var ui = document.createElement('style');
+    ui.textContent = '#mpChip{position:fixed;top:6px;left:50%;transform:translateX(-50%);z-index:600;font:700 12px system-ui,sans-serif;color:#fff;background:rgba(14,18,34,.78);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:4px 12px;cursor:pointer;white-space:nowrap;display:none;backdrop-filter:blur(4px)}' +
+      '#mpChip b{letter-spacing:.18em;font-size:13px}#mpChip.free{border-color:#ffd23f;box-shadow:0 0 12px rgba(255,210,63,.6);animation:mpfree 1.2s ease-in-out infinite alternate}@keyframes mpfree{to{box-shadow:0 0 2px rgba(255,210,63,.2)}}' +
+      '#mpRj{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:1800;background:#1d2342;color:#fff;border:1px solid #7c5cff;border-radius:14px;padding:10px 12px 10px 16px;display:none;gap:10px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45);font:600 14px system-ui,sans-serif;max-width:calc(100vw - 24px)}' +
+      '#mpRj button{font:inherit;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:#7c5cff;color:#fff}#mpRj button.x{background:transparent;color:#aab;padding:4px 8px}';
+    document.head.appendChild(ui);
+    var chip = document.createElement('div'); chip.id = 'mpChip'; chip.setAttribute('data-noi18n', ''); document.body.appendChild(chip);
+    function roomCode() { return L.role === 'host' && L.room ? L.room.code : (L.role === 'client' ? L.joinCode : null); }
+    function inviteUrl(code) { return location.origin + location.pathname + '?room=' + code; }
+    chip.onclick = function () {
+      var code = roomCode(); if (!code) return; var url = inviteUrl(code), done = function () { toast('Einladungslink kopiert: ' + code); };
+      try { navigator.clipboard.writeText(url).then(done, function () { prompt('Einladungslink:', url); }); } catch (e) { prompt('Einladungslink:', url); }
+    };
+    setInterval(function () {
+      var code = L.playing ? roomCode() : null;
+      if (!code) { chip.style.display = 'none'; return; }
+      var free = L.role === 'host' && L.seats.some(function (s) { return s.away; });
+      chip.style.display = 'block'; chip.className = free ? 'free' : '';
+      chip.innerHTML = '🔗 Raum <b>' + esc(code) + '</b>' + (free ? ' · Platz frei' : '');
+      chip.title = free ? 'Jemand ist weg: Mit dem Code oder Link kann die Person (oder jemand anderes) zurück ins Spiel. Antippen kopiert den Link.' : 'Raumcode: Antippen kopiert den Einladungslink';
+    }, 1200);
+    var rj = document.createElement('div'); rj.id = 'mpRj'; rj.setAttribute('data-noi18n', ''); document.body.appendChild(rj);
+    var rjOff = false; try { rjOff = sessionStorage.getItem('mp-rj-off-' + cfg.prefix) === '1'; } catch (e) {}
+    function showRejoin() {
+      var l = getLast(); if (!l || L.role !== 'local' || rjOff) { rj.style.display = 'none'; return; }
+      rj.innerHTML = '<span>↩ Du warst in Raum <b>' + esc(l.code) + '</b>.</span><button class="go">Zurück ins Spiel</button><button class="x" title="Ausblenden">✕</button>';
+      rj.style.display = 'flex';
+      rj.querySelector('.go').onclick = function () { rj.style.display = 'none'; L.rejoin(); };
+      rj.querySelector('.x').onclick = function () { rjOff = true; try { sessionStorage.setItem('mp-rj-off-' + cfg.prefix, '1'); } catch (e) {} rj.style.display = 'none'; };
+    }
+    L.showRejoin = function () { rjOff = false; try { sessionStorage.removeItem('mp-rj-off-' + cfg.prefix); } catch (e) {} setTimeout(showRejoin, 400); };
+    if (cfg.rejoin) { setTimeout(showRejoin, 1200); setInterval(function () { if (L.role !== 'local' || !getLast()) rj.style.display = 'none'; }, 2000); }
     addEventListener('beforeunload', function () { try { if (L.role === 'host') L.handover(); } catch (e) {} try { if (L.role === 'client' && L.hostConn) L.hostConn.send({ t: 'bye' }); } catch (e) {} });
 
     // Raumlink (?room=CODE): Beitritts-Fenster direkt öffnen
