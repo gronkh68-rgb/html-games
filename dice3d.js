@@ -16,6 +16,20 @@
   var C = null, loadP = null;
   var HALF = 0.5, TX = 4.3, TZ = 6.2, G = -42, DT = 1 / 60, EVERY = 2;      // Würfelkante 1, Tablett 8,6 x 12,4 (Schuss von unten nach oben)
   var FACE_N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]], FACE_V = [3, 4, 1, 6, 2, 5];   // Reihenfolge der BoxGeometry-Seiten
+  // Vierseitiger Würfel (Tetraeder): Ecke i trägt den Wert i+1, oben liegt die Ecke, die nach oben zeigt (die gegenüberliegende Fläche liegt flach auf dem Tisch).
+  var TET_R = .85, TET_N = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map(function (a) { var l = Math.sqrt(3); return [a[0] / l, a[1] / l, a[2] / l]; });
+  var kindN = function (k) { return k === 'd4' ? TET_N : FACE_N; }, kindV = function (k) { return k === 'd4' ? [1, 2, 3, 4] : FACE_V; }, restH = function (k) { return k === 'd4' ? TET_R / 3 : HALF; };
+  function tetFaces() {      // Fläche i liegt gegenüber der Ecke i; Eckenfolge so, dass die Fläche nach außen zeigt (gegen den Uhrzeigersinn von außen gesehen)
+    var out = [];
+    for (var i = 0; i < 4; i++) {
+      var idx = [0, 1, 2, 3].filter(function (j) { return j !== i; }), a = TET_N[idx[0]], b = TET_N[idx[1]], c = TET_N[idx[2]];
+      var ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, cx = a[0] + b[0] + c[0], cy = a[1] + b[1] + c[1], cz = a[2] + b[2] + c[2];
+      if (nx * cx + ny * cy + nz * cz < 0) idx = [idx[0], idx[2], idx[1]];
+      out.push(idx);
+    }
+    return out;
+  }
   function load(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load ' + src)); }; document.head.appendChild(s); }); }
   D.ready = function () {
     if (loadP) return loadP;
@@ -27,15 +41,15 @@
   D.setCannon = function (m) { C = m; };          // für Tests ohne Netz
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
   function randQ() { var u = Math.random(), v = Math.random(), w = Math.random(); return [Math.sqrt(1 - u) * Math.sin(2 * Math.PI * v), Math.sqrt(1 - u) * Math.cos(2 * Math.PI * v), Math.sqrt(u) * Math.sin(2 * Math.PI * w), Math.sqrt(u) * Math.cos(2 * Math.PI * w)]; }
-  function topFace(q) {         // Welche Seite zeigt nach oben? -> {v, d (Ausrichtung 0..1)}
-    var x = q[0], y = q[1], z = q[2], w = q[3], best = -2, bv = 1;
-    for (var i = 0; i < 6; i++) {
-      var n = FACE_N[i], tx = n[0], ty = n[1], tz = n[2];
+  function topFace(q, kind) {         // Welche Seite (beim Vierseiter: welche Ecke) zeigt nach oben? -> {v, d (Ausrichtung 0..1)}
+    var x = q[0], y = q[1], z = q[2], w = q[3], best = -2, bv = 1, N = kindN(kind), V = kindV(kind);
+    for (var i = 0; i < N.length; i++) {
+      var n = N[i], tx = n[0], ty = n[1], tz = n[2];
       // y-Komponente von q * n
       var cx = y * tz - z * ty, cy = z * tx - x * tz;                                    // q.xyz x n (x und y)
       var cy2 = z * cx - x * (x * ty - y * tx);                                          // y von q.xyz x (q.xyz x n)
       var ry = ty + 2 * (w * cy + cy2);
-      if (ry > best) { best = ry; bv = FACE_V[i]; }
+      if (ry > best) { best = ry; bv = V[i]; }
     }
     return { v: bv, d: best };
   }
@@ -66,7 +80,7 @@
 
   // ---------- Simulation ----------
   // obs (optional): feste Hindernisse [x, z, Radius, Höhe] in Tablett-Koordinaten (z. B. Spielfiguren und Mittelobjekte), an denen die Würfel abprallen
-  D.simulate = async function (params, obs) {
+  D.simulate = async function (params, obs, kinds) {      // kinds (optional): pro Würfel 'd6' (Standard) oder 'd4'
     await D.ready();
     var n = params.dice.length, world = new C.World({ gravity: new C.Vec3(0, G, 0) });
     world.allowSleep = false; world.solver.iterations = 24;
@@ -83,16 +97,21 @@
       b.addShape(new C.Sphere(r), new C.Vec3(0, r, 0)); if (o[3] > r * 2.2) { b.addShape(new C.Sphere(r * .72), new C.Vec3(0, o[3] - r * .72, 0)); if (o[3] > r * 3.4) b.addShape(new C.Sphere(r * .85), new C.Vec3(0, (r + o[3]) / 2 - r * .1, 0)); }
       b.position.set(o[0], 0, o[1]); world.addBody(b);
     });
-    var bodies = params.dice.map(function (d) {
+    var tetShape = function () {
+      var vs = TET_N.map(function (n) { return new C.Vec3(n[0] * TET_R, n[1] * TET_R, n[2] * TET_R); });
+      return new C.ConvexPolyhedron({ vertices: vs, faces: tetFaces() });
+    };
+    var bodies = params.dice.map(function (d, di) {
       var b = new C.Body({ mass: 1, material: mDie, linearDamping: .06, angularDamping: .10 });
-      b.addShape(new C.Box(new C.Vec3(HALF, HALF, HALF)));
+      b._k = kinds && kinds[di] === 'd4' ? 'd4' : 'd6';
+      b.addShape(b._k === 'd4' ? tetShape() : new C.Box(new C.Vec3(HALF, HALF, HALF)));
       b.position.set(d.p[0], d.p[1], d.p[2]); b.quaternion.set(d.q[0], d.q[1], d.q[2], d.q[3]);
       b.velocity.set(d.v[0], d.v[1], d.v[2]); b.angularVelocity.set(d.w[0], d.w[1], d.w[2]);
       world.addBody(b); return b;
     });
     var frames = [], step = 0, calm = 0, rerolls = 0, maxSteps = 60 * 6, res = null;
     function rec() { var f = []; bodies.forEach(function (b) { f.push(+b.position.x.toFixed(2), +b.position.y.toFixed(2), +b.position.z.toFixed(2), +b.quaternion.x.toFixed(3), +b.quaternion.y.toFixed(3), +b.quaternion.z.toFixed(3), +b.quaternion.w.toFixed(3)); }); frames.push(f); }
-    var topOf = function (b) { return topFace([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w]); };
+    var topOf = function (b) { return topFace([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w], b._k); };
     rec();
     while (step < maxSteps) {
       world.step(DT); step++;
@@ -115,12 +134,12 @@
         var starts = bodies.map(function (b) { return { p: b.position.clone(), q: b.quaternion.clone() }; });
         var targets = bodies.map(function (b) {
           var q = b.quaternion, t = topOf(b), best = 0, bd = -2;
-          for (var i = 0; i < 6; i++) { var nn = q.vmult(new C.Vec3(FACE_N[i][0], FACE_N[i][1], FACE_N[i][2])); if (nn.y > bd) { bd = nn.y; best = nn; } }
+          var KN = kindN(b._k); for (var i = 0; i < KN.length; i++) { var nn = q.vmult(new C.Vec3(KN[i][0], KN[i][1], KN[i][2])); if (nn.y > bd) { bd = nn.y; best = nn; } }
           var r = new C.Quaternion(); r.setFromVectors(best, new C.Vec3(0, 1, 0)); var tq = r.mult(q); tq.normalize(); return tq;
         });
         for (var f = 1; f <= 14; f++) {
           var u = f / 14, e = u * u * (3 - 2 * u);
-          bodies.forEach(function (b, i) { var q = new C.Quaternion(); starts[i].q.slerp(targets[i], e, q); b.quaternion.copy(q); b.position.set(starts[i].p.x, starts[i].p.y + (HALF - starts[i].p.y) * e, starts[i].p.z); });
+          bodies.forEach(function (b, i) { var q = new C.Quaternion(); starts[i].q.slerp(targets[i], e, q); b.quaternion.copy(q); b.position.set(starts[i].p.x, starts[i].p.y + (restH(b._k) - starts[i].p.y) * e, starts[i].p.z); });
           rec(); rec();
         }
       }
@@ -163,16 +182,29 @@
     });
     var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
-  // Rechenwürfel: ein normaler Würfel, dessen Seiten 1 bis 4 die Rechenzeichen +2, -2, x2, geteilt durch 2 zeigen (die Seiten 5 und 6 kommen nie nach oben: die Seite, die das Spiel auswertet, ist immer 1 bis 4)
+  // Rechenwürfel: ein vierseitiger Würfel (Tetraeder) mit den Zeichen +2, -2, x2, geteilt durch 2 an den vier Ecken. Wie bei echten Vierseitern steht der Wert der oberen Ecke auf allen drei Seitenflächen an dieser Ecke.
   var OPS = ['+2', '\u22122', '\u00d72', '\u00f72'];
   D.OPS = OPS;
-  function modTex(v, size) {
-    var cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
-    var g = x.createRadialGradient(size / 2, size / 2, size * .1, size / 2, size / 2, size * .75); g.addColorStop(0, '#4a3208'); g.addColorStop(1, '#1d1304'); x.fillStyle = g; x.fillRect(0, 0, size, size);
-    x.strokeStyle = '#ffd23f'; x.lineWidth = size * .045; x.strokeRect(size * .035, size * .035, size * .93, size * .93);
-    x.font = '900 ' + Math.round(size * (OPS[(v - 1) % 4].length > 2 ? .44 : .5)) + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.shadowColor = '#ffd23f'; x.shadowBlur = size * .05; x.fillStyle = '#fff3c4'; x.fillText(OPS[(v - 1) % 4], size / 2, size * .53);
-    var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
+  function tetTex(fi, size) {
+    var idx = tetFaces()[fi], cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
+    var C3 = [[0, size], [size, size], [size / 2, size * (1 - .866)]], cen = [size / 2, size * (1 - .866 / 3 * 1)];
+    var g = x.createRadialGradient(cen[0], cen[1], size * .05, cen[0], cen[1], size * .7); g.addColorStop(0, '#5a3d0a'); g.addColorStop(1, '#241704'); x.fillStyle = g; x.fillRect(0, 0, size, size);
+    x.strokeStyle = '#ffd23f'; x.lineWidth = size * .04; x.beginPath(); x.moveTo(C3[0][0], C3[0][1]); x.lineTo(C3[1][0], C3[1][1]); x.lineTo(C3[2][0], C3[2][1]); x.closePath(); x.stroke();
+    cen = [(C3[0][0] + C3[1][0] + C3[2][0]) / 3, (C3[0][1] + C3[1][1] + C3[2][1]) / 3];
+    for (var k = 0; k < 3; k++) {
+      var c = C3[k], px = c[0] + (cen[0] - c[0]) * .46, py = c[1] + (cen[1] - c[1]) * .46, ang = Math.atan2(c[1] - py, c[0] - px) + Math.PI / 2, txt = OPS[idx[k]];
+      x.save(); x.translate(px, py); x.rotate(ang); x.font = '900 ' + Math.round(size * (txt.length > 2 ? .2 : .24)) + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.shadowColor = '#ffd23f'; x.shadowBlur = size * .03; x.fillStyle = '#fff3c4'; x.fillText(txt, 0, 0); x.restore();
+    }
+    var t3 = new THREE.CanvasTexture(cv); t3.anisotropy = 4; return t3;
+  }
+  var tetGeoC = null;
+  function tetGeo() {
+    if (tetGeoC) return tetGeoC;
+    var g = new THREE.BufferGeometry(), pos = [], uv = [], F = tetFaces(), U = [[0, 0], [1, 0], [.5, .866]];
+    F.forEach(function (idx, fi) { idx.forEach(function (vi, k) { var n = TET_N[vi]; pos.push(n[0] * TET_R, n[1] * TET_R, n[2] * TET_R); uv.push(U[k][0], U[k][1]); }); g.addGroup(fi * 3, 3, fi); });
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+    return tetGeoC = g;
   }
   // ---------- Darstellung: Tablett als Dock neben dem Spielfeld, Kamerafahrt nur beim eigenen Wurf ----------
   var ASP = (TX * 2 + 2.8) / (TZ * 2 + 2.8), MAXP = 4.6, ANCH_Z = TZ - 1.7;
@@ -253,15 +285,18 @@
         return new THREE.MeshStandardMaterial(cy ? { map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .75, roughness: .35, metalness: .3 } : { map: t, roughness: .55, metalness: 0 });
       }) };
       mats.cy = cy;
-      R.dice.forEach(function (d, i) { d.mesh.material = R.mod && i === 1 && modMats ? modMats : mats.list; });
+      R.dice.forEach(function (d, i) { d.mesh.material = R.mod && i === 1 && tetMats ? tetMats : mats.list; });
       if (cy && !fontTried && document.fonts && document.fonts.load) {      // Orbitron nachladen, dann Texturen neu zeichnen
         fontTried = true;
         document.fonts.load('900 40px Orbitron').then(function () { mats = null; R.mk(); R.skin(); }, function () { });
       }
       return mats;
     };
-    R.mod = false; var modMats = null;      // mod: der zweite Würfel ist der Rechenwürfel
-    R.assign = function () { var m = R.mk(); if (R.mod && !modMats) modMats = FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: modTex(v, 128), roughness: .45, metalness: .1, emissive: 0x2a1c00 }); }); R.dice.forEach(function (d, i) { d.mesh.material = R.mod && i === 1 ? modMats : m.list; }); };
+    R.mod = false; var tetMats = null;      // mod: der zweite Würfel ist der vierseitige Rechenwürfel
+    R.assign = function () {
+      var m = R.mk(); if (R.mod && !tetMats) tetMats = [0, 1, 2, 3].map(function (fi) { return new THREE.MeshStandardMaterial({ map: tetTex(fi, 256), roughness: .45, metalness: .1, emissive: 0x2a1c00 }); });
+      R.dice.forEach(function (d, i) { var four = R.mod && i === 1; d.mesh.geometry = four ? tetGeo() : geo; d.mesh.material = four ? tetMats : m.list; });
+    };
     R.ensure = function (n) {
       while (R.dice.length < n) { var m = new THREE.Mesh(geo, R.mk().list); m.castShadow = true; R.group.add(m); R.dice.push({ mesh: m }); }
       R.dice.forEach(function (d, i) { d.mesh.visible = i < n || (d.mesh.visible && i < R.shown); });

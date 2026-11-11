@@ -54,7 +54,7 @@
     var xs = F.pts.map(function (p) { return p.x; }), ys = F.pts.map(function (p) { return p.y; });
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
     cx0 = (x0 + x1) / 2; cy0 = (y0 + y1) / 2; K = Math.min(1, 34 / Math.max(x1 - x0, y1 - y0)) ; K = Math.max(.02, K);
-    bw = (x1 - x0 + 120) * K; bh = (y1 - y0 + 120) * K;
+    bw = (x1 - x0 + 70) * K; bh = (y1 - y0 + 70) * K;
     var plate = new THREE.Mesh(new THREE.BoxGeometry(bw, .4, bh), new THREE.MeshStandardMaterial({ color: 0x0d1424, roughness: .6, metalness: .4 })); plate.position.y = -.25; group.add(plate);
     var pe = new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry), new THREE.LineBasicMaterial({ color: 0x00cfff })); pe.position.copy(plate.position); group.add(pe);
     if (F.loop) {      // Bahn als helle Spur unter den Feldern
@@ -70,10 +70,10 @@
     });
     // Richtungspfeile (leuchten der Reihe nach in Laufrichtung auf)
     arrowM = [];
-    var ag = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-.34, -.4), new THREE.Vector2(.42, 0), new THREE.Vector2(-.34, .4), new THREE.Vector2(-.14, 0)]));
+    var ag = arrowGeo();
     (F.arrows || []).forEach(function (a) {
       var m = new THREE.Mesh(ag, new THREE.MeshBasicMaterial({ color: new THREE.Color(a.c), transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false })), v = P3([a.x, a.y]);
-      m.rotation.x = -Math.PI / 2; m.rotation.z = -a.a; m.position.set(v.x, .24, v.z); m.scale.setScalar(a.s * 1.7); m.rotation.order = 'YXZ'; group.add(m); arrowM.push({ m: m, ph: a.ph });
+      m.rotation.x = -Math.PI / 2; m.rotation.z = -a.a; m.position.set(v.x, .24, v.z); m.scale.setScalar(a.s * 1.2); m.rotation.order = 'YXZ'; group.add(m); arrowM.push({ m: m, ph: a.ph });
     });
     // Figuren
     var cone = new THREE.ConeGeometry(.27, .62, 18), head = new THREE.SphereGeometry(.17, 16, 12), hit = new THREE.CylinderGeometry(.6, .6, 1.5, 8);
@@ -89,8 +89,10 @@
   }
 
   // ---------- Update ----------
-  var rings = [], arrowM = [];
-  H.update = function (v, F, ptOf, opts) {
+  var rings = [], arrowM = [], arrowG = null;
+  function arrowGeo() { return arrowG || (arrowG = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-.34, -.4), new THREE.Vector2(.42, 0), new THREE.Vector2(-.34, .4), new THREE.Vector2(-.14, 0)]))); }
+  var trailM = [];
+  H.update = function (v, F, ptOf, opts, trails) {
     if (!H.ready) return;
     if (built !== F.key) { built = F.key; build(F); lastPos = null; }
     // Figuren setzen oder animieren
@@ -106,6 +108,15 @@
     Object.keys(pcs).forEach(function (id) { pcs[id].can = !!can[id]; });
     rings.forEach(function (m) { group.remove(m); }); rings = [];
     pickables = pickables.filter(function (m) { return m.userData.k === undefined; });
+    trailM.forEach(function (m) { group.remove(m.m); }); trailM = [];
+    (trails || []).forEach(function (tr) {      // Zugweg: Pfeile auf dem Weg der Figur, laufen der Reihe nach zum Ziel
+      var ag = arrowGeo();
+      for (var s = 0; s + 1 < tr.pts.length; s++) {
+        var a = tr.pts[s], b = tr.pts[s + 1], mid = P3([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        var m = new THREE.Mesh(ag, new THREE.MeshBasicMaterial({ color: new THREE.Color(tr.c), transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
+        m.rotation.order = 'YXZ'; m.rotation.x = -Math.PI / 2; m.rotation.z = -ang; m.position.set(mid.x, .3, mid.z); m.scale.setScalar(1.15); group.add(m); trailM.push({ m: m, ph: s, n: tr.pts.length });
+      }
+    });
     (opts || []).forEach(function (o, k) {
       var q = P3(ptOf(o.q, o.to, o.i)), m = new THREE.Mesh(new THREE.RingGeometry(.5, .66, 28), new THREE.MeshBasicMaterial({ color: o.cap ? 0xff5a5a : 0xffd23f, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
       m.rotation.x = -Math.PI / 2; m.position.set(q.x, .25, q.z); m.userData = { k: k }; group.add(m); rings.push(m); pickables.push(m);
@@ -129,6 +140,7 @@
     var t = now / 1000;
     Object.keys(pcs).forEach(function (id) { var pc = pcs[id], pulse = .5 + .5 * Math.sin(t * 6); pc.mat.emissiveIntensity = pc.can ? .6 + .9 * pulse : .35; if (pc.can) pc.mat.emissive.copy(pc.base).lerp(new THREE.Color(0xffffff), .25 * pulse); else pc.mat.emissive.copy(pc.base).multiplyScalar(.25); });
     rings.forEach(function (m, k) { m.scale.setScalar(1 + .12 * Math.sin(t * 5 + k)); });
+    trailM.forEach(function (o) { o.m.material.opacity = .35 + .65 * Math.max(0, Math.sin(t * 8 - o.ph * 1.1)); });
     arrowM.forEach(function (o) { o.m.material.opacity = .25 + .75 * Math.max(0, Math.sin(t * 3.6 - o.ph * .8)); });
     controls.update(); r.render(scene, camera);
   }

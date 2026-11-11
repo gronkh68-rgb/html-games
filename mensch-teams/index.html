@@ -21,6 +21,7 @@
 .bw{width:min(100%,calc(100vh - 170px));min-width:320px;margin:0 auto}
 .bw.wide{width:100%;max-width:1150px}
 .modbox{fill:rgba(0,0,0,.45);stroke:#ffd23f;stroke-width:2.5}
+.trl,.trl2{pointer-events:none}.trl2{animation:trlflow .7s linear infinite}@keyframes trlflow{to{stroke-dashoffset:-12}}
 .dirA{pointer-events:none;animation:dirflow 1.6s ease-in-out infinite}@keyframes dirflow{0%,100%{opacity:.3}45%{opacity:1}}
 #svg{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 45%,#2b3a55,#141c2e);border:3px solid #0b1424;border-radius:18px;transition:border-color .3s,box-shadow .3s}
 #svg.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.3),0 0 40px rgba(255,210,63,.25)}
@@ -42,6 +43,15 @@ html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1
 #diceDock{height:300px;width:225px;margin:0 auto;position:relative}
 #stage3d{position:relative;width:100%;height:min(74vh,760px);min-height:360px;border-radius:14px;overflow:hidden;border:2px solid #0b1424;background:#07090f}
 #stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
+body.full3d{overflow:hidden}body.full3d .top,body.full3d footer{display:none}
+body.full3d #stage3d{position:fixed;inset:0;width:auto;height:auto;min-height:0;border:0;border-radius:0;z-index:20}
+body.full3d .hk-layout{display:block}body.full3d .hk-main,body.full3d .hk-side{display:contents}
+body.full3d #hkBanner{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:30;max-width:min(92vw,720px);padding:6px 16px;font-size:.95rem}
+body.full3d #hkStatus{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:30;max-width:min(92vw,720px);min-height:0;padding:5px 14px;font-size:.9rem}
+body.full3d .hk-side>*:not(#diceDock):not(.panel:has(#fs3)){display:none}
+body.full3d .panel:has(#fs3){position:fixed;top:8px;right:8px;z-index:40;margin:0;padding:6px;background:rgba(10,14,28,.7);border:0}
+body.full3d .panel:has(#fs3) #v3d{display:none}
+body.full3d #diceDock{position:fixed;right:10px;bottom:46px;width:150px;height:200px;margin:0;z-index:30}
 </style>
 </head>
 <body>
@@ -59,7 +69,7 @@ html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1
       <div class="hk-side">
         <div id="diceDock"></div>
         <div class="panel"><div id="teams"></div></div>
-        <div class="panel"><div class="row" style="margin:0"><button class="btn alt" id="v3d" style="flex:1">🧊 3D-Ansicht</button><button class="btn alt" id="cam3" style="flex:none" hidden title="Ansicht zurücksetzen">⟲</button></div></div>
+        <div class="panel"><div class="row" style="margin:0"><button class="btn alt" id="v3d" style="flex:1">🧊 3D-Ansicht</button><button class="btn alt" id="cam3" style="flex:none" hidden title="Ansicht zurücksetzen">⟲</button><button class="btn alt" id="fs3" style="flex:none" hidden title="Vollbild">⛶</button></div></div>
         <div class="panel"><div id="hkLog"></div></div>
         <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
         <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
@@ -144,6 +154,10 @@ function arrowsOf(v){
   }
   return out;
 }
+// Zugpfade: für jeden erlaubten Zug der Weg, den die Figur geht (so sieht man bei vielen Figuren sofort, wohin und in welche Richtung gezogen wird)
+function trailsOf(v,L,opts){
+  return (opts||[]).map(o=>{const pts=[];if(o.from<0)pts.push(pcPt(L,o.q,-1,o.i),pcPt(L,o.q,o.to,o.i));else for(let x=o.from;x<=o.to;x++)pts.push(pcPt(L,o.q,x,o.i));return {pts,c:seatColor(o.q,v.n),cap:!!o.cap};});
+}
 let builtKey='';
 function buildEight(v){
   const L=layoutEight();let h='<g id="bg">';
@@ -155,7 +169,7 @@ function buildEight(v){
     L.base[p].forEach(b=>{h+=`<circle class="fld" cx="${b[0]}" cy="${b[1]}" r="11" fill="${c}" fill-opacity=".22" stroke="${c}"/>`;});}
   [0,1].forEach(tm=>{const c=TEAMC[tm];L.house[tm].forEach((pt,q)=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="${c}" fill-opacity=".34" stroke="${c}"/>`;});});
   arrowsOf(v).forEach(a=>{h+=`<path class="dirA" style="animation-delay:${a.ph*.22}s" d="M-5,-6 L5,0 L-5,6 L-2,0 Z" fill="${a.c}" stroke="#fff" stroke-width=".7" transform="translate(${a.x},${a.y}) rotate(${a.a*180/Math.PI}) scale(${a.s*1.9})"/>`;});
-  h+='</g><g id="mid"></g><g id="tg"></g><g id="pcs">';
+  h+='</g><g id="mid"></g><g id="trl"></g><g id="tg"></g><g id="pcs">';
   for(let p=0;p<4;p++)for(let i=0;i<4;i++)h+=`<g class="pcg" id="pg-${p}-${i}"><circle class="pc" data-p="${p}" data-i="${i}" r="10" fill="${seatColor(p,4)}"/><circle r="3.4" fill="${TEAMC[teamOf(p,4)]}" stroke="#fff" stroke-width="1" pointer-events="none"/></g>`;
   h+='</g><g id="lbls"></g>';
   $('svg').setAttribute('viewBox','0 0 '+EW+' '+EH);$('svg').parentNode.classList.add('wide');$('svg').innerHTML=h;
@@ -172,7 +186,7 @@ function build(v){
     L.lane[p].forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="10.5" fill="${c}" fill-opacity=".38" stroke="${c}"/>`;});
     L.house[p].forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="${c}" fill-opacity=".22" stroke="${c}"/>`;});
   }
-  h+='</g><g id="mid"></g><g id="tg"></g><g id="pcs">';
+  h+='</g><g id="mid"></g><g id="trl"></g><g id="tg"></g><g id="pcs">';
   for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++)h+=`<g class="pcg" id="pg-${p}-${i}"><circle class="pc" data-p="${p}" data-i="${i}" r="10" fill="${seatColor(p,v.n)}"/><circle r="3.4" fill="${TEAMC[teamOf(p,v.n)]}" stroke="#fff" stroke-width="1" pointer-events="none"/></g>`;
   h+='</g><g id="lbls"></g>';
   $('svg').innerHTML=h;
@@ -192,6 +206,13 @@ function render(v,prev){
   let tg='';
   if(mine)inp.opts.forEach((o,k)=>{const pt=pcPt(L,o.q,o.to,o.i);tg+=`<circle class="tgt" data-k="${k}" cx="${pt[0]}" cy="${pt[1]}" r="12"/>`;});
   $('tg').innerHTML=tg;
+  let trl='';
+  if(mine)trailsOf(v,L,inp.opts).forEach((tr,k)=>{
+    const d=tr.pts.map(p=>p[0]+','+p[1]).join(' '),n=tr.pts.length,a=tr.pts[n-2],b=tr.pts[n-1],ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+    trl+=`<polyline class="trl" points="${d}" fill="none" stroke="${tr.c}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/><polyline class="trl2" points="${d}" fill="none" stroke="#fff" stroke-width="2.4" stroke-dasharray="3 9" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`
+      +`<path d="M-9,-9 L11,0 L-9,9 L-4,0 Z" fill="${tr.c}" stroke="#fff" stroke-width="1.4" transform="translate(${b[0]},${b[1]}) rotate(${ang}) scale(1.15)" pointer-events="none"/>`;
+  });
+  $('trl').innerHTML=trl;
   let lb='',m='';const total=v.n/2;
   if(v.map==='eight'){
     // Namen an den Startseiten, Würfel und Rechenwürfel oben in der Mitte, Teamstand unten
@@ -246,7 +267,8 @@ const loadLibs3=()=>window.THREE&&THREE.OrbitControls?Promise.resolve():LIBS3.re
 function sync3d(){
   if(!use3d||!V||!window.MT3D||!MT3D.ready)return;
   const L=layout(V.n,V.P,V.map);
-  MT3D.update(V,fields3d(V),(p,pos,i)=>pcPt(L,p,pos,i),!!inp&&!V.over?inp.opts:null);
+  const opts=!!inp&&!V.over?inp.opts:null;
+  MT3D.update(V,fields3d(V),(p,pos,i)=>pcPt(L,p,pos,i),opts,trailsOf(V,L,opts));
 }
 async function set3d(on){
   if(on&&!(window.MT3D&&MT3D.ready)){
@@ -258,12 +280,22 @@ async function set3d(on){
     loading3=false;
   }
   use3d=on;try{localStorage.setItem('mt-3d',on?'1':'0');}catch(e){}
-  $('stage3d').hidden=!on;$('svg').parentNode.hidden=on;$('cam3').hidden=!on;
+  $('stage3d').hidden=!on;$('svg').parentNode.hidden=on;$('cam3').hidden=!on;$('fs3').hidden=!on;if(!on)setFull(false);
   $('v3d').textContent=on?T('🧊 2D-Ansicht','🧊 2D view'):T('🧊 3D-Ansicht','🧊 3D view');
   if(window.MT3D&&MT3D.ready){MT3D.setActive(on);if(on){MT3D.resize();builtKey3=null;}}
   if(on&&K&&K.V)K.apply();
 }
 let builtKey3=null;
+// Vollbild: Brett füllt den Bildschirm, Banner, Hinweis und Würfel schweben darüber
+function setFull(on){
+  if(document.body.classList.contains('full3d')===on)return;
+  document.body.classList.toggle('full3d',on);$('fs3').textContent=on?'✕':'⛶';
+  try{if(on&&document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
+  [150,500,1100].forEach(ms=>setTimeout(()=>{if(window.MT3D&&MT3D.ready){MT3D.resize();MT3D.camReset();}},ms));      // der Browser braucht einen Moment, bis die Vollbildgröße steht
+}
+$('fs3').onclick=()=>setFull(!document.body.classList.contains('full3d'));
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('full3d'))setFull(false);});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('full3d'))setFull(false);});
 $('v3d').onclick=()=>set3d(!use3d);
 $('cam3').onclick=()=>MT3D.camReset();
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,v:spec.v,opts:spec.opts};hintTxt='';K.apply();}else res(null);});}
