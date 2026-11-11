@@ -18,6 +18,8 @@
 .wrap{max-width:1400px}
 .hk-layout{grid-template-columns:minmax(0,1fr) 310px}
 .bw{width:min(100%,calc(100vh - 170px));min-width:320px;margin:0 auto}
+.bw.wide{width:100%;max-width:1150px}
+.modbox{fill:rgba(0,0,0,.45);stroke:#ffd23f;stroke-width:2.5}
 #svg{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 45%,#2b3a55,#141c2e);border:3px solid #0b1424;border-radius:18px;transition:border-color .3s,box-shadow .3s}
 #svg.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.3),0 0 40px rgba(255,210,63,.25)}
 html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1a2e,#04070d);border-color:#00f0ff55}
@@ -68,9 +70,11 @@ const RULES=()=>`<ul>
 <li>${T('Mit einer <b>6</b> kommt eine Figur raus, nach einer 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du 3 Versuche.','A <b>6</b> brings a piece out, and after a 6 you roll again. With no piece on the field you get 3 tries.')}</li>
 <li>${T('Wer auf eine fremde Figur zieht, wirft sie raus. Figuren deines <b>Teams</b> blockieren sich, man kann sie nicht schlagen.','Landing on an opponent’s piece sends it home. Pieces of your <b>team</b> block each other and cannot be captured.')}</li>
 <li>${T('Alle Figuren müssen in die eigene <b>Zielgasse</b> (man darf dort nicht überspringen). Mit <b>Teamzügen</b> darfst du mit jedem Wurf auch Figuren deines Partners ziehen.','All pieces must reach your own <b>goal lane</b> (no jumping there). With <b>team moves</b> you may move your partner’s pieces with any roll.')}</li>
-<li>${T('Ein Team gewinnt, wenn alle Figuren beider Partner im Ziel sind.','A team wins when all pieces of both partners are home.')}</li></ul>`;
+<li>${T('Ein Team gewinnt, wenn alle Figuren beider Partner im Ziel sind.','A team wins when all pieces of both partners are home.')}</li>
+<li>${T('<b>Liegende Acht</b> (4 Spieler): Die Bahn ist eine 8 mit gemeinsamer Kreuzung, auf der man sich auch schlagen kann. Die beiden Spieler eines Teams starten auf derselben Seite, laufen aber in <b>entgegengesetzte Richtungen</b> und begegnen sich. Nur mit einer <b>6</b> kommt eine Figur raus. Das Team hat ein <b>gemeinsames Haus</b> mit 8 Plätzen: Es ist egal, wer in welcher Reihenfolge einzieht, aber im Haus darf man nicht überspringen. Zusätzlich zum normalen Würfel gibt es einen <b>Rechenwürfel</b> (+2, −2, ×2, ÷2), der immer angewendet wird. Das Ergebnis ist mindestens 1.','<b>Figure eight</b> (4 players): the track is an 8 with a shared crossing where you can capture each other. The two players of a team start on the same side but run in <b>opposite directions</b> and meet. Only a <b>6</b> brings a piece out. The team has one <b>shared house</b> with 8 slots: it does not matter who enters in which order, but you cannot jump inside the house. Besides the normal die there is a <b>calculation die</b> (+2, −2, ×2, ÷2) which is always applied. The result is at least 1.')}</li></ul>`;
 $('setup').innerHTML=`<h2>🎲 ${T('Mädn Teams: das große Brett','Ludo Teams: the big board')}</h2>
 <p style="margin:0 0 10px;color:var(--muted)">${T('Mensch ärgere dich nicht im Team auf dem doppelt so großen Brett. Gegen den Computer oder online.','Ludo in teams on a board twice as big. Against the computer or online.')}</p>
+<div class="row"><label for="map">${T('Brett','Board')}</label><select id="map"><option value="ring">${T('Großer Ring (80 Felder)','Big ring (80 fields)')}</option><option value="eight">${T('Liegende Acht (4 Spieler, Rechenwürfel)','Figure eight (4 players, calculation die)')}</option></select></div>
 <div class="row"><label for="mode">${T('Spielart','Mode')}</label><select id="mode">
 <option value="4-4">${T('4 Spieler, 2 Teams à 2, je 4 Figuren (8 pro Team)','4 players, 2 teams of 2, 4 pieces each (8 per team)')}</option>
 <option value="8-4">${T('8 Spieler, 4 Teams à 2, je 4 Figuren (8 pro Team), sehr lang','8 players, 4 teams of 2, 4 pieces each (8 per team), very long')}</option>
@@ -80,10 +84,13 @@ $('setup').innerHTML=`<h2>🎲 ${T('Mädn Teams: das große Brett','Ludo Teams: 
 <div class="row"><button class="btn" id="start">${T('Gegen den Computer','Against the computer')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
 <details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
 $('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
-const readOpts=()=>{const [n,P]=$('mode').value.split('-').map(Number);return {n,P,share:$('oShare').checked};};
+const readOpts=()=>{const map=$('map').value==='eight'?'eight':'ring';if(map==='eight')return {n:4,P:4,share:true,map};const [n,P]=$('mode').value.split('-').map(Number);return {n,P,share:$('oShare').checked,map};};
 try{const m=localStorage.getItem('mt-mode');if(m)$('mode').value=m;if(localStorage.getItem('mt-share')==='0')$('oShare').checked=false;}catch(e){}
 $('oShare').onchange=()=>{try{localStorage.setItem('mt-share',$('oShare').checked?'1':'0');}catch(e){}};
 $('mode').onchange=()=>{try{localStorage.setItem('mt-mode',$('mode').value);}catch(e){}};
+const syncMap=()=>{const e=$('map').value==='eight';$('mode').disabled=e;$('oShare').disabled=e;try{localStorage.setItem('mt-map',$('map').value);}catch(x){}};
+try{const m=localStorage.getItem('mt-map');if(m==='eight'||m==='ring')$('map').value=m;}catch(e){}
+$('map').onchange=syncMap;syncMap();
 
 let K,V=null,inp=null,hintTxt='';
 // ---------- Farben und Brett ----------
@@ -93,8 +100,21 @@ const teamOf=(p,n)=>p%(n/2);
 const seatColor=(p,n)=>{const c=TEAMC[teamOf(p,n)];return p<n/2?c:lighten(c,.45);};
 const D=26,X0=140,Y0=140,SIDE=20*D,CEN=[X0+SIDE/2,Y0+SIDE/2];
 const rotV=(v,k)=>{let x=v[0],y=v[1];for(let i=0;i<k;i++){const t=x;x=-y;y=t;}return [x,y];};
-const LAY={};
-function layout(n,P){
+const LAY={},EW=1200,EH=560,ECX=600,ECY=270,EA=440;
+function layoutEight(){      // liegende Acht (Lemniskate): 72 Wegpunkte gleichmäßig nach Bogenlänge, Mitte = Kreuzung
+  if(LAY.eight)return LAY.eight;
+  const M=4000,fine=[],cum=[0];let prev=null,acc=0;
+  for(let k=0;k<=M;k++){const a=2*Math.PI*k/M,den=1+Math.sin(a)**2,x=EA*Math.cos(a)/den,y=-EA*Math.sin(a)*Math.cos(a)/den;fine.push([x,y]);if(prev){acc+=Math.hypot(x-prev[0],y-prev[1]);cum.push(acc);}prev=[x,y];}
+  const EN=MTE.EN,sp=acc/EN,cells=[];let k=0;
+  for(let i=0;i<EN;i++){const s=i*acc/EN;while(k<M&&cum[k+1]<s)k++;const f=(s-cum[k])/Math.max(1e-6,cum[k+1]-cum[k]),a=fine[k],b=fine[Math.min(M,k+1)];cells.push([ECX+a[0]+(b[0]-a[0])*f,ECY+a[1]+(b[1]-a[1])*f]);}
+  cells[MTE.ECEN]=[ECX,ECY];cells[MTE.EDUP]=[ECX,ECY];cells[0][1]=ECY;cells[EN/2][1]=ECY;
+  const house=[0,1].map(tm=>Array.from({length:8},(_,q)=>{const e=cells[tm===0?0:EN/2];return [e[0]+(tm===0?-1:1)*(q+1)*sp,ECY];}));      // Team 0 rechts, Team 1 links
+  const left=p=>p%2===1;      // Sitze 1 und 3 (Team 1) links, 0 und 2 (Team 0) rechts
+  const base=Array.from({length:4},(_,p)=>Array.from({length:4},(_,i)=>{const ex=left(p)?cells[EN/2][0]-110:cells[0][0]+110,top=p<2,bx=ex+((i%2)-.5)*30,by=ECY+(top?-82:82)+(Math.floor(i/2)-.5)*30;return [bx,by];}));
+  return LAY.eight={eight:true,cells,house,base,len:EN,sp};
+}
+function layout(n,P,map){
+  if(map==='eight')return layoutEight();
   const key=n+'-'+P;if(LAY[key])return LAY[key];
   const ring=[];
   for(let i=0;i<80;i++){const k=Math.floor(i/20),t=i%20,r=rotV([X0+t*D-CEN[0],Y0-CEN[1]],k);ring.push([CEN[0]+r[0],CEN[1]+r[1]]);}
@@ -107,10 +127,26 @@ function layout(n,P){
   }
   return LAY[key]={ring,start,lane,house};
 }
-const pcPt=(L,p,pos,i)=>pos<0?L.house[p][i]:pos<80?L.ring[(L.start[p]+pos)%80]:L.lane[p][pos-80];
+const pcPt=(L,p,pos,i)=>L.eight?(pos<0?L.base[p][i]:pos<L.len?L.cells[MTE.eightCell(p,pos)]:L.house[p%2===0?0:1][pos-L.len]):(pos<0?L.house[p][i]:pos<80?L.ring[(L.start[p]+pos)%80]:L.lane[p][pos-80]);
 let builtKey='';
+function buildEight(v){
+  const L=layoutEight();let h='<g id="bg">';
+  h+=`<polyline points="${Array.from({length:MTE.EN+1},(_,i)=>L.cells[MTE.eightCell(0,i-1)||0]).map(c=>c[0]+','+c[1]).join(' ')}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="16" stroke-linejoin="round"/>`;
+  L.cells.forEach((pt,i)=>{if(i===MTE.EDUP)return;h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="${i===MTE.ECEN?13:11}" fill="rgba(255,255,255,${i===MTE.ECEN?.2:.12})"/>`;});
+  for(let p=0;p<4;p++){const c=seatColor(p,4),s=MTE.ESEAT[p].s,pt=L.cells[s],d=MTE.ESEAT[p].d;
+    h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="13" fill="${c}" stroke="#fff" stroke-width="2"/>`;
+    const nx=L.cells[(s+d+MTE.EN)%MTE.EN];h+=`<text class="lbl" x="${(pt[0]+nx[0])/2}" y="${(pt[1]+nx[1])/2+4}" style="font-size:11px;fill:#fff;opacity:.85">${d>0?'↻':'↺'}</text>`;
+    L.base[p].forEach(b=>{h+=`<circle class="fld" cx="${b[0]}" cy="${b[1]}" r="11" fill="${c}" fill-opacity=".22" stroke="${c}"/>`;});}
+  [0,1].forEach(tm=>{const c=TEAMC[tm];L.house[tm].forEach((pt,q)=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="${c}" fill-opacity=".34" stroke="${c}"/>`;});});
+  h+='</g><g id="mid"></g><g id="tg"></g><g id="pcs">';
+  for(let p=0;p<4;p++)for(let i=0;i<4;i++)h+=`<g class="pcg" id="pg-${p}-${i}"><circle class="pc" data-p="${p}" data-i="${i}" r="10" fill="${seatColor(p,4)}"/><circle r="3.4" fill="${TEAMC[teamOf(p,4)]}" stroke="#fff" stroke-width="1" pointer-events="none"/></g>`;
+  h+='</g><g id="lbls"></g>';
+  $('svg').setAttribute('viewBox','0 0 '+EW+' '+EH);$('svg').parentNode.classList.add('wide');$('svg').innerHTML=h;
+}
 function build(v){
-  const key=v.n+'-'+v.P;if(builtKey===key)return;builtKey=key;
+  const key=(v.map||'ring')+v.n+'-'+v.P;if(builtKey===key)return;builtKey=key;
+  if(v.map==='eight'){buildEight(v);return;}
+  $('svg').setAttribute('viewBox','0 0 800 800');$('svg').parentNode.classList.remove('wide');
   const L=layout(v.n,v.P);let h='<g id="bg">';
   L.ring.forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="rgba(255,255,255,.12)"/>`;});
   for(let p=0;p<v.n;p++){
@@ -127,7 +163,7 @@ function build(v){
 const nameOf=i=>i===V.me?T('Du','You'):esc(V.names[i]);
 function render(v,prev){
   V=v;$('setup').hidden=true;$('game').hidden=false;build(v);
-  const L=layout(v.n,v.P),mine=!!inp&&!v.over;
+  const L=layout(v.n,v.P,v.map),mine=!!inp&&!v.over;
   const movable=new Set(mine?inp.opts.map(o=>o.q+'-'+o.i):[]);
   // Figuren
   for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++){
@@ -139,15 +175,21 @@ function render(v,prev){
   let tg='';
   if(mine)inp.opts.forEach((o,k)=>{const pt=pcPt(L,o.q,o.to,o.i);tg+=`<circle class="tgt" data-k="${k}" cx="${pt[0]}" cy="${pt[1]}" r="12"/>`;});
   $('tg').innerHTML=tg;
-  // Namen an den Häusern, Mitte
-  let lb='';
-  for(let p=0;p<v.n;p++){const h=L.house[p],cx=h.reduce((a,x)=>a+x[0],0)/h.length,cy=h.reduce((a,x)=>a+x[1],0)/h.length,k=Math.floor(p/(v.n/4)),o=rotV([0,-1],k);lb+=`<text class="lbl" x="${cx+o[0]*36}" y="${cy+o[1]*36+4}" style="fill:${seatColor(p,v.n)};${v.cur===p?'font-size:15px':''}">${v.cur===p?'▶ ':''}${p===v.me?T('Du','You'):esc(v.names[p])}</text>`;}
-  $('lbls').innerHTML=lb;
-  const mid=[];const total=v.n/2;
-  let m=`<text class="lbl" x="${CEN[0]}" y="${CEN[1]-70}" style="font-size:24px;letter-spacing:.06em">${esc(TT.toUpperCase())}</text>`;
+  let lb='',m='';const total=v.n/2;
+  if(v.map==='eight'){
+    // Namen an den Startseiten, Würfel und Rechenwürfel oben in der Mitte, Teamstand unten
+    for(let p=0;p<4;p++){const bs=L.base[p],bx=bs.reduce((s,x)=>s+x[0],0)/4,by=bs.reduce((s,x)=>s+x[1],0)/4+(p<2?-34:42);lb+=`<text class="lbl" x="${bx}" y="${by}" style="fill:${seatColor(p,4)};${v.cur===p?'font-size:16px':''}">${v.cur===p?'▶ ':''}${esc(nameOf(p))}</text>`;}
+    if(v.die){const ops=['+2','\u22122','\u00d72','\u00f72'],md=v.mod;
+      m+=`<text class="lbl" x="${ECX-105}" y="${62}" style="font-size:54px">${['','⚀','⚁','⚂','⚃','⚄','⚅'][v.die]}</text>`;
+      if(md){m+=`<rect class="modbox" x="${ECX-48}" y="22" width="88" height="56" rx="10"/><text class="lbl" x="${ECX-4}" y="64" style="font-size:34px;fill:#ffd23f">${ops[md.op]}</text><text class="lbl" x="${ECX+96}" y="62" style="font-size:40px">= ${md.s}</text>`;}}
+    m+=`<text class="lbl" x="${ECX}" y="${EH-18}" style="font-size:15px;opacity:.8">${[0,1].map(tm=>(tx(TEAMN[tm]))+' '+v.teamPieces[tm].home+'/'+v.teamPieces[tm].total).join('   ·   ')}</text>`;
+  }else{
+  for(let p=0;p<v.n;p++){const h=L.house[p],cx=h.reduce((a,x)=>a+x[0],0)/h.length,cy=h.reduce((a,x)=>a+x[1],0)/h.length,k=Math.floor(p/(v.n/4)),o=rotV([0,-1],k);lb+=`<text class="lbl" x="${cx+o[0]*36}" y="${cy+o[1]*36+4}" style="fill:${seatColor(p,v.n)};${v.cur===p?'font-size:15px':''}">${v.cur===p?'▶ ':''}${esc(nameOf(p))}</text>`;}
+  m=`<text class="lbl" x="${CEN[0]}" y="${CEN[1]-70}" style="font-size:24px;letter-spacing:.06em">${esc(TT.toUpperCase())}</text>`;
   if(v.die){m+=`<text class="lbl" x="${CEN[0]}" y="${CEN[1]-20}" style="font-size:54px">${['','⚀','⚁','⚂','⚃','⚄','⚅'][v.die]}</text>`;}
   for(let t=0;t<total;t++){const pcs=v.teamPieces[t],y=CEN[1]+20+t*22;m+=`<circle cx="${CEN[0]-70}" cy="${y-4}" r="7" fill="${TEAMC[t]}" stroke="#fff"/><text class="lbl" x="${CEN[0]-55}" y="${y}" style="text-anchor:start;font-size:14px">${pcs.home}/${pcs.total}</text>`;}
-  $('mid').innerHTML=m;
+  }
+  $('lbls').innerHTML=lb;$('mid').innerHTML=m;
   if(v.last&&(!prev||!prev.last||prev.last.seq!==v.last.seq)){K.sfx(v.last.cap?'bad':'lay');}
   // Teams
   $('teams').innerHTML=Array.from({length:total},(_,t)=>{const mem=v.names.map((n,i)=>i).filter(i=>teamOf(i,v.n)===t),pc=v.teamPieces[t];
@@ -175,16 +217,16 @@ $('svg').addEventListener('click',e=>{
 });
 // ---------- Sicht und Start ----------
 function view(g,s){
-  const tp=[];for(let t=0;t<g.n/2;t++){let home=0,total=0;for(let p=0;p<g.n;p++)if(MTE.teamOf(g,p)===t){total+=g.P;g.pos[p].forEach(x=>{if(x>=80)home++;});}tp.push({home,total});}
-  return {me:s,n:g.n,P:g.P,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),pos:g.pos,cur:g.cur,die:g.die,dieP:g.dieP,last:g.last,over:g.over,teamPieces:tp,log:K.logFor(s)};
+  const R=MTE.len(g),tp=[];for(let t=0;t<g.n/2;t++){let home=0,total=0;for(let p=0;p<g.n;p++)if(MTE.teamOf(g,p)===t){total+=g.P;g.pos[p].forEach(x=>{if(x>=R)home++;});}tp.push({home,total});}
+  return {map:g.map,mod:g.mod,me:s,n:g.n,P:g.P,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),pos:g.pos,cur:g.cur,die:g.die,dieP:g.dieP,last:g.last,over:g.over,teamPieces:tp,log:K.logFor(s)};
 }
 function startGame(seats,opts){
   K.reset();
-  let n=opts.n,P=opts.P;if(seats.length>n){n=8;P=4;}
+  let n=opts.n,P=opts.P,map=opts.map;if(seats.length>n){n=8;P=4;map='ring';}      // zu viele Sitze für die Acht (nur 4 Spieler): dann das große Ring-Brett
   const names=['Kira','Bolt','Nova','Pixel','Juno','Rook','Echo','Zed'];let k=0;
   const full=seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away}));
   while(full.length<n)full.push({type:'cpu',name:names[k++%names.length],seat:-1});
-  K.G=MTE.setup(full,{n,P});
+  K.G=MTE.setup(full,{n,P,map,share:opts.share});
   K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' beginnt.','New game. '+K.nm(K.G.cur)+' starts.'));
   K.push();K.run(main);
 }

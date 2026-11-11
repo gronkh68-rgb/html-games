@@ -459,7 +459,7 @@ function draw2D() {
   g.setTransform(DPR * view.s, 0, 0, DPR * view.s, DPR * view.ox, DPR * view.oy);
   // Brett
   g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(-8, -8, G.Bw + 16, G.Bh + 16);
-  g.globalAlpha = showPrev ? .8 : .14; g.drawImage(IMG, 0, 0, G.Bw, G.Bh); g.globalAlpha = 1;
+  if (showPrev) { g.globalAlpha = .8; g.drawImage(IMG, 0, 0, G.Bw, G.Bh); g.globalAlpha = 1; }      // Hintergrundbild ist aus; nur beim Halten von "Vorschau" sichtbar
   g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2 / view.s; g.setLineDash([10 / view.s, 7 / view.s]); g.strokeRect(0, 0, G.Bw, G.Bh); g.setLineDash([]);
   // Teile
   for (var pass = 0; pass < 2; pass++) for (var k = 0; k < order.length; k++) {
@@ -529,7 +529,7 @@ function sync3D(dt) {
     var tl = p.lift > .02 ? 1 : 0; m.rotation.z += ((-vel.x * .035 * tl) - m.rotation.z) * Math.min(1, dt * 12); m.rotation.x += ((vel.y * .035 * tl) - m.rotation.x) * Math.min(1, dt * 12);
     var e = p.pulse > 0 && p.pulse <= 1 ? p.pulse * .45 : 0; m.material[0].emissive.setRGB(e, e, e);
   });
-  R3.ghost.material.opacity = showPrev ? .85 : .16; if (winFade > 0) R3.ghost.material.opacity = Math.max(R3.ghost.material.opacity, Math.min(1, winFade));
+  R3.ghost.material.opacity = showPrev ? .85 : 0; if (winFade > 0) R3.ghost.material.opacity = Math.max(R3.ghost.material.opacity, Math.min(1, winFade));
   var cp = R3.pitch, yw = R3.yaw || 0, d = R3.dist; R3.cam.position.set(R3.tx + Math.sin(yw) * Math.cos(cp) * d, Math.sin(cp) * d, R3.tz + Math.cos(yw) * Math.cos(cp) * d); R3.cam.up.set(0, 1, 0); R3.cam.lookAt(R3.tx, 0, R3.tz);
   R3.r.render(R3.scene, R3.cam);
 }

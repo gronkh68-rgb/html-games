@@ -104,7 +104,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.12.3';
+  var VERSION = '3.13.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
