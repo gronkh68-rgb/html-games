@@ -18,7 +18,7 @@
 <style>
 .wrap{max-width:1500px}
 /* Würfelfläche = das ganze Spielfeld (kein Tablett): die Würfel werden über das Brett geschnippt */
-#diceDock{position:absolute;inset:0;z-index:8}
+#diceDock{position:absolute;inset:0;z-index:8;pointer-events:none}      /* fängt nur Eingaben ab, solange der Würfel gezogen wird (setzt dice3d.js am Fenster darin) */
 #tronFx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;mix-blend-mode:screen}
 html[data-style="cyber"] #board{transition:border-color .9s,box-shadow .9s;border-color:var(--edge,var(--pc,#00cfff))!important;box-shadow:0 0 22px var(--edge,var(--pc,#00cfff))!important}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
