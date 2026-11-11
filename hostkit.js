@@ -66,7 +66,7 @@
     };
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
     K.fxLocal = function (d) {
-      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col, mine: d.p === K.ME }); return; }
+      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col, mine: d.p === K.ME, mod: !!d.mod }); return; }
       if (cfg.fx) cfg.fx(d);
     };
     K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
@@ -92,16 +92,22 @@
         btn.textContent = '🎲 ' + T('Für mich werfen', 'Throw for me');
         btn.onclick = function () { btn.remove(); V.stopDrag(); res(null); };
         V.wrap.appendChild(btn);
-        V.drag(spec.n, { color: spec.col, zoom: cfg.diceZoom !== false, hint: spec.hint ? HK.tx(spec.hint) : T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') }).then(function (p) { btn.remove(); res(p); }, function () { btn.remove(); });
+        V.drag(spec.n, { color: spec.col, mod: !!spec.mod, zoom: cfg.diceZoom !== false, hint: spec.hint ? HK.tx(spec.hint) : T('Würfel mit der Maus ziehen und loslassen zum Werfen', 'Drag the dice and release to throw') }).then(function (p) { btn.remove(); res(p); }, function () { btn.remove(); });
       });
     };
     // Wirft n Würfel für Spieler p und gibt die Augen zurück (Host). Das Ergebnis kommt aus der Physik.
-    K.throwDice = async function (p, n, hint) {
-      var col = cfg.dieColor ? cfg.dieColor(p, K.G) : null;
-      var par = await K.ask(p, { k: 'throw', n: n, hint: hint || null, col: col, p: p }, function () { return Dice3D.autoParams(n); });
+    // opt.mod: Der zweite Würfel ist ein Rechenwürfel mit vier Werten (+2, -2, x2, geteilt durch 2): Er zählt nur, wenn er auf 1 bis 4 liegt; liegt er auf 5 oder 6, wird der Wurf unsichtbar leicht abgewandelt und neu gerechnet (so bleibt jeder der vier Werte gleich wahrscheinlich).
+    K.throwDice = async function (p, n, hint, opt) {
+      var col = cfg.dieColor ? cfg.dieColor(p, K.G) : null, mod = !!(opt && opt.mod) && n === 2;
+      var par = await K.ask(p, { k: 'throw', n: n, hint: hint || null, col: col, p: p, mod: mod }, function () { return Dice3D.autoParams(n); });
       par = Dice3D.clean(par, n) || Dice3D.autoParams(n);
       var r = await Dice3D.simulate(par);
-      K.fx({ k: 'dice3d', track: r.track, col: col, p: p }); K.sfx('dice');
+      for (var tries = 0; mod && r.v[1] > 4 && tries < 60; tries++) {
+        var q = JSON.parse(JSON.stringify(par)), d1 = q.dice[1], j = function (a) { return (Math.random() - .5) * a; };
+        d1.v = [d1.v[0] + j(5), d1.v[1], d1.v[2] + j(5)]; d1.w = [d1.w[0] + j(30), d1.w[1] + j(30), d1.w[2] + j(30)]; d1.p = [d1.p[0] + j(.4), d1.p[1], d1.p[2]];
+        r = await Dice3D.simulate(Dice3D.clean(q, n) || q);
+      }
+      K.fx({ k: 'dice3d', track: r.track, col: col, p: p, mod: mod }); K.sfx('dice');
       await K.sleep(Math.round(r.track.f.length / r.track.hz * 1000) + 900);
       return r.v;
     };

@@ -163,6 +163,17 @@
     });
     var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
+  // Rechenwürfel: ein normaler Würfel, dessen Seiten 1 bis 4 die Rechenzeichen +2, -2, x2, geteilt durch 2 zeigen (die Seiten 5 und 6 kommen nie nach oben: die Seite, die das Spiel auswertet, ist immer 1 bis 4)
+  var OPS = ['+2', '\u22122', '\u00d72', '\u00f72'];
+  D.OPS = OPS;
+  function modTex(v, size) {
+    var cv = document.createElement('canvas'); cv.width = cv.height = size; var x = cv.getContext('2d');
+    var g = x.createRadialGradient(size / 2, size / 2, size * .1, size / 2, size / 2, size * .75); g.addColorStop(0, '#4a3208'); g.addColorStop(1, '#1d1304'); x.fillStyle = g; x.fillRect(0, 0, size, size);
+    x.strokeStyle = '#ffd23f'; x.lineWidth = size * .045; x.strokeRect(size * .035, size * .035, size * .93, size * .93);
+    x.font = '900 ' + Math.round(size * (OPS[(v - 1) % 4].length > 2 ? .44 : .5)) + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.shadowColor = '#ffd23f'; x.shadowBlur = size * .05; x.fillStyle = '#fff3c4'; x.fillText(OPS[(v - 1) % 4], size / 2, size * .53);
+    var t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
+  }
   // ---------- Darstellung: Tablett als Dock neben dem Spielfeld, Kamerafahrt nur beim eigenen Wurf ----------
   var ASP = (TX * 2 + 2.8) / (TZ * 2 + 2.8), MAXP = 4.6, ANCH_Z = TZ - 1.7;
   var cssDone = false;
@@ -242,16 +253,19 @@
         return new THREE.MeshStandardMaterial(cy ? { map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .75, roughness: .35, metalness: .3 } : { map: t, roughness: .55, metalness: 0 });
       }) };
       mats.cy = cy;
-      R.dice.forEach(function (d) { d.mesh.material = mats.list; });
+      R.dice.forEach(function (d, i) { d.mesh.material = R.mod && i === 1 && modMats ? modMats : mats.list; });
       if (cy && !fontTried && document.fonts && document.fonts.load) {      // Orbitron nachladen, dann Texturen neu zeichnen
         fontTried = true;
         document.fonts.load('900 40px Orbitron').then(function () { mats = null; R.mk(); R.skin(); }, function () { });
       }
       return mats;
     };
+    R.mod = false; var modMats = null;      // mod: der zweite Würfel ist der Rechenwürfel
+    R.assign = function () { var m = R.mk(); if (R.mod && !modMats) modMats = FACE_V.map(function (v) { return new THREE.MeshStandardMaterial({ map: modTex(v, 128), roughness: .45, metalness: .1, emissive: 0x2a1c00 }); }); R.dice.forEach(function (d, i) { d.mesh.material = R.mod && i === 1 ? modMats : m.list; }); };
     R.ensure = function (n) {
       while (R.dice.length < n) { var m = new THREE.Mesh(geo, R.mk().list); m.castShadow = true; R.group.add(m); R.dice.push({ mesh: m }); }
       R.dice.forEach(function (d, i) { d.mesh.visible = i < n || (d.mesh.visible && i < R.shown); });
+      R.assign();
     };
     R.aim = function (ax, az, pull) {      // Gummiband, Griff und Zielpunkte; Rückgabe: Kraft 0..1
       var len = Math.hypot(pull.x, pull.z), power = Math.max(0, Math.min(1, (len - .7) / (MAXP - .7))), col = new THREE.Color().setHSL(.33 * (1 - power), .9, .55);
@@ -308,7 +322,7 @@
     V.drag = function (n, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.mine = true; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
+        var R = env.R; R.mine = true; R.mod = !!opts.mod; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
         if (opts.zoom !== false) V.zoom(true);
         var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = R.dice.map(function () { return randQ(); }), spin = R.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), t0 = performance.now(), last = t0;
         var base = opts.hint || (window.SITE ? SITE.T('Würfel nach unten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice down, aim and release to shoot') : 'Pull down, aim, release');
@@ -371,7 +385,7 @@
     V.play = function (track, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.mine = opts.mine !== false; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        var R = env.R; R.mine = opts.mine !== false; R.mod = !!opts.mod; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
         V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); R.aimG.visible = false; R.pad.visible = false; R.ensure(track.n); R.shown = track.n; R.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); env.anim(1);
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {

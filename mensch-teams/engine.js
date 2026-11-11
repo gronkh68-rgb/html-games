@@ -121,10 +121,10 @@
         var onField = seatsF.some(function (q) { return g.pos[q].some(function (x) { return x >= 0; }); }), attempts = onField ? 1 : 3, v = 0, moves = [];
         for (var a = 0; a < attempts; a++) {
           g.dieP = p; g.die = 0; g.mod = null; K.push();
-          var d = await K.throwDice(p, 1, L2('Wirf den Würfel', 'Throw the die'));
+          var d = await K.throwDice(p, eight ? 2 : 1, eight ? L2('Wirf beide Würfel (der goldene rechnet)', 'Throw both dice (the golden one calculates)') : L2('Wirf den Würfel', 'Throw the die'), { mod: eight });
           v = d[0]; g.die = v; g.rolls++; steps = v;
-          if (eight) {      // Rechenwürfel (+2, -2, x2, geteilt durch 2): wird immer angewendet, das Ergebnis ist mindestens 1
-            var op = HK.rnd(4); steps = E.applyOp(v, op); g.mod = { op: op, s: steps, seq: g.rolls };
+          if (eight) {      // zweiter, physischer Rechenwürfel (+2, -2, x2, geteilt durch 2, Seiten 1 bis 4): wird immer angewendet, das Ergebnis ist mindestens 1
+            var op = Math.max(0, Math.min(3, (d[1] | 0) - 1)); steps = E.applyOp(v, op); g.mod = { op: op, s: steps, seq: g.rolls };
             var ot = ['+2', '\u22122', '\u00d72', '\u00f72'][op];
             K.say(p, L2(nm(p) + ' würfelt ' + v + ' ' + ot + ' = ' + steps + '.', nm(p) + ' rolls ' + v + ' ' + ot + ' = ' + steps + '.'), L2('Du würfelst ' + v + ' ' + ot + ' = ' + steps + '.', 'You roll ' + v + ' ' + ot + ' = ' + steps + '.'));
           } else K.say(p, L2(nm(p) + ' würfelt eine ' + v + '.', nm(p) + ' rolls a ' + v + '.'), L2('Du würfelst eine ' + v + '.', 'You roll a ' + v + '.'));
