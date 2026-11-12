@@ -118,7 +118,7 @@
       }
     });
     (opts || []).forEach(function (o, k) {
-      var q = P3(ptOf(o.q, o.to, o.i)), m = new THREE.Mesh(new THREE.RingGeometry(.5, .66, 28), new THREE.MeshBasicMaterial({ color: o.cap ? 0xff5a5a : 0xffd23f, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
+      var q = P3(ptOf(o.q, o.to, o.i, o.sw)), m = new THREE.Mesh(new THREE.RingGeometry(.5, .66, 28), new THREE.MeshBasicMaterial({ color: o.cap ? 0xff5a5a : 0xffd23f, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
       m.rotation.x = -Math.PI / 2; m.position.set(q.x, .25, q.z); m.userData = { k: k }; group.add(m); rings.push(m); pickables.push(m);
     });
   };

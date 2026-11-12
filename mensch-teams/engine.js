@@ -11,12 +11,22 @@
   E.len = function (g) { return g.map === 'eight' ? EN : 80; };
   E.slots = function (g) { return g.map === 'eight' ? 8 : g.P; };
   // Wege-Position der Acht -> Feldnummer (die zweite Kreuzungsposition zählt als dasselbe Feld wie die erste)
-  E.eightCell = function (q, x) { var i = (((ESEAT[q].s + ESEAT[q].d * x) % EN) + EN) % EN; return i === EDUP ? ECEN : i; };
+  // Mittelpunkt-Regel: Die Kreuzung wird auf dem Weg zweimal erreicht (an den Wegpositionen eCenters). Landet eine Figur genau darauf, darf sie beim nächsten Zug wählen, auf welchem Arm sie weitergeht (oben oder unten):
+  // das spiegelt den folgenden Abschnitt (ein Umschalter t1 für den Abschnitt nach der 1. Kreuzung, t2 für den nach der 2.). Gerade durch die Mitte gehen bleibt der Standard; die Wegstrecke bleibt gleich lang.
+  function eCenters(q) { var s = ESEAT[q].s, d = ESEAT[q].d, r = []; [ECEN, EDUP].forEach(function (c) { r.push((((c - s) * d) % EN + EN) % EN); }); r.sort(function (a, b) { return a - b; }); return r; }
+  E.centers = eCenters;
+  E.eightCellSw = function (q, x, t1, t2) {
+    var s = ESEAT[q].s, d = ESEAT[q].d, xc = eCenters(q), idx = (((s + d * x) % EN) + EN) % EN, k = x > xc[1] ? 1 : 0, m = x > xc[1] ? (t1 ^ t2) : (x > xc[0] ? t1 : 0);
+    if (m) { var c = (((s + d * xc[k]) % EN) + EN) % EN, c2 = c === ECEN ? EDUP : ECEN, j = x - xc[k]; idx = (((d > 0 ? c2 - j : c2 + j) % EN) + EN) % EN; }
+    return idx === EDUP ? ECEN : idx;
+  };
+  E.eightCell = function (q, x) { return E.eightCellSw(q, x, 0, 0); };
   var nm = function (p) { return K.nm(p); };
   E.teamOf = function (g, p) { return p % (g.n / 2); };
   E.partner = function (g, p) { return (p + g.n / 2) % g.n; };
   E.start = function (g, p) { if (g.map === 'eight') return ESEAT[p].s; var per = g.n / 4, side = Math.floor(p / per), j = p % per; return 20 * side + (per === 1 ? 10 : 5 + 10 * j); };
-  E.cell = function (g, q, x) { return g.map === 'eight' ? E.eightCell(q, x) : (E.start(g, q) + x) % 80; };
+  E.cell = function (g, q, x, i) { if (g.map !== 'eight') return (E.start(g, q) + x) % 80; var sw = g.sw && i != null && g.sw[q][i] || [0, 0]; return E.eightCellSw(q, x, sw[0], sw[1]); };
+  var cellFor = function (g, c, x, sw) { return g.map === 'eight' ? E.eightCellSw(c, x, sw ? sw[0] : 0, sw ? sw[1] : 0) : (E.start(g, c) + x) % 80; };
   E.applyOp = function (r, op) { return op === 0 ? r + 2 : op === 1 ? Math.max(1, r - 2) : op === 2 ? r * 2 : Math.max(1, Math.ceil(r / 2)); };      // +2, -2, x2, geteilt durch 2 (aufgerundet); nie unter 1
   var sameTeam = function (g, a, b) { return E.teamOf(g, a) === E.teamOf(g, b); };
   var done = function (g, p) { var R = E.len(g); return g.pos[p].every(function (x) { return x >= R; }); };
@@ -26,7 +36,7 @@
   E.ctrl = function (g, p) { return done(g, p) ? E.partner(g, p) : p; };
   function occupant(g, cell) {
     var R = E.len(g);
-    for (var q = 0; q < g.n; q++) for (var i = 0; i < g.P; i++) { var x = g.pos[q][i]; if (x >= 0 && x < R && E.cell(g, q, x) === cell) return { q: q, i: i }; }
+    for (var q = 0; q < g.n; q++) for (var i = 0; i < g.P; i++) { var x = g.pos[q][i]; if (x >= 0 && x < R && E.cell(g, q, x, i) === cell) return { q: q, i: i }; }
     return null;
   }
   // Haus: Liegende Acht = gemeinsames Haus des Teams (egal wer einzieht), Ring = Zielgasse nur für den eigenen Spieler
@@ -44,19 +54,35 @@
   };
   // r = Augen des Würfels (nur mit einer 6 kommt man raus), s = Anzahl der Schritte (auf der Acht durch den Rechenwürfel verändert, sonst gleich r)
   function movesOf(g, c, r, s) {
-    var moves = [], R = E.len(g), lastSlot = R + E.slots(g) - 1;
+    var moves = [], R = E.len(g), lastSlot = R + E.slots(g) - 1, eight = g.map === 'eight';
     g.pos[c].forEach(function (x, i) {
-      var to = null;
-      if (x === -1) { if (r !== 6) return; to = 0; }
-      else { to = x + s; }
+      var sw = eight ? g.sw[c][i] : null, to = null;
+      if (x === -1) {
+        if (r !== 6) return;
+        // Sonderregel (Acht): 6 mit +2 oder x2 -> die Figur kommt raus und geht den Bonus (Ergebnis minus 6) sofort vom Startfeld weg; ist das Ziel durch das eigene Team blockiert, kommt sie normal raus
+        var cands = eight && s > 6 ? [s - 6, 0] : [0];
+        for (var ci = 0; ci < cands.length; ci++) {
+          var o0 = occupant(g, cellFor(g, c, cands[ci], [0, 0]));
+          if (o0 && sameTeam(g, o0.q, c)) continue;
+          moves.push({ q: c, i: i, from: x, to: cands[ci], cap: o0 && !sameTeam(g, o0.q, c) ? o0 : null, sw: eight ? [0, 0] : undefined }); break;
+        }
+        return;
+      }
+      to = x + s;
       if (to > lastSlot) return;
       if (to >= R) {                        // Haus/Zielgasse: nicht über Figuren springen
         for (var k = Math.max(x + 1, R); k <= to; k++) if (houseBusy(g, c, k, i)) return;
-        moves.push({ q: c, i: i, from: x, to: to, cap: null }); return;
+        moves.push({ q: c, i: i, from: x, to: to, cap: null, sw: eight ? sw.slice() : undefined }); return;
       }
-      var o = occupant(g, E.cell(g, c, to));
-      if (o && sameTeam(g, o.q, c) && !(o.q === c && o.i === i)) return;     // Figuren des eigenen Teams blockieren
-      moves.push({ q: c, i: i, from: x, to: to, cap: o && !sameTeam(g, o.q, c) ? o : null });
+      var choices = [sw];
+      if (eight && g.ch[c][i]) { var xc = eCenters(c), kk = x === xc[0] ? 0 : x === xc[1] ? 1 : -1; if (kk >= 0) { var alt = sw.slice(); alt[kk] ^= 1; choices = [sw, alt]; } }      // genau auf der Mitte gelandet: oben oder unten weiter
+      var seen = {};
+      choices.forEach(function (sv, ch) {
+        var cell = cellFor(g, c, to, sv); if (seen[cell]) return; seen[cell] = 1;
+        var o = occupant(g, cell);
+        if (o && sameTeam(g, o.q, c) && !(o.q === c && o.i === i)) return;     // Figuren des eigenen Teams blockieren
+        moves.push({ q: c, i: i, from: x, to: to, cap: o && !sameTeam(g, o.q, c) ? o : null, sw: eight ? sv.slice() : undefined, alt: ch ? 1 : 0 });
+      });
     });
     return moves;
   }
@@ -73,13 +99,18 @@
   };
   E.apply = function (g, c, m) {
     g.pos[m.q][m.i] = m.to;
+    if (g.map === 'eight') {
+      if (m.sw) g.sw[m.q][m.i] = m.sw.slice();
+      var xc = eCenters(m.q); g.ch[m.q][m.i] = m.to === xc[0] || m.to === xc[1] ? 1 : 0;      // genau auf der Mitte gelandet: beim nächsten Zug darf sie wählen
+      if (m.cap) { g.sw[m.cap.q][m.cap.i] = [0, 0]; g.ch[m.cap.q][m.cap.i] = 0; }
+    }
     if (m.cap) { g.pos[m.cap.q][m.cap.i] = -1; }
     g.last = { p: m.q, i: m.i, from: m.from, to: m.to, cap: m.cap, seq: (g.last ? g.last.seq : 0) + 1 };
   };
   // ---------- Computer ----------
   function threatened(g, c, cell) {      // kann ein Gegner dieses Feld mit einem Wurf von 1 bis 6 erreichen?
     var R = E.len(g);
-    for (var q = 0; q < g.n; q++) { if (sameTeam(g, q, c)) continue; for (var i = 0; i < g.P; i++) { var x = g.pos[q][i]; if (x < 0 || x >= R) continue; for (var d = 1; d <= 6; d++) if (x + d < R && E.cell(g, q, x + d) === cell) return true; } }
+    for (var q = 0; q < g.n; q++) { if (sameTeam(g, q, c)) continue; for (var i = 0; i < g.P; i++) { var x = g.pos[q][i]; if (x < 0 || x >= R) continue; for (var d = 1; d <= 6; d++) if (x + d < R && E.cell(g, q, x + d, i) === cell) return true; } }
     return false;
   }
   E.ai = function (g, p, moves) {
@@ -91,8 +122,9 @@
       if (m.from === -1) sc += 85;
       sc += m.to * .25;
       if (m.to < R) {
-        if (threatened(g, c, E.cell(g, c, m.to))) sc -= 28;
-        if (m.from >= 0 && m.from < R && threatened(g, c, E.cell(g, c, m.from))) sc += 32;      // aus der Gefahr ziehen
+        if (threatened(g, c, cellFor(g, c, m.to, m.sw))) sc -= 28;
+        if (m.from >= 0 && m.from < R && threatened(g, c, E.cell(g, c, m.from, m.i))) sc += 32;      // aus der Gefahr ziehen
+        if (m.from === -1 && m.to > 0) sc += 14 + m.to;      // Bonus beim Rauskommen
       }
       if (m.from >= R) sc -= 8;
       if (sc > bs) { bs = sc; best = k; }
@@ -104,7 +136,8 @@
   E.setup = function (seats, opts) {
     var map = opts.map === 'eight' ? 'eight' : 'ring', n = map === 'eight' ? 4 : opts.n, P = map === 'eight' ? 4 : opts.P;
     var g = { seats: seats, opts: { n: n, P: P, share: opts.share !== false, map: map }, map: map, n: n, P: P, log: [], pos: [], cur: HK.rnd(n), die: 0, mod: null, dieP: -1, last: null, over: null, rolls: 0 };
-    for (var p = 0; p < n; p++) { g.pos.push([]); for (var i = 0; i < P; i++) g.pos[p].push(-1); }
+    g.sw = []; g.ch = [];
+    for (var p = 0; p < n; p++) { g.pos.push([]); g.sw.push([]); g.ch.push([]); for (var i = 0; i < P; i++) { g.pos[p].push(-1); g.sw[p].push([0, 0]); g.ch[p].push(0); } }
     return g;
   };
   function nextSeat(g) { g.cur = (g.cur + 1) % g.n; }
@@ -137,6 +170,8 @@
         if (!(Number.isInteger(idx) && idx >= 0 && idx < moves.length)) idx = E.ai(g, p, moves);
         var m = moves[idx];
         E.apply(g, p, m);
+        if (eight && m.from === -1 && m.to > 0) K.say(p, L2(nm(m.q) + ' kommt raus und geht direkt ' + m.to + ' weiter (Bonus).', nm(m.q) + ' comes out and moves ' + m.to + ' further (bonus).'), L2('Deine Figur kommt raus und geht direkt ' + m.to + ' weiter (Bonus).', 'Your piece comes out and moves ' + m.to + ' further (bonus).'));
+        if (eight && g.ch[m.q][m.i]) K.say(p, L2(nm(m.q) + ' steht genau auf der Mitte: Beim nächsten Zug darf die Figur oben oder unten weitergehen.', nm(m.q) + ' is exactly on the centre: next move this piece may continue up or down.'), L2('Deine Figur steht genau auf der Mitte: Beim nächsten Zug darfst du oben oder unten weitergehen.', 'Your piece is exactly on the centre: next move you may continue up or down.'));
         if (m.cap) { K.say(p, L2(nm(p) + ' wirft eine Figur von ' + nm(m.cap.q) + ' raus!', nm(p) + ' sends a piece of ' + nm(m.cap.q) + ' home!'), L2('Du wirfst eine Figur von ' + nm(m.cap.q) + ' raus!', 'You send a piece of ' + nm(m.cap.q) + ' home!')); K.sfx('bad'); }
         else if (m.to >= E.len(g)) { K.say(p, L2(nm(m.q) + ' bringt eine Figur ins Ziel.', nm(m.q) + ' brings a piece home.')); K.sfx('coin'); }
         K.push(); await K.sleep(g.seats[p].type === 'cpu' ? 450 : 200);

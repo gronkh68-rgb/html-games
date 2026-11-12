@@ -21,6 +21,7 @@
 .bw{width:min(100%,calc(100vh - 170px));min-width:320px;margin:0 auto}
 .bw.wide{width:100%;max-width:1150px}
 .modbox{fill:rgba(0,0,0,.45);stroke:#ffd23f;stroke-width:2.5}
+.pc.wait{stroke:#ffd23f;stroke-width:3.4;stroke-dasharray:4 3}
 .trl,.trl2{pointer-events:none}.trl2{animation:trlflow .7s linear infinite}@keyframes trlflow{to{stroke-dashoffset:-12}}
 .dirA{pointer-events:none;animation:dirflow 1.6s ease-in-out infinite}@keyframes dirflow{0%,100%{opacity:.3}45%{opacity:1}}
 #svg{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 45%,#2b3a55,#141c2e);border:3px solid #0b1424;border-radius:18px;transition:border-color .3s,box-shadow .3s}
@@ -87,7 +88,7 @@ const RULES=()=>`<ul>
 <li>${T('Wer auf eine fremde Figur zieht, wirft sie raus. Figuren deines <b>Teams</b> blockieren sich, man kann sie nicht schlagen.','Landing on an opponent’s piece sends it home. Pieces of your <b>team</b> block each other and cannot be captured.')}</li>
 <li>${T('Alle Figuren müssen in die eigene <b>Zielgasse</b> (man darf dort nicht überspringen). Mit <b>Teamzügen</b> darfst du mit jedem Wurf auch Figuren deines Partners ziehen.','All pieces must reach your own <b>goal lane</b> (no jumping there). With <b>team moves</b> you may move your partner’s pieces with any roll.')}</li>
 <li>${T('Ein Team gewinnt, wenn alle Figuren beider Partner im Ziel sind.','A team wins when all pieces of both partners are home.')}</li>
-<li>${T('<b>Liegende Acht</b> (4 Spieler): Die Bahn ist eine 8 mit gemeinsamer Kreuzung, auf der man sich auch schlagen kann. Die beiden Spieler eines Teams starten auf derselben Seite, laufen aber in <b>entgegengesetzte Richtungen</b> und begegnen sich. Nur mit einer <b>6</b> kommt eine Figur raus. Das Team hat ein <b>gemeinsames Haus</b> mit 8 Plätzen: Es ist egal, wer in welcher Reihenfolge einzieht, aber im Haus darf man nicht überspringen. Zusätzlich zum normalen Würfel gibt es einen <b>Rechenwürfel</b> (+2, −2, ×2, ÷2), der immer angewendet wird. Das Ergebnis ist mindestens 1.','<b>Figure eight</b> (4 players): the track is an 8 with a shared crossing where you can capture each other. The two players of a team start on the same side but run in <b>opposite directions</b> and meet. Only a <b>6</b> brings a piece out. The team has one <b>shared house</b> with 8 slots: it does not matter who enters in which order, but you cannot jump inside the house. Besides the normal die there is a <b>calculation die</b> (+2, −2, ×2, ÷2) which is always applied. The result is at least 1.')}</li></ul>`;
+<li>${T('<b>Liegende Acht</b> (4 Spieler): Die Bahn ist eine 8 mit gemeinsamer Kreuzung, auf der man sich auch schlagen kann. Die beiden Spieler eines Teams starten auf derselben Seite, laufen aber in <b>entgegengesetzte Richtungen</b> und begegnen sich. Nur mit einer <b>6</b> kommt eine Figur raus. Das Team hat ein <b>gemeinsames Haus</b> mit 8 Plätzen: Es ist egal, wer in welcher Reihenfolge einzieht, aber im Haus darf man nicht überspringen. Zusätzlich zum normalen Würfel gibt es einen <b>Rechenwürfel</b> (+2, −2, ×2, ÷2), der immer angewendet wird. Das Ergebnis ist mindestens 1. <b>Mitte:</b> Landet eine Figur <u>genau</u> auf der Kreuzung, darf sie bei ihrem nächsten Zug wählen, ob sie oben oder unten weitergeht (es gibt dann zwei Ziele; wer nur durchzieht, geht wie gewohnt geradeaus). <b>Bonus beim Rauskommen:</b> Mit einer 6 und +2 oder ×2 kommt die Figur raus und geht den Bonus (Ergebnis minus 6) sofort vom Startfeld weg.','<b>Figure eight</b> (4 players): the track is an 8 with a shared crossing where you can capture each other. The two players of a team start on the same side but run in <b>opposite directions</b> and meet. Only a <b>6</b> brings a piece out. The team has one <b>shared house</b> with 8 slots: it does not matter who enters in which order, but you cannot jump inside the house. Besides the normal die there is a <b>calculation die</b> (+2, −2, ×2, ÷2) which is always applied. The result is at least 1. <b>Centre:</b> if a piece lands <u>exactly</u> on the crossing it may choose, on its next move, whether to continue up or down (two targets then; passing through goes straight on as usual). <b>Bonus when coming out:</b> with a 6 and +2 or ×2 the piece comes out and immediately moves the bonus (result minus 6) away from the start.')}</li></ul>`;
 $('setup').innerHTML=`<h2>🎲 ${T('Mädn Teams: das große Brett','Ludo Teams: the big board')}</h2>
 <p style="margin:0 0 10px;color:var(--muted)">${T('Mensch ärgere dich nicht im Team auf dem doppelt so großen Brett. Gegen den Computer oder online.','Ludo in teams on a board twice as big. Against the computer or online.')}</p>
 <div class="row"><label for="map">${T('Brett','Board')}</label><select id="map"><option value="ring">${T('Großer Ring (80 Felder)','Big ring (80 fields)')}</option><option value="eight">${T('Liegende Acht (4 Spieler, Rechenwürfel)','Figure eight (4 players, calculation die)')}</option></select></div>
@@ -143,7 +144,7 @@ function layout(n,P,map){
   }
   return LAY[key]={ring,start,lane,house};
 }
-const pcPt=(L,p,pos,i)=>L.eight?(pos<0?L.base[p][i]:pos<L.len?L.cells[MTE.eightCell(p,pos)]:L.house[p%2===0?0:1][pos-L.len]):(pos<0?L.house[p][i]:pos<80?L.ring[(L.start[p]+pos)%80]:L.lane[p][pos-80]);
+const pcPt=(L,p,pos,i,sw)=>L.eight?(pos<0?L.base[p][i]:pos<L.len?L.cells[(s=>MTE.eightCellSw(p,pos,s[0],s[1]))(sw||(V&&V.sw&&V.sw[p]&&V.sw[p][i])||[0,0])]:L.house[p%2===0?0:1][pos-L.len]):(pos<0?L.house[p][i]:pos<80?L.ring[(L.start[p]+pos)%80]:L.lane[p][pos-80]);
 // Richtungspfeile: vor dem Startfeld jedes Sitzes laufen Pfeile in dessen Laufrichtung, am Hauseingang zeigt ein Pfeil hinein
 function arrowsOf(v){
   const L=layout(v.n,v.P,v.map),R=MTE.len({map:v.map,P:v.P,n:v.n}),out=[];
@@ -156,7 +157,7 @@ function arrowsOf(v){
 }
 // Zugpfade: für jeden erlaubten Zug der Weg, den die Figur geht (so sieht man bei vielen Figuren sofort, wohin und in welche Richtung gezogen wird)
 function trailsOf(v,L,opts){
-  return (opts||[]).map(o=>{const pts=[];if(o.from<0)pts.push(pcPt(L,o.q,-1,o.i),pcPt(L,o.q,o.to,o.i));else for(let x=o.from;x<=o.to;x++)pts.push(pcPt(L,o.q,x,o.i));return {pts,c:seatColor(o.q,v.n),cap:!!o.cap};});
+  return (opts||[]).map(o=>{const pts=[];if(o.from<0)pts.push(pcPt(L,o.q,-1,o.i),pcPt(L,o.q,o.to,o.i,o.sw));else for(let x=o.from;x<=o.to;x++)pts.push(pcPt(L,o.q,x,o.i,o.sw));return {pts,c:seatColor(o.q,v.n),cap:!!o.cap};});
 }
 let builtKey='';
 function buildEight(v){
@@ -200,11 +201,11 @@ function render(v,prev){
   for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++){
     const g=$('pg-'+p+'-'+i),pt=pcPt(L,p,v.pos[p][i],i);
     g.style.transform=`translate(${pt[0]}px,${pt[1]}px)`;
-    const c=g.firstChild;c.classList.toggle('can',mine&&movable.has(p+'-'+i));
+    const c=g.firstChild;c.classList.toggle('can',mine&&movable.has(p+'-'+i));c.classList.toggle('wait',!!(v.ch&&v.ch[p]&&v.ch[p][i]));
   }
   // Ziele der erlaubten Züge
   let tg='';
-  if(mine)inp.opts.forEach((o,k)=>{const pt=pcPt(L,o.q,o.to,o.i);tg+=`<circle class="tgt" data-k="${k}" cx="${pt[0]}" cy="${pt[1]}" r="12"/>`;});
+  if(mine)inp.opts.forEach((o,k)=>{const pt=pcPt(L,o.q,o.to,o.i,o.sw);tg+=`<circle class="tgt" data-k="${k}" cx="${pt[0]}" cy="${pt[1]}" r="12"/>`;});
   $('tg').innerHTML=tg;
   let trl='';
   if(mine)trailsOf(v,L,inp.opts).forEach((tr,k)=>{
@@ -268,7 +269,7 @@ function sync3d(){
   if(!use3d||!V||!window.MT3D||!MT3D.ready)return;
   const L=layout(V.n,V.P,V.map);
   const opts=!!inp&&!V.over?inp.opts:null;
-  MT3D.update(V,fields3d(V),(p,pos,i)=>pcPt(L,p,pos,i),opts,trailsOf(V,L,opts));
+  MT3D.update(V,fields3d(V),(p,pos,i,sw)=>pcPt(L,p,pos,i,sw),opts,trailsOf(V,L,opts));
 }
 async function set3d(on){
   if(on&&!(window.MT3D&&MT3D.ready)){
@@ -310,7 +311,7 @@ $('svg').addEventListener('click',e=>{
 // ---------- Sicht und Start ----------
 function view(g,s){
   const R=MTE.len(g),tp=[];for(let t=0;t<g.n/2;t++){let home=0,total=0;for(let p=0;p<g.n;p++)if(MTE.teamOf(g,p)===t){total+=g.P;g.pos[p].forEach(x=>{if(x>=R)home++;});}tp.push({home,total});}
-  return {map:g.map,mod:g.mod,me:s,n:g.n,P:g.P,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),pos:g.pos,cur:g.cur,die:g.die,dieP:g.dieP,last:g.last,over:g.over,teamPieces:tp,log:K.logFor(s)};
+  return {map:g.map,mod:g.mod,sw:g.sw,ch:g.ch,me:s,n:g.n,P:g.P,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),pos:g.pos,cur:g.cur,die:g.die,dieP:g.dieP,last:g.last,over:g.over,teamPieces:tp,log:K.logFor(s)};
 }
 function startGame(seats,opts){
   K.reset();
