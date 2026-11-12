@@ -45,6 +45,7 @@ button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .c.empty{background:transparent;border:none;cursor:default}
 .c .n{position:absolute;top:0;left:2px;font-size:calc(var(--cs)*.28);font-weight:600;line-height:1;color:var(--muted)}
 .c.inw{background:var(--word)}
+.c.lock{background:var(--okbg)}
 .c.sel{background:var(--sel);color:#111}
 .c.wrong{background:var(--badbg);color:var(--bad)}
 .c.right{background:var(--okbg)}
@@ -1341,14 +1342,22 @@ function cellsOf(w){
 }
 function curWord(){const i=wordIdx(sel.r,sel.c,dir);return i===undefined?null:{i,w:P.words[i]}}
 
+// Gesperrte Felder: Hinweis-Buchstaben und alle Felder abgeschlossener (richtig gelöster) Wörter lassen sich nicht mehr ändern
+function lockedSet(){
+  const s=new Set();
+  P.grid.forEach((row,r)=>row.forEach((cell,c)=>{if(cell&&mark[r][c]==="hint"&&user[r][c]===cell.ch)s.add(r+","+c)}));
+  P.words.forEach(w=>{const cs=cellsOf(w);if(cs.every(([r,c])=>user[r][c]===P.grid[r][c].ch))cs.forEach(([r,c])=>s.add(r+","+c))});
+  return s;
+}
 function render(){
+  const LK=lockedSet();
   const cw=curWord();
   const inw=new Set(cw?cellsOf(cw.w).map(([r,c])=>r+","+c):[]);
   P.grid.forEach((row,r)=>row.forEach((cell,c)=>{
     if(!cell)return;
     const el=document.getElementById(`c${r}_${c}`);
     el.querySelector(".ch").textContent=user[r][c];
-    el.className="c"+(inw.has(r+","+c)?" inw":"")+(sel.r===r&&sel.c===c?" sel":"")+(mark[r][c]?" "+mark[r][c]:"");
+    el.className="c"+(inw.has(r+","+c)?" inw":"")+(LK.has(r+","+c)?" lock":"")+(sel.r===r&&sel.c===c?" sel":"")+(mark[r][c]?" "+mark[r][c]:"");
   }));
   P.words.forEach((w,i)=>{
     const li=document.getElementById("cl"+i);if(!li)return;
@@ -1357,7 +1366,10 @@ function render(){
   });
   $("#active").innerHTML=cw?`<b>${cw.w.num} ${dir==="A"?"waagerecht →":"senkrecht ↓"}</b> ${cw.w.clue} <small>${lenLabel(cw.w)} · ${TOPICS[cw.w.topic]}</small>`:"";
   const act=document.getElementById("cl"+(cw?cw.i:""));
-  if(act&&cw)act.scrollIntoView({block:"nearest"});
+  if(act&&cw){      // nur die Hinweisliste scrollen, nie die Seite (sonst springt die Ansicht bei jedem Tipp, vor allem auf dem Handy)
+    const box=document.querySelector(".clues");
+    if(box&&box.scrollHeight>box.clientHeight+2){const br=box.getBoundingClientRect(),ar=act.getBoundingClientRect();if(ar.top<br.top)box.scrollTop-=br.top-ar.top+4;else if(ar.bottom>br.bottom)box.scrollTop+=ar.bottom-br.bottom+4}
+  }
   const filled=user.flat().filter(Boolean).length,total=P.grid.flat().filter(Boolean).length;
   $("#stat").textContent=`${filled}/${total} Felder · Hilfen: ${hints} · ${fmt()}`;
 }
@@ -1387,13 +1399,21 @@ function move(dr,dc){
   }
 }
 function typeChar(ch){
+  if(finished)return;
+  const LK=lockedSet(),key=(r,c)=>r+","+c;
+  if(LK.has(key(sel.r,sel.c))){
+    // Über einem gesperrten Buchstaben: derselbe Buchstabe zählt als eingegeben (nicht überspringen), ein anderer überspringt die gesperrten Felder
+    if(P.grid[sel.r][sel.c].ch===ch){step(dir,true);render();return}
+    while(LK.has(key(sel.r,sel.c))){if(!step(dir,true)){render();return}}
+  }
   user[sel.r][sel.c]=ch;mark[sel.r][sel.c]="";
   step(dir,true);
   render();checkWin();
 }
 function backspace(){
-  if(user[sel.r][sel.c]){user[sel.r][sel.c]="";mark[sel.r][sel.c]=""}
-  else if(step(dir,false)){user[sel.r][sel.c]="";mark[sel.r][sel.c]=""}
+  const LK=lockedSet(),key=(r,c)=>r+","+c;
+  if(!LK.has(key(sel.r,sel.c))&&user[sel.r][sel.c]){user[sel.r][sel.c]="";mark[sel.r][sel.c]=""}
+  else while(step(dir,false)){if(!LK.has(key(sel.r,sel.c))){user[sel.r][sel.c]="";mark[sel.r][sel.c]="";break}}
   render();
 }
 const MAP={"Ä":"AE","Ö":"OE","Ü":"UE","ß":"SS","ẞ":"SS"};
@@ -1411,7 +1431,7 @@ kb.addEventListener("keydown",e=>{
   else if(k==="ArrowDown"){move(1,0)}
   else if(k==="ArrowUp"){move(-1,0)}
   else if(k==="Backspace"){backspace()}
-  else if(k==="Delete"){user[sel.r][sel.c]="";mark[sel.r][sel.c]="";render()}
+  else if(k==="Delete"){if(!lockedSet().has(sel.r+","+sel.c)){user[sel.r][sel.c]="";mark[sel.r][sel.c]=""}render()}
   else if(k===" "||k==="Enter"){const o=dir==="A"?"D":"A";if(wordIdx(sel.r,sel.c,o)!==undefined){dir=o;render()}}
   else if(k==="Tab"){
     const i=curWord()?curWord().i:0,n=P.words.length,j=(i+(e.shiftKey?n-1:1))%n;
@@ -1435,7 +1455,7 @@ function checkWin(){
 }
 $("#check").onclick=()=>{
   P.grid.forEach((row,r)=>row.forEach((cell,c)=>{
-    if(cell&&user[r][c])mark[r][c]=user[r][c]===cell.ch?"right":"wrong";
+    if(cell&&user[r][c]&&mark[r][c]!=="hint")mark[r][c]=user[r][c]===cell.ch?"right":"wrong";
   }));
   render();focusKb();
 };
