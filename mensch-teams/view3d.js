@@ -5,8 +5,15 @@
    MT3D.setActive(on) · MT3D.resize() · MT3D.camReset()                                                                                   */
 (function () {
   var H = window.MT3D = { ready: false };
+  var floorM = null, ambL = null, diceV = null, diceF = null;
   var host, api, r, scene, camera, controls, active = false, built = '', group = null, pcs = {}, tgts = [], lastPos = null, lastF = null, tw = [], K = 1 / 30, cx0 = 0, cy0 = 0, bw = 10, bh = 10, pickables = [];
-  var COL = { track: 0x2a3550, trackE: 0x6b7aa0, center: 0x39456a };
+  // Stilpaletten: cyber (Neon auf Dunkelblau), dark (flach grau), standard (helles Holz)
+  var PAL = {
+    cyber: { clear: 0x07090f, plate: 0x0d1424, plateE: 0x00cfff, track: 0x2a3550, trackE: 0x6b7aa0, center: 0x39456a, other: 0x1a2238, tube: 0x24304d, floor: 0x05060b, ambient: 0xbfd0ff },
+    dark: { clear: 0x08090c, plate: 0x15171d, plateE: 0x3a4152, track: 0x262b36, trackE: 0x4a5266, center: 0x30384a, other: 0x1a1d25, tube: 0x20242d, floor: 0x050608, ambient: 0xd0d6e6 },
+    standard: { clear: 0x3a2a1c, plate: 0x8a5a2b, plateE: 0x4a2f12, track: 0xf2e8cd, trackE: 0x7a5a32, center: 0xe6d6ae, other: 0xcdb98c, tube: 0xb58a55, floor: 0x2a1d12, ambient: 0xfff0dd }
+  };
+  var COL = PAL.cyber, styleName = 'cyber';
   var P3 = function (pt) { return new THREE.Vector3((pt[0] - cx0) * K, 0, (pt[1] - cy0) * K); };
 
   H.init = function (hostEl, apiObj) {
@@ -15,9 +22,9 @@
     scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x07090f, 60, 140);
     camera = new THREE.PerspectiveCamera(40, 1, .1, 300); camera.position.set(0, 24, 24);
     controls = new THREE.OrbitControls(camera, r.domElement); controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 8; controls.maxDistance = 90; controls.maxPolarAngle = 1.4;
-    scene.add(new THREE.AmbientLight(0xbfd0ff, .6));
+    ambL = new THREE.AmbientLight(0xbfd0ff, .6); scene.add(ambL);
     var dl = new THREE.DirectionalLight(0xffffff, .85); dl.position.set(8, 30, 14); scene.add(dl);
-    var floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ color: 0x05060b })); floor.rotation.x = -Math.PI / 2; floor.position.y = -1; scene.add(floor);
+    floorM = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ color: 0x05060b })); floorM.rotation.x = -Math.PI / 2; floorM.position.y = -1; scene.add(floorM);
     // Klick auf Figur oder Ziel
     var ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), down = null;
     r.domElement.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
@@ -33,6 +40,17 @@
     requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (active) tick(now); });
     H.ready = true; H.resize();
   };
+  // ---------- Würfelfläche in der Szene (kein Tablett): deckt das ganze Brett ab, 1 Würfeleinheit = F.unit Brettpixel ----------
+  function placeDice() {
+    if (!diceV || !diceF || !diceV.R) return; var g = diceV.R.group, v = P3([diceF.vb[0] / 2, diceF.vb[1] / 2]);
+    g.position.set(v.x, .12, v.z); g.scale.setScalar(diceF.unit * K); g.updateMatrixWorld(true);
+  }
+  H.diceView = function () {
+    if (!H.ready || !diceF) return null;
+    if (!diceV) { var v = P3([diceF.vb[0] / 2, diceF.vb[1] / 2]); diceV = Dice3D.embed({ scene: scene, camera: camera, dom: r.domElement, stage: host, pos: [v.x, .12, v.z], scale: diceF.unit * K, rotY: 0, bare: true, rotCam: diceF.rotCam, focus: function () { } }); }
+    return diceV;
+  };
+  H.cancelDice = function () { if (diceV) diceV.cancel(); };
   H.setActive = function (a) { active = !!a; if (a) H.resize(); };
   H.resize = function () {
     if (!H.ready) return; var w = host.clientWidth || 800, h = host.clientHeight || 600; r.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -48,25 +66,31 @@
   setInterval(function () { if (!active) runTw(performance.now()); }, 100);
 
   // ---------- Brett aufbauen ----------
+  function applyStyle() {
+    styleName = api.style ? api.style() : 'cyber'; if (!PAL[styleName]) styleName = 'cyber'; COL = PAL[styleName];
+    r.setClearColor(COL.clear); scene.fog.color.setHex(COL.clear); if (floorM) floorM.material.color.setHex(COL.floor); if (ambL) ambL.color.setHex(COL.ambient);
+  }
+  H.restyle = function () { built = ''; };
   function build(F) {
+    applyStyle();
     if (group) scene.remove(group);
     group = new THREE.Group(); scene.add(group); pcs = {}; pickables = [];
     var xs = F.pts.map(function (p) { return p.x; }), ys = F.pts.map(function (p) { return p.y; });
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
     cx0 = (x0 + x1) / 2; cy0 = (y0 + y1) / 2; K = Math.min(1, 34 / Math.max(x1 - x0, y1 - y0)) ; K = Math.max(.02, K);
     bw = (x1 - x0 + 70) * K; bh = (y1 - y0 + 70) * K;
-    var plate = new THREE.Mesh(new THREE.BoxGeometry(bw, .4, bh), new THREE.MeshStandardMaterial({ color: 0x0d1424, roughness: .6, metalness: .4 })); plate.position.y = -.25; group.add(plate);
-    var pe = new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry), new THREE.LineBasicMaterial({ color: 0x00cfff })); pe.position.copy(plate.position); group.add(pe);
+    var plate = new THREE.Mesh(new THREE.BoxGeometry(bw, .4, bh), new THREE.MeshStandardMaterial({ color: COL.plate, roughness: styleName === 'standard' ? .7 : .6, metalness: styleName === 'standard' ? .05 : .4 })); plate.position.y = -.25; group.add(plate);
+    var pe = new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry), new THREE.LineBasicMaterial({ color: COL.plateE })); pe.position.copy(plate.position); group.add(pe);
     if (F.loop) {      // Bahn als helle Spur unter den Feldern
       var pts = F.loop.map(function (p) { var v = P3(p); v.y = .02; return v; }), curve = new THREE.CatmullRomCurve3(pts, !!F.closed);
-      var tube = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(60, pts.length * 4), .22, 8, !!F.closed), new THREE.MeshBasicMaterial({ color: 0x24304d, transparent: true, opacity: .8 })); tube.scale.y = .3; group.add(tube);
+      var tube = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(60, pts.length * 4), .22, 8, !!F.closed), new THREE.MeshBasicMaterial({ color: COL.tube, transparent: true, opacity: .8 })); tube.scale.y = .3; group.add(tube);
     }
     var cg = new THREE.CylinderGeometry(.4, .44, .14, 24);
     F.pts.forEach(function (p) {
-      var c = p.c ? new THREE.Color(p.c) : null, base = p.k === 'track' ? COL.track : p.k === 'center' ? COL.center : 0x1a2238;
-      var mat = new THREE.MeshStandardMaterial({ color: c && p.k === 'start' ? c : (c ? c.clone().multiplyScalar(.35).add(new THREE.Color(0x0a0f1c)) : base), roughness: .45, metalness: .3, emissive: c ? c.clone().multiplyScalar(p.k === 'start' ? .25 : .12) : 0x0a1020 });
+      var c = p.c ? new THREE.Color(p.c) : null, base = p.k === 'track' ? COL.track : p.k === 'center' ? COL.center : COL.other;
+      var mat = new THREE.MeshStandardMaterial({ color: c && p.k === 'start' ? c : (c ? (styleName === 'standard' ? c.clone().lerp(new THREE.Color(0xffffff), .55) : c.clone().multiplyScalar(.35).add(new THREE.Color(0x0a0f1c))) : base), roughness: .45, metalness: .3, emissive: styleName === 'standard' ? 0x000000 : (c ? c.clone().multiplyScalar(p.k === 'start' ? .25 : .12) : 0x0a1020) });
       var m = new THREE.Mesh(cg, mat); var v = P3([p.x, p.y]); m.position.set(v.x, .05, v.z); if (p.k === 'center') m.scale.set(1.25, 1, 1.25); group.add(m);
-      var e = new THREE.LineSegments(new THREE.EdgesGeometry(cg, 40), new THREE.LineBasicMaterial({ color: c ? c : COL.trackE, transparent: true, opacity: c ? .95 : .55 })); e.position.copy(m.position); if (p.k === 'center') e.scale.copy(m.scale); group.add(e);
+      var e = new THREE.LineSegments(new THREE.EdgesGeometry(cg, 40), new THREE.LineBasicMaterial({ color: c ? c : COL.trackE, transparent: true, opacity: c ? .95 : (styleName === 'standard' ? .9 : .55) })); e.position.copy(m.position); if (p.k === 'center') e.scale.copy(m.scale); group.add(e);
     });
     // Richtungspfeile (leuchten der Reihe nach in Laufrichtung auf)
     arrowM = [];
@@ -94,7 +118,9 @@
   var trailM = [];
   H.update = function (v, F, ptOf, opts, trails) {
     if (!H.ready) return;
+    diceF = F;
     if (built !== F.key) { built = F.key; build(F); lastPos = null; }
+    placeDice();
     // Figuren setzen oder animieren
     var first = !lastPos; if (first) lastPos = {};
     for (var p = 0; p < v.n; p++) for (var i = 0; i < v.P; i++) {

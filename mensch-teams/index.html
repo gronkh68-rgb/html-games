@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mädn Teams</title>
 <link rel="stylesheet" href="../common.css">
+<script>window.DARK_STYLE=1;</script>
 <script src="../theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
@@ -20,6 +21,17 @@
 .hk-layout{grid-template-columns:minmax(0,1fr) 310px}
 .bw{width:min(100%,calc(100vh - 170px));min-width:320px;margin:0 auto}
 .bw.wide{width:100%;max-width:1150px}
+/* Stile (2D): Cyber = Neon auf Dunkelblau, Dunkel = flach grau, Standard = helles Holz */
+html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1a2e,#04070d);border-color:#00f0ff88;box-shadow:0 0 24px rgba(0,240,255,.25)}
+html[data-style="cyber"] .fld.trk{fill:rgba(0,240,255,.06);stroke:#00cfff99;stroke-width:1.7}
+html[data-style="cyber"] .pc{filter:drop-shadow(0 0 4px rgba(255,255,255,.55))}
+html[data-style="dark"] #svg{background:#0d0f14;border-color:#2a2f3b}
+html[data-style="dark"] .fld.trk{fill:#1b1f29;stroke:#343b4a;stroke-width:1.5}
+html[data-style="dark"] #svg text.lbl{fill:#cfd5e4}
+html:not([data-style]) #svg{background:radial-gradient(ellipse at 50% 45%,#d9b98a,#a67b4b);border-color:#6b4a2b}
+html:not([data-style]) .fld.trk{fill:#f4ecd8;stroke:#7a5a32;stroke-width:1.6}
+html:not([data-style]) #svg text.lbl{fill:#3a2412}
+@media (prefers-color-scheme:light){html:not([data-style]) .modbox{fill:rgba(255,255,255,.6)}}
 .modbox{fill:rgba(0,0,0,.45);stroke:#ffd23f;stroke-width:2.5}
 .pc.wait{stroke:#ffd23f;stroke-width:3.4;stroke-dasharray:4 3}
 .trl,.trl2{pointer-events:none}.trl2{animation:trlflow .7s linear infinite}@keyframes trlflow{to{stroke-dashoffset:-12}}
@@ -41,7 +53,9 @@ html[data-style="cyber"] #svg{background:radial-gradient(ellipse at 50% 45%,#0b1
 .tm small{color:var(--muted)}
 .tm b{margin-left:auto}
 .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:3px}.bar i{display:block;height:100%;background:#3ddc84}
-#diceDock{height:300px;width:225px;margin:0 auto;position:relative}
+/* Würfelfläche = das ganze Brett (kein Tablett): die Würfel werden über das Spielfeld geschnippt */
+.bw{position:relative}
+#diceDock{position:absolute;inset:0;z-index:8;pointer-events:none}
 #stage3d{position:relative;width:100%;height:min(74vh,760px);min-height:360px;border-radius:14px;overflow:hidden;border:2px solid #0b1424;background:#07090f}
 #stage3d canvas{display:block;width:100%;height:100%;touch-action:none}
 body.full3d{overflow:hidden}body.full3d .top,body.full3d footer{display:none}
@@ -49,10 +63,11 @@ body.full3d #stage3d{position:fixed;inset:0;width:auto;height:auto;min-height:0;
 body.full3d .hk-layout{display:block}body.full3d .hk-main,body.full3d .hk-side{display:contents}
 body.full3d #hkBanner{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:30;max-width:min(92vw,720px);padding:6px 16px;font-size:.95rem}
 body.full3d #hkStatus{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:30;max-width:min(92vw,720px);min-height:0;padding:5px 14px;font-size:.9rem}
-body.full3d .hk-side>*:not(#diceDock):not(.panel:has(#fs3)){display:none}
+body.full3d .hk-side>*:not(.panel:has(#fs3)):not(.panel:has(#teams)){display:none}
 body.full3d .panel:has(#fs3){position:fixed;top:8px;right:8px;z-index:40;margin:0;padding:6px;background:rgba(10,14,28,.7);border:0}
-body.full3d .panel:has(#fs3) #v3d{display:none}
-body.full3d #diceDock{position:fixed;right:10px;bottom:46px;width:150px;height:200px;margin:0;z-index:30}
+body.full3d .panel:has(#fs3) .row{flex-wrap:nowrap}
+body.full3d .panel:has(#teams){position:fixed;left:8px;bottom:46px;z-index:30;margin:0;padding:6px 8px;background:rgba(10,14,28,.72);border:0;max-width:240px;font-size:.8rem}
+body.full3d .panel:has(#teams) .bar{display:none}
 </style>
 </head>
 <body>
@@ -64,11 +79,10 @@ body.full3d #diceDock{position:fixed;right:10px;bottom:46px;width:150px;height:2
       <div class="hk-main">
         <div id="hkBanner"></div>
         <div id="hkStatus"></div>
-        <div class="bw"><svg id="svg" viewBox="0 0 800 800"></svg></div>
+        <div class="bw"><svg id="svg" viewBox="0 0 800 800"></svg><div id="diceDock" data-bare="1"></div></div>
         <div id="stage3d" hidden></div>
       </div>
       <div class="hk-side">
-        <div id="diceDock"></div>
         <div class="panel"><div id="teams"></div></div>
         <div class="panel"><div class="row" style="margin:0"><button class="btn alt" id="v3d" style="flex:1">🧊 3D-Ansicht</button><button class="btn alt" id="cam3" style="flex:none" hidden title="Ansicht zurücksetzen">⟲</button><button class="btn alt" id="fs3" style="flex:none" hidden title="Vollbild">⛶</button></div></div>
         <div class="panel"><div id="hkLog"></div></div>
@@ -163,7 +177,7 @@ let builtKey='';
 function buildEight(v){
   const L=layoutEight();let h='<g id="bg">';
   h+=`<polyline points="${Array.from({length:MTE.EN+1},(_,i)=>L.cells[MTE.eightCell(0,i-1)||0]).map(c=>c[0]+','+c[1]).join(' ')}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="16" stroke-linejoin="round"/>`;
-  L.cells.forEach((pt,i)=>{if(i===MTE.EDUP)return;h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="${i===MTE.ECEN?13:11}" fill="rgba(255,255,255,${i===MTE.ECEN?.2:.12})"/>`;});
+  L.cells.forEach((pt,i)=>{if(i===MTE.EDUP)return;h+=`<circle class="fld trk" cx="${pt[0]}" cy="${pt[1]}" r="${i===MTE.ECEN?13:11}" fill="rgba(255,255,255,${i===MTE.ECEN?.2:.12})"/>`;});
   for(let p=0;p<4;p++){const c=seatColor(p,4),s=MTE.ESEAT[p].s,pt=L.cells[s],d=MTE.ESEAT[p].d;
     h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="13" fill="${c}" stroke="#fff" stroke-width="2"/>`;
 
@@ -176,11 +190,11 @@ function buildEight(v){
   $('svg').setAttribute('viewBox','0 0 '+EW+' '+EH);$('svg').parentNode.classList.add('wide');$('svg').innerHTML=h;
 }
 function build(v){
-  const key=(v.map||'ring')+v.n+'-'+v.P;if(builtKey===key)return;builtKey=key;
+  const key=(v.map||'ring')+v.n+'-'+v.P;if(builtKey===key)return;builtKey=key;setDiceArea(v.map==='eight'?'eight':'ring');
   if(v.map==='eight'){buildEight(v);return;}
   $('svg').setAttribute('viewBox','0 0 800 800');$('svg').parentNode.classList.remove('wide');
   const L=layout(v.n,v.P);let h='<g id="bg">';
-  L.ring.forEach(pt=>{h+=`<circle class="fld" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="rgba(255,255,255,.12)"/>`;});
+  L.ring.forEach(pt=>{h+=`<circle class="fld trk" cx="${pt[0]}" cy="${pt[1]}" r="11" fill="rgba(255,255,255,.12)"/>`;});
   for(let p=0;p<v.n;p++){
     const c=seatColor(p,v.n);
     h+=`<circle class="fld" cx="${L.ring[L.start[p]][0]}" cy="${L.ring[L.start[p]][1]}" r="12.5" fill="${c}" stroke="#fff" stroke-width="2"/>`;
@@ -246,6 +260,21 @@ function render(v,prev){
   $('hkLog').innerHTML=v.log.slice(1,60).map(l=>`<div>${esc(tx(l))}</div>`).join('');
   sync3d();
 }
+// ---------- Würfelfläche: das ganze Brett (2D: unsichtbare Fläche darüber, 3D: Fläche in der Szene) ----------
+// 1 Würfeleinheit = u Pixel der Brettzeichnung; die Fläche deckt genau die Zeichnung ab (w x h Pixel)
+const VBOX=map=>map==='eight'?{w:1200,h:560,u:24.8}:{w:800,h:800,u:20.8};
+function setDiceArea(map){
+  const b=VBOX(map);Dice3D.setArea(b.w/b.u/2,b.h/b.u/2);
+  if(!use3d&&K&&K.dview){try{const v=K.dview(0);if(v&&v.refit)v.refit();}catch(e){}}
+}
+function diceObstaclesT(g,rot){      // alle Figuren als feste Hindernisse; Koordinaten relativ zur Brettmitte, zur geworfenen Seite gedreht
+  const b=VBOX(g.map),L=layout(g.n,g.P,g.map),th=(rot|0)*Math.PI/2,cs=Math.cos(th),sn=Math.sin(th),o=[];
+  for(let p=0;p<g.n;p++)for(let i=0;i<g.P;i++){
+    const sw=g.sw&&g.sw[p]&&g.sw[p][i]||[0,0],pt=pcPt(L,p,g.pos[p][i],i,sw),x=(pt[0]-b.w/2)/b.u,z=(pt[1]-b.h/2)/b.u;
+    o.push([x*cs-z*sn,x*sn+z*cs,.45,1.3]);
+  }
+  return o;
+}
 // ---------- 3D-Ansicht ----------
 function fields3d(v){
   const L=layout(v.n,v.P,v.map),pts=[],key=(v.map||'ring')+v.n+'-'+v.P;let loop=null;
@@ -259,7 +288,8 @@ function fields3d(v){
     for(let p=0;p<v.n;p++){const c=L.ring[L.start[p]];pts.push({x:c[0],y:c[1],k:'start',c:seatColor(p,v.n)});L.lane[p].forEach(h=>pts.push({x:h[0],y:h[1],k:'lane',c:seatColor(p,v.n)}));L.house[p].forEach(h=>pts.push({x:h[0],y:h[1],k:'base',c:seatColor(p,v.n)}));}
   }
   const pieces=[];for(let p=0;p<v.n;p++)for(let i=0;i<v.P;i++)pieces.push({p,i,c:seatColor(p,v.n),tc:TEAMC[teamOf(p,v.n)]});
-  return {key,pts,loop,closed:true,pieces,arrows:arrowsOf(v)};
+  const vb=VBOX(v.map);
+  return {key,pts,loop,closed:true,pieces,arrows:arrowsOf(v),vb:[vb.w,vb.h],unit:vb.u,rotCam:v.map==='eight'?'half':true};
 }
 let use3d=false,loading3=false;
 try{use3d=localStorage.getItem('mt-3d')==='1';}catch(e){}
@@ -274,29 +304,33 @@ function sync3d(){
 async function set3d(on){
   if(on&&!(window.MT3D&&MT3D.ready)){
     if(loading3)return;loading3=true;$('v3d').textContent=T('Lade 3D …','Loading 3D …');
-    try{await loadLibs3();MT3D.init($('stage3d'),{
+    try{await loadLibs3();await Dice3D.ready();MT3D.init($('stage3d'),{
       onTarget:k=>{if(inp)answer(k);},
+      style:()=>document.documentElement.getAttribute('data-style')||'standard',
       onPiece:(p,i)=>{if(!inp)return;const k=inp.opts.findIndex(o=>o.q===p&&o.i===i);if(k>=0)answer(k);else{hintTxt=T('Diese Figur kann gerade nicht ziehen.','This piece cannot move right now.');K.apply();}}});}
     catch(e){loading3=false;$('v3d').textContent=T('3D nicht verfügbar','3D unavailable');return;}
     loading3=false;
   }
   use3d=on;try{localStorage.setItem('mt-3d',on?'1':'0');}catch(e){}
-  $('stage3d').hidden=!on;$('svg').parentNode.hidden=on;$('cam3').hidden=!on;$('fs3').hidden=!on;if(!on)setFull(false);
-  $('v3d').textContent=on?T('🧊 2D-Ansicht','🧊 2D view'):T('🧊 3D-Ansicht','🧊 3D view');
+  $('stage3d').hidden=!on;$('svg').parentNode.hidden=on;$('cam3').hidden=!on;$('fs3').hidden=!on;
+  setFull(on);      // 3D füllt wie bei Mensch ärgere dich nicht die ganze Seite; Banner, Hinweis und Knöpfe schweben darüber
+  $('v3d').textContent=on?T('2D-Ansicht','2D view'):T('🧊 3D-Ansicht','🧊 3D view');
   if(window.MT3D&&MT3D.ready){MT3D.setActive(on);if(on){MT3D.resize();builtKey3=null;}}
-  if(on&&K&&K.V)K.apply();
+  if(K&&K.V){K.prevV=null;K.apply();}
 }
 let builtKey3=null;
-// Vollbild: Brett füllt den Bildschirm, Banner, Hinweis und Würfel schweben darüber
-function setFull(on){
+function setFull(on){      // Seitenlayout: 3D-Bühne füllt den Bildschirm
   if(document.body.classList.contains('full3d')===on)return;
-  document.body.classList.toggle('full3d',on);$('fs3').textContent=on?'✕':'⛶';
-  try{if(on&&document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
-  [150,500,1100].forEach(ms=>setTimeout(()=>{if(window.MT3D&&MT3D.ready){MT3D.resize();MT3D.camReset();}},ms));      // der Browser braucht einen Moment, bis die Vollbildgröße steht
+  document.body.classList.toggle('full3d',on);
+  [100,500].forEach(ms=>setTimeout(()=>{if(window.MT3D&&MT3D.ready){MT3D.resize();MT3D.camReset();}},ms));
 }
-$('fs3').onclick=()=>setFull(!document.body.classList.contains('full3d'));
-document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('full3d'))setFull(false);});
-addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('full3d'))setFull(false);});
+function toggleBrowserFs(){      // zusätzlich echter Browser-Vollbildmodus
+  try{if(!document.fullscreenElement&&document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});else if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
+  [150,500,1100].forEach(ms=>setTimeout(()=>{if(window.MT3D&&MT3D.ready){MT3D.resize();MT3D.camReset();}},ms));
+}
+$('fs3').onclick=toggleBrowserFs;
+addEventListener('keydown',e=>{if(e.key==='Escape'&&use3d&&!document.fullscreenElement)set3d(false);});
+new MutationObserver(()=>{if(window.MT3D&&MT3D.ready){MT3D.restyle();if(K&&K.V)K.apply();}}).observe(document.documentElement,{attributes:true,attributeFilter:['data-style']});
 $('v3d').onclick=()=>set3d(!use3d);
 $('cam3').onclick=()=>MT3D.camReset();
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,v:spec.v,opts:spec.opts};hintTxt='';K.apply();}else res(null);});}
@@ -330,7 +364,9 @@ async function main(){
   if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
 }
 K=HK.init({
-  prefix:'mtm-v1-',title:L2('Mädn Teams','Ludo Teams'),minPlayers:2,diceZoom:false,diceDock:'diceDock',
+  prefix:'mtm-v1-',title:L2('Mädn Teams','Ludo Teams'),minPlayers:2,diceZoom:false,diceDock:'diceDock',bareDice:true,timeoutMs:30000,
+  dviewFor:p=>use3d&&window.MT3D&&MT3D.ready?MT3D.diceView():null,
+  diceObstacles:diceObstaclesT,cancelUi:()=>{inp=null;K.apply();},cancelDice:()=>{if(window.MT3D&&MT3D.ready&&MT3D.diceView)MT3D.cancelDice();},
   seats:Array.from({length:8},(_,i)=>({name:T('Sitz ','Seat ')+(i+1),color:seatColor(i,8)})),
   cpuNames:['Kira','Bolt','Nova','Pixel','Juno','Rook','Echo','Zed'],
   dieColor:(p,g)=>seatColor(p,g.n),

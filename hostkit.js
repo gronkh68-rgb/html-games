@@ -25,6 +25,7 @@
   var CSS = '.hk-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}@media (max-width:900px){.hk-layout{grid-template-columns:1fr}}' +
     '.hk-main{display:flex;flex-direction:column;gap:10px;min-width:0}.hk-side{display:flex;flex-direction:column;gap:12px}.hk-side .panel{margin:0}' +
     '#hkBanner{border-radius:12px;padding:10px 14px;text-align:center;font-weight:900;letter-spacing:.03em;font-size:1.05rem;background:rgba(0,0,0,.35);color:#cfe3ff;border:2px solid rgba(255,255,255,.12);transition:all .25s}' +
+    '#hkBanner[data-t]::after{content:" \\00b7  " attr(data-t) " s";font-variant-numeric:tabular-nums}#hkBanner[data-low]{background:#7a1010!important;color:#fff!important}' +
     '#hkBanner.me{background:linear-gradient(90deg,#ffb300,#ffd23f,#ffb300);color:#1b1200;border-color:#fff;font-size:1.25rem;animation:hkPulse .8s ease-in-out infinite alternate}' +
     'html[data-style="cyber"] #hkBanner.me{background:linear-gradient(90deg,#c9bd00,#fcee09,#c9bd00)}' +
     '@keyframes hkPulse{from{box-shadow:0 0 6px rgba(255,210,63,.5)}to{box-shadow:0 0 26px rgba(255,210,63,.95)}}' +
@@ -66,7 +67,7 @@
     };
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
     K.fxLocal = function (d) {
-      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col, mine: d.p === K.ME, mod: !!d.mod }); return; }
+      if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col, mine: d.p === K.ME, mod: !!d.mod, rot: d.rot || 0 }); return; }
       if (cfg.fx) cfg.fx(d);
     };
     K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
@@ -75,11 +76,39 @@
     };
 
     // ---------- Fragen an Spieler ----------
+    // Zugtimer (cfg.timeoutMs, nur für Würfe und Zugwahl): Nach Ablauf entscheidet das Spiel selbst (ai). Nach 3 automatischen Zügen in Folge wird der Spieler zum Computer (Online: aus dem Raum geworfen, der Platz bleibt für den Wiederbeitritt).
+    var IDLE = {};
+    K.timerShow = function (secs) { var b = $('hkBanner'); if (!b) return; if (secs == null) { delete b.dataset.t; delete b.dataset.low; } else { b.dataset.t = secs; if (secs <= 8) b.dataset.low = '1'; else delete b.dataset.low; } };
+    K.cancelUiFor = function (spec) {
+      if (spec.k === 'throw') { try { K.dview(spec.p).stopDrag(); } catch (e) {} document.querySelectorAll('.dbtn').forEach(function (b) { b.remove(); }); }
+      else if (cfg.cancelUi) cfg.cancelUi(spec);
+    };
+    K.idleToBot = function (p) {
+      var s = K.G.seats[p]; if (!s || s.type === 'cpu') return; IDLE[p] = 0;
+      var why = HK.L2('Du warst zu lange inaktiv: Ein Computer hat deinen Platz übernommen.', 'You were inactive for too long: a computer took your seat.');
+      if (s.type === 'remote') { K.L.kick(s.seat, HK.tx(why)); return; }      // löst onSeatDrop aus: Der Platz wird CPU (und bleibt für die Rückkehr frei)
+      var was = s.name; K.G.seats[p] = { type: 'cpu', name: was + ' (Bot)', seat: s.seat, orig: was, away: false };
+      K.say(-1, HK.L2(was + ' war zu lange inaktiv und wird durch einen Computer ersetzt.', was + ' was inactive for too long and is replaced by a computer.')); K.push();
+    };
     K.ask = function (p, spec, ai) {
       var s = K.G.seats[p];
       if (s.type === 'cpu') return Promise.resolve(ai());
-      if (s.type === 'host') return K.uiAsk(spec);
-      return new Promise(function (res) { var id = ++K.askN; K.pend[p] = { id: id, res: res, ai: ai, spec: spec }; K.L.sendTo(s.seat, { k: 'ask', id: id, spec: spec }); });
+      var tm = cfg.timeoutMs && (spec.k === 'throw' || spec.k === 'turn') ? cfg.timeoutMs : 0;
+      if (tm) spec = Object.assign({}, spec, { tm: tm });
+      var pr = s.type === 'host' ? K.uiAsk(spec) : new Promise(function (res) { var id = ++K.askN; K.pend[p] = { id: id, res: res, ai: ai, spec: spec }; K.L.sendTo(s.seat, { k: 'ask', id: id, spec: spec }); });
+      if (!tm) return pr;
+      return new Promise(function (res) {
+        var fin = false, t0 = Date.now(), iv = 0, tt = 0, mine = s.type === 'host', tok = K.token;
+        var stop = function () { clearTimeout(tt); clearInterval(iv); if (mine) K.timerShow(null); };
+        if (mine) { var show = function () { K.timerShow(Math.max(0, Math.ceil((tm - (Date.now() - t0)) / 1000))); }; show(); iv = setInterval(show, 500); }
+        tt = setTimeout(function () {
+          if (fin) return; fin = true; stop();
+          if (tok !== K.token) return;      // Spiel wurde inzwischen beendet oder neu gestartet
+          if (mine) K.cancelUiFor(spec); else { delete K.pend[p]; K.L.sendTo(s.seat, { k: 'cancelask' }); }
+          IDLE[p] = (IDLE[p] || 0) + 1; var out = ai(); res(out); if (IDLE[p] >= 3) setTimeout(function () { K.idleToBot(p); }, 0);
+        }, tm);
+        pr.then(function (a) { if (fin) return; fin = true; stop(); IDLE[p] = 0; res(a); });
+      });
     };
     K.uiAsk = function (spec) { return spec.k === 'dlg' ? K.dlg(spec) : spec.k === 'throw' ? K.throwUi(spec) : cfg.ui(spec); };
     // ---------- Echte Würfelphysik (dice3d.js): Wurf per Maus ziehen, der Host rechnet, alle sehen dieselbe Bahn ----------
@@ -99,10 +128,10 @@
     // opt.mod: Der zweite Würfel ist ein vierseitiger Rechenwürfel (Tetraeder, Werte 1 bis 4 = +2, -2, x2, geteilt durch 2), echte Physik
     K.throwDice = async function (p, n, hint, opt) {
       var col = cfg.dieColor ? cfg.dieColor(p, K.G) : null, mod = !!(opt && opt.mod) && n === 2;
-      var par = await K.ask(p, { k: 'throw', n: n, hint: hint || null, col: col, p: p, mod: mod }, function () { return Dice3D.autoParams(n); });
-      par = Dice3D.clean(par, n) || Dice3D.autoParams(n);
-      var r = await Dice3D.simulate(par, null, mod ? ['d6', 'd4'] : null);
-      K.fx({ k: 'dice3d', track: r.track, col: col, p: p, mod: mod }); K.sfx('dice');
+      var ans = await K.ask(p, { k: 'throw', n: n, hint: hint || null, col: col, p: p, mod: mod }, function () { return Dice3D.autoParams(n, !!cfg.bareDice); });
+      var par = Dice3D.clean(ans, n) || Dice3D.autoParams(n, !!cfg.bareDice), rot = ans && Number.isInteger(ans.rot) ? (((ans.rot % 4) + 4) % 4) : 0;      // rot: Seite, von der geworfen wurde (Viertelschritte)
+      var r = await Dice3D.simulate(par, cfg.diceObstacles ? cfg.diceObstacles(K.G, rot) : null, mod ? ['d6', 'd4'] : null);
+      K.fx({ k: 'dice3d', track: r.track, col: col, p: p, mod: mod, rot: rot }); K.sfx('dice');
       await K.sleep(Math.round(r.track.f.length / r.track.hz * 1000) + 900);
       return r.v;
     };
@@ -205,11 +234,16 @@
       } else if (m.k === 'sync') { K.L.sendTo(from, { k: 'v', v: cfg.view(K.G, p) }); var e2 = K.pend[p]; if (e2) K.L.sendTo(from, { k: 'ask', id: e2.id, spec: e2.spec }); }
       else if (cfg.hostMsg) cfg.hostMsg(p, m);
     }
-    var clientAsk = 0;
+    var clientAsk = 0, clientSpec = null, clientIv = 0;
     function clientMsg(m) {
       if (!m) return;
       if (m.k === 'v') { K.V = m.v; K.apply(); }
-      else if (m.k === 'ask') { var my = ++clientAsk; K.closeDlg(); K.uiAsk(m.spec).then(function (a) { if (my === clientAsk) K.L.send({ k: 'ans', id: m.id, a: a }); }); }
+      else if (m.k === 'ask') {
+        var my = ++clientAsk; K.closeDlg(); clientSpec = m.spec; clearInterval(clientIv); K.timerShow(null);
+        if (m.spec.tm) { var c0 = Date.now(), cs = function () { K.timerShow(Math.max(0, Math.ceil((m.spec.tm - (Date.now() - c0)) / 1000))); }; cs(); clientIv = setInterval(cs, 500); }
+        K.uiAsk(m.spec).then(function (a) { if (my === clientAsk) { clearInterval(clientIv); K.timerShow(null); K.L.send({ k: 'ans', id: m.id, a: a }); } });
+      }
+      else if (m.k === 'cancelask') { clientAsk++; clearInterval(clientIv); K.timerShow(null); if (clientSpec) K.cancelUiFor(clientSpec); clientSpec = null; K.closeDlg(); }
       else if (m.k === 'fx') { K.fxLocal(m.d); }
       else if (m.k === 'closedlg') { K.closeDlg(); }
     }

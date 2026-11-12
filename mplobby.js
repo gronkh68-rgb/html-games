@@ -236,8 +236,8 @@
       var s = L.seats[+k.dataset.kick]; if (s && s.conn) { var c = s.conn; try { c.send({ t: 'kicked', why: 'Der Host hat dich entfernt' }); } catch (er) {} dropRemote(c); setTimeout(function () { try { c.close(); } catch (er) {} }, 300); }
     });
     // Mitspieler während des Spiels entfernen (z. B. vom Spiel aus aufrufbar)
-    L.kick = function (seat) {
-      var s = L.seats[seat]; if (s && s.conn) { var c = s.conn; try { c.send({ t: 'kicked', why: 'Ein Computer hat deinen Platz übernommen' }); } catch (er) {} dropRemote(c); setTimeout(function () { try { c.close(); } catch (er) {} }, 300); }
+    L.kick = function (seat, why) {
+      var s = L.seats[seat]; if (s && s.conn) { var c = s.conn; try { c.send({ t: 'kicked', why: why || 'Ein Computer hat deinen Platz übernommen' }); } catch (er) {} dropRemote(c); setTimeout(function () { try { c.close(); } catch (er) {} }, 300); }
     };
     $('mpStart').onclick = function () {
       if (L.role !== 'host') return;

@@ -546,6 +546,7 @@
     addEventListener('resize', function () { if (zoomed) { applyBig(); resize(); } });
     env.destroy = function () { if (ro) ro.disconnect(); wrap.remove(); };
     V = controller(env);
+    V.refit = function () { resize(); };      // nach D.setArea: Kamera neu an die Wurffläche anpassen
     return V;
   };
 
@@ -583,7 +584,8 @@
     var rq = 0;
     env.faceCam = function () {
       if (!o.rotCam || !env.R) return; var g = env.R.group, c = o.camera.position, a = Math.atan2(c.x - g.position.x, c.z - g.position.z);
-      rq = (((Math.round(a / (Math.PI / 2))) % 4) + 4) % 4; g.rotation.y = rq * Math.PI / 2; g.updateMatrixWorld(true);
+      rq = o.rotCam === 'half' ? (Math.cos(a) >= -1e-6 ? 0 : 2) : (((Math.round(a / (Math.PI / 2))) % 4) + 4) % 4;      // 'half': längliche Fläche nur um 180 Grad drehen
+      g.rotation.y = rq * Math.PI / 2; g.updateMatrixWorld(true);
     };
     env.rotQ = function () { return rq; };
     env.destroy = function () { overlay.remove(); };
