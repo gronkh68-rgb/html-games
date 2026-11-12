@@ -212,7 +212,7 @@ var hasThree = typeof THREE !== 'undefined';
     im.onload = function () { S.custom = im; S.gif = /gif/i.test(f.type || '') || /\.gif$/i.test(f.name || ''); S.pic = -1; sel(); var t = up.querySelector('img'); if (t) t.remove(); var ti = document.createElement('img'); ti.src = url; up.insertBefore(ti, up.firstChild); up.querySelector('small').textContent = 'Dein Bild'; };
     im.src = url;
   };
-  [6, 12, 24, 48, 96, 150].forEach(function (n) { var b = document.createElement('button'); b.className = 'opt'; b.dataset.n = n; b.textContent = n + ' Teile'; b.onclick = function () { S.cnt = n; sel(); }; $('cntOpts').appendChild(b); });
+  [6, 12, 24, 48, 96, 150, 500, 1000].forEach(function (n) { var b = document.createElement('button'); b.className = 'opt'; b.dataset.n = n; b.textContent = n + ' Teile'; b.onclick = function () { S.cnt = n; sel(); }; $('cntOpts').appendChild(b); });
   SHAPES.forEach(function (s) {
     var b = document.createElement('button'); b.className = 'opt shape'; b.dataset.s = s.id; var c = document.createElement('canvas'); c.width = 160; c.height = 120; b.appendChild(c); b.appendChild(document.createTextNode(s.name));
     var pz = buildPuzzle(2, 2, s.id, 140, 100, 7), x = c.getContext('2d'); x.translate(10, 10); x.strokeStyle = '#7ae6d8'; x.lineWidth = 2.2; x.lineJoin = 'round';
