@@ -57,11 +57,11 @@
 
   // ---------- Wurfdaten ----------
   // params: { dice: [ { p:[x,y,z], q:[x,y,z,w], v:[x,y,z], w:[x,y,z] } ] }
-  D.autoParams = function (n) {
+  D.autoParams = function (n, bare) {      // bare: Wurf ohne Tablett über ein Spielbrett: von hoch oben abwerfen (Spielfiguren stehen im Weg)
     var d = [];
     for (var i = 0; i < n; i++) {
       var ang = rnd(-.45, .45), sp = rnd(14, 38), x = (i - (n - 1) / 2) * 1.55 + rnd(-.3, .3), z = TZ - 1.7;
-      d.push({ p: [x, .9, z], q: randQ(), v: [Math.sin(ang) * sp, rnd(-2, 2), -Math.cos(ang) * sp], w: [rnd(-20, 20), rnd(-20, 20), rnd(-20, 20)] });
+      d.push({ p: [x, bare ? 3.6 : .9, z], q: randQ(), v: [Math.sin(ang) * sp, bare ? rnd(-5, -2) : rnd(-2, 2), -Math.cos(ang) * sp], w: [rnd(-20, 20), rnd(-20, 20), rnd(-20, 20)] });
     }
     return { dice: d };
   };
@@ -73,7 +73,7 @@
     for (var i = 0; i < n; i++) {
       var d = p.dice[i]; if (!d || !fin(d.p, 3) || !fin(d.q, 4) || !fin(d.v, 3) || !fin(d.w, 3)) return null;
       var ql = Math.hypot(d.q[0], d.q[1], d.q[2], d.q[3]) || 1;
-      out.push({ p: [cl(d.p[0], TX - .6), cl(d.p[1], 3), cl(d.p[2], TZ - .6)], q: d.q.map(function (x) { return x / ql; }), v: [cl(d.v[0], 45), cl(d.v[1], 15), cl(d.v[2], 45)], w: [cl(d.w[0], 60), cl(d.w[1], 60), cl(d.w[2], 60)] });
+      out.push({ p: [cl(d.p[0], TX - .6), cl(d.p[1], 4.5), cl(d.p[2], TZ - .6)], q: d.q.map(function (x) { return x / ql; }), v: [cl(d.v[0], 45), cl(d.v[1], 15), cl(d.v[2], 45)], w: [cl(d.w[0], 60), cl(d.w[1], 60), cl(d.w[2], 60)] });
     }
     return { dice: out };
   };
@@ -369,9 +369,11 @@
       opts = opts || {};
       return V.show().then(function () {
         var R = env.R; R.mine = true; R.mod = !!opts.mod; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); R.ensure(n); R.shown = n; V.busy = true; env.anim(1);
+        if (env.faceCam) env.faceCam();      // ohne Tablett: Die Fläche dreht sich so, dass "unten" die Seite ist, von der man gerade aufs Brett schaut
         if (opts.zoom !== false) V.zoom(true);
         var ax = 0, az = ANCH_Z, held = false, gp = [0, 0], pull = { x: 0, z: 0 }, q0 = R.dice.map(function () { return randQ(); }), spin = R.dice.map(function () { return [rnd(-3, 3), rnd(-3, 3), rnd(-3, 3)]; }), t0 = performance.now(), last = t0;
         var base = opts.hint || (window.SITE ? SITE.T('Würfel nach unten ziehen, zielen und loslassen zum Abschießen', 'Pull the dice down, aim and release to shoot') : 'Pull down, aim, release');
+        var HOLD_Y = env.bare ? 3.6 : .9;      // ohne Tablett: hoch halten und von oben fallen lassen, damit der Wurf nie in einer Spielfigur beginnt
         var off = function (i) { return (i - (n - 1) / 2) * 1.55; };
         R.pad.visible = true; R.aimG.visible = false;
         R.dice.slice(0, n).forEach(function (d, i) { d.mesh.visible = true; setDie(d, [ax + off(i), .5, az], q0[i]); });
@@ -381,7 +383,7 @@
           R.dice.slice(0, n).forEach(function (d, i) {
             var s = held ? 1.6 : .35, ax2 = new THREE.Vector3(spin[i][0], spin[i][1], spin[i][2]), a = ax2.length() * dt * s;
             if (a > 0) { var dq = new THREE.Quaternion().setFromAxisAngle(ax2.normalize(), a); var cq = new THREE.Quaternion(q0[i][0], q0[i][1], q0[i][2], q0[i][3]).premultiply(dq); q0[i] = [cq.x, cq.y, cq.z, cq.w]; }
-            var py = held ? .9 : .5 + .12 * Math.abs(Math.sin((now - t0) / 500));
+            var py = held ? HOLD_Y : .5 + .12 * Math.abs(Math.sin((now - t0) / 500));
             d.mesh.position.set(ax + off(i) + pull.x * .22, py, az + pull.z * .22); d.mesh.quaternion.set(q0[i][0], q0[i][1], q0[i][2], q0[i][3]);
           });
           env.once();
@@ -415,9 +417,9 @@
               var ang = base0 + rnd(-.04, .04), vx2 = Math.cos(ang) * speed, vz2 = Math.sin(ang) * speed;
               // Drehung: Rollen in Schussrichtung plus zufälliges Taumeln aus der Hand
               var w = [vz2 * 1.0 + rnd(-9, 9) + spin[i][0] * 1.5, rnd(-8, 8) + spin[i][1] * 1.5, -vx2 * 1.0 + rnd(-9, 9) + spin[i][2] * 1.5];
-              dice.push({ p: [ax + off(i) + pull.x * .22, env.bare ? 2.6 : .9, az + pull.z * .22], q: q0[i].slice(), v: [vx2, env.bare ? rnd(-5, -2) : rnd(-1.5, .5), vz2], w: w });
+              dice.push({ p: [ax + off(i) + pull.x * .22, HOLD_Y, az + pull.z * .22], q: q0[i].slice(), v: [vx2, env.bare ? rnd(-5, -2) : rnd(-1.5, .5), vz2], w: w });
             }
-            res({ dice: dice });
+            res({ dice: dice, rot: env.rotQ ? env.rotQ() : 0 });
           }
           function cleanup() { L.removeEventListener('pointerdown', down, true); L.removeEventListener('pointermove', move, true); L.removeEventListener('pointerup', up, true); L.removeEventListener('pointercancel', up, true); env.cursor(''); V._tick = 0; V.hint(''); V._cleanup = null; }
           V._cleanup = function () { cleanup(); rej(new Error('cancel')); };
@@ -431,7 +433,8 @@
     V.play = function (track, opts) {
       opts = opts || {};
       return V.show().then(function () {
-        var R = env.R; R.mine = opts.mine !== false; R.mod = !!opts.mod; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
+        var R = env.R; if (opts.rot != null) { R.group.rotation.y = (opts.rot | 0) * Math.PI / 2; R.group.updateMatrixWorld(true); }
+        R.mine = opts.mine !== false; R.mod = !!opts.mod; R.setColor(opts.color); R.mk(); R.skin(); clearTimeout(hideT); clearTimeout(unzoomT); if (V._cleanup) { try { V._cleanup(); } catch (e) {} }
         V._tick = 0; V.busy = true; V._playing = 1; V.hint(''); R.aimG.visible = false; R.pad.visible = false; R.ensure(track.n); R.shown = track.n; R.dice.slice(0, track.n).forEach(function (d) { d.mesh.visible = true; }); env.anim(1);
         var frames = track.f, hz = track.hz, n = track.n, t0 = performance.now(), q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
         return new Promise(function (res) {
@@ -576,6 +579,13 @@
     env.near = function (v3, rad) { return ray.ray.distanceToPoint(env.R.group.localToWorld(v3.clone())) < rad * S; };
     env.listen = o.dom; env.cursor = function (c) { o.dom.style.cursor = c; };
     env.focus = function (on) { if (o.focus) o.focus(on); };
+    // o.rotCam: Würfelfläche nach der Kameraseite ausrichten (Viertelschritte), damit der Wurf immer von unten (aus Sicht des Zuschauers) startet
+    var rq = 0;
+    env.faceCam = function () {
+      if (!o.rotCam || !env.R) return; var g = env.R.group, c = o.camera.position, a = Math.atan2(c.x - g.position.x, c.z - g.position.z);
+      rq = (((Math.round(a / (Math.PI / 2))) % 4) + 4) % 4; g.rotation.y = rq * Math.PI / 2; g.updateMatrixWorld(true);
+    };
+    env.rotQ = function () { return rq; };
     env.destroy = function () { overlay.remove(); };
     return controller(env);
   };
