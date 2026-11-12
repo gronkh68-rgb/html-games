@@ -89,6 +89,13 @@
     world.addContactMaterial(new C.ContactMaterial(mDie, mWall, { friction: .1, restitution: .8 }));       // Ränder: sehr federnd wie Gummibanden
     world.addContactMaterial(new C.ContactMaterial(mDie, mDie, { friction: .22, restitution: .5 }));
     var mObs = new C.Material('obs'); world.addContactMaterial(new C.ContactMaterial(mDie, mObs, { friction: .35, restitution: .42 }));
+    // Vierseiter: deutlich federnder als der Würfel (springt mehrfach auf dem Tisch und prallt kräftig von den Banden ab)
+    var mD4 = new C.Material('d4');
+    world.addContactMaterial(new C.ContactMaterial(mD4, mFloor, { friction: .24, restitution: .9 }));
+    world.addContactMaterial(new C.ContactMaterial(mD4, mWall, { friction: .1, restitution: .98 }));
+    world.addContactMaterial(new C.ContactMaterial(mD4, mDie, { friction: .22, restitution: .7 }));
+    world.addContactMaterial(new C.ContactMaterial(mD4, mD4, { friction: .22, restitution: .7 }));
+    world.addContactMaterial(new C.ContactMaterial(mD4, mObs, { friction: .3, restitution: .65 }));
     function wall(hx, hy, hz, x, y, z, mat) { var b = new C.Body({ mass: 0, material: mat || mWall }); b.addShape(new C.Box(new C.Vec3(hx, hy, hz))); b.position.set(x, y, z); world.addBody(b); }
     wall(TX + 2, .5, TZ + 2, 0, -.5, 0, mFloor);         // Boden (Oberkante y=0)
     wall(.5, 5, TZ + 2, TX + .5, 5, 0); wall(.5, 5, TZ + 2, -TX - .5, 5, 0); wall(TX + 2, 5, .5, 0, 5, TZ + .5); wall(TX + 2, 5, .5, 0, 5, -TZ - .5); wall(TX + 2, .5, TZ + 2, 0, 10.5, 0);   // Wände und Decke
@@ -102,8 +109,8 @@
       return new C.ConvexPolyhedron({ vertices: vs, faces: tetFaces() });
     };
     var bodies = params.dice.map(function (d, di) {
-      var b = new C.Body({ mass: 1, material: mDie, linearDamping: .06, angularDamping: .10 });
-      b._k = kinds && kinds[di] === 'd4' ? 'd4' : 'd6';
+      var k0 = kinds && kinds[di] === 'd4' ? 'd4' : 'd6', b = new C.Body({ mass: 1, material: k0 === 'd4' ? mD4 : mDie, linearDamping: k0 === 'd4' ? .03 : .06, angularDamping: k0 === 'd4' ? .06 : .10 });
+      b._k = k0;
       b.addShape(b._k === 'd4' ? tetShape() : new C.Box(new C.Vec3(HALF, HALF, HALF)));
       b.position.set(d.p[0], d.p[1], d.p[2]); b.quaternion.set(d.q[0], d.q[1], d.q[2], d.q[3]);
       b.velocity.set(d.v[0], d.v[1], d.v[2]); b.angularVelocity.set(d.w[0], d.w[1], d.w[2]);
