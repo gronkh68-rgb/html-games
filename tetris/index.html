@@ -36,6 +36,18 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .touch button:active,.touch button.on{background:var(--accent);color:#fff;transform:scale(.96)}
 .touch button.big{background:var(--accent);color:#fff}
 @media (pointer:coarse){.touch{display:grid}body{padding-bottom:92px}}
+/* 3D: Schacht füllt den ganzen Bildschirm, Seitenfelder schweben darüber */
+body.full3d{overflow:hidden;padding-bottom:0}body.full3d .top{display:none}html body.full3d .wrap{max-width:none;padding:0;clip-path:none!important;background:none!important;border:0!important;box-shadow:none!important;filter:none!important;transform:none!important}body.full3d .wrap::before,body.full3d .wrap::after{display:none!important}
+html body.full3d .game{display:block;clip-path:none!important;background:none!important;border:0!important;transform:none!important}
+body.full3d #boardWrap{position:fixed;inset:0;z-index:5;line-height:normal}
+#stage3d{position:absolute;inset:0}
+body.full3d #board{display:none}
+body.full3d .col.side{position:fixed;top:8px;z-index:20;width:150px}
+body.full3d #left{left:8px}body.full3d #right{right:8px}
+body.full3d .panel{background:rgba(10,14,28,.68);backdrop-filter:blur(3px)}
+body.full3d .keys{display:none}
+body.full3d #musicPanel{display:none}
+@media (pointer:coarse),(max-width:760px){body.full3d #boardWrap{bottom:92px}body.full3d .col.side{width:72px}}
 @media (max-width:760px){
   .touch{display:grid}body{padding-bottom:92px}
   .wrap{padding:6px 8px 4px}
@@ -75,11 +87,12 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
     </div>
     <div id="boardWrap">
       <canvas id="board" width="300" height="600"></canvas>
+      <div id="stage3d" hidden></div>
       <div class="toast" id="toast"></div>
     </div>
     <div class="col side" id="right">
       <div class="panel" id="nextPanel"><h2>Nächste</h2><canvas id="nextC" width="104" height="330"></canvas></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="pauseBtn">Pause</button><button class="btn alt" id="restartBtn">Neu</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="pauseBtn">Pause</button><button class="btn alt" id="restartBtn">Neu</button><button class="btn alt" id="v3d">🧊 3D</button></div>
       <div class="panel" id="musicPanel">
         <h2>Musik</h2>
         <div class="mrow"><button class="btn alt" id="musicBtn">♪ an</button></div>
@@ -278,6 +291,10 @@ function drawSide(){
   queue.slice(0,5).forEach((t,i)=>drawPieceMini(nctx,t,12,i*64,64));
 }
 function draw(){
+  if(use3d&&window.T3&&T3.ready){
+    T3.render({board,cur,ghostY:cur?ghostY():0,clearing,particles,cols:COLS,rows:ROWS,cell:CELL,colors:COLORS,cyber:isCyber(),fx:fxOn(),shake});
+    return;
+  }
   const w=COLS*CELL,h=ROWS*CELL,cy=isCyber();
   ctx.save();ctx.clearRect(0,0,w,h);
   if(shake>0&&fxOn())ctx.translate((Math.random()-.5)*shake*14,(Math.random()-.5)*shake*14);
@@ -318,6 +335,24 @@ function loop(now){
   particles=particles.filter(p=>p.life>0);
   draw();drawSide();
 }
+// ---------- 3D-Ansicht ----------
+let use3d=false,loading3=false;
+try{use3d=localStorage.getItem('tetris-3d')==='1';}catch(e){}
+const loadJs=u=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>rej(new Error(u));document.head.appendChild(s);});
+async function set3d(on){
+  if(on&&!(window.T3&&T3.ready)){
+    if(loading3)return;loading3=true;$('v3d').textContent='Lade …';
+    try{if(!window.THREE)await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');if(!window.T3)await loadJs('view3d.js');T3.init($('stage3d'));}
+    catch(e){loading3=false;$('v3d').textContent='3D n/a';use3d=false;document.body.classList.remove('full3d');return;}
+    loading3=false;
+  }
+  use3d=on;try{localStorage.setItem('tetris-3d',on?'1':'0');}catch(e){}
+  $('stage3d').hidden=!on;document.body.classList.toggle('full3d',on);$('v3d').textContent=on?'2D':'🧊 3D';
+  if(on)setTimeout(()=>{T3.resize();},60);
+}
+$('v3d').onclick=()=>set3d(!use3d);
+addEventListener('resize',()=>{if(use3d&&window.T3&&T3.ready)T3.resize();});
+if(use3d)set3d(true);
 // Hintergrund-Tab: Spiel anhalten
 setInterval(()=>{if(running&&document.hidden&&!paused)setPause(true);},1000);
 
@@ -355,10 +390,10 @@ document.querySelectorAll('#touch button').forEach(b=>{
 });
 // Wischen auf dem Spielfeld: links/rechts bewegen, nach oben drehen, nach unten fallen lassen, Tippen dreht
 let sw=null;
-$('board').addEventListener('pointerdown',e=>{sw={x:e.clientX,y:e.clientY,t:performance.now(),lx:e.clientX,acc:0};});
-$('board').addEventListener('pointermove',e=>{
+$('boardWrap').addEventListener('pointerdown',e=>{sw={x:e.clientX,y:e.clientY,t:performance.now(),lx:e.clientX,acc:0};});
+$('boardWrap').addEventListener('pointermove',e=>{
   if(!sw||!running||paused)return;
-  const cell=$('board').getBoundingClientRect().width/COLS;
+  const cell=use3d?Math.min(innerWidth/14,innerHeight/24):$('board').getBoundingClientRect().width/COLS;
   sw.acc+=e.clientX-sw.lx;sw.lx=e.clientX;
   while(sw.acc>=cell*1.1){act('right');sw.acc-=cell*1.1;sw.moved=true;}
   while(sw.acc<=-cell*1.1){act('left');sw.acc+=cell*1.1;sw.moved=true;}
