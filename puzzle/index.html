@@ -36,6 +36,11 @@ body{-webkit-tap-highlight-color:transparent}
 #hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:rgba(255,255,255,.7);font-size:.8rem;pointer-events:none;text-shadow:0 1px 4px #000;padding:0 10px}
 #loading{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,12,24,.7);color:#fff;font-weight:700}
 @media (max-width:700px){#stage{height:calc(100vh - 190px)}}
+/* 3D: Tisch füllt den ganzen Bildschirm, die Leiste schwebt darüber */
+body.full3d{overflow:hidden}body.full3d .top{display:none}body.full3d .wrap{max-width:none;padding:0}
+body.full3d #stage{position:fixed;inset:0;width:auto;height:auto;min-height:0;border:0;border-radius:0;z-index:20}
+body.full3d .bar{position:fixed;top:6px;left:6px;right:6px;z-index:30;margin:0;padding:5px 8px;border-radius:12px;background:rgba(10,12,24,.62);backdrop-filter:blur(4px)}
+body.full3d #hint{bottom:46px}
 </style>
 </head>
 <body>
@@ -263,7 +268,8 @@ $('start').onclick = function () { startGame(false); };
 $('again').onclick = function () { $('win').hidden = true; startGame(true); };
 $('newp').onclick = function () { $('win').hidden = true; toSetup(); };
 $('bBack').onclick = toSetup;
-function toSetup() { $('game').hidden = true; $('setup').hidden = false; timer.on = false; }
+function syncFull() { var on = S.mode === '3d' && !$('game').hidden; document.body.classList.toggle('full3d', on); if (G && !$('game').hidden) setTimeout(resizeAll, 60); }
+function toSetup() { $('game').hidden = true; $('setup').hidden = false; timer.on = false; syncFull(); }
 
 /* ===================== Verteilen ===================== */
 function scatterTarget(p, rnd) {
@@ -539,7 +545,7 @@ function setMode(m, silent) {
   cv2.hidden = m === '3d'; cv3.hidden = m !== '3d';
   if (m === '3d') { resizeAll(); if (G && !G.pieces[0].mesh) build3D(); }
   var h = $('hint'); if (h && G) h.textContent = 'Teile ziehen und passend zusammenschieben · Mausrad/Pinch: Zoom · Hintergrund ziehen: verschieben' + (m === '3d' ? ' · Rechtsklick ziehen: Kamera neigen' : '');
-  dirty = true;
+  syncFull(); dirty = true;
 }
 
 /* ===================== Konfetti ===================== */
