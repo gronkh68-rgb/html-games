@@ -144,8 +144,12 @@
       }
     });
     (opts || []).forEach(function (o, k) {
-      var q = P3(ptOf(o.q, o.to, o.i, o.sw)), m = new THREE.Mesh(new THREE.RingGeometry(.5, .66, 28), new THREE.MeshBasicMaterial({ color: o.cap ? 0xff5a5a : 0xffd23f, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
+      var q = P3(ptOf(o.q, o.to, o.i, o.sw)), m = new THREE.Mesh(new THREE.RingGeometry(.5, .66, 28), new THREE.MeshBasicMaterial({ color: o.cap ? 0xff5a5a : o.lc ? new THREE.Color(o.lc) : 0xffd23f, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
       m.rotation.x = -Math.PI / 2; m.position.set(q.x, .25, q.z); m.userData = { k: k }; group.add(m); rings.push(m); pickables.push(m);
+      if (o.lab) {      // Mitte: Wahl A/B als Buchstabe über dem Ziel
+        var cv = document.createElement('canvas'); cv.width = cv.height = 64; var cx = cv.getContext('2d'); cx.font = '900 48px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.lineWidth = 8; cx.strokeStyle = '#000'; cx.strokeText(o.lab, 32, 34); cx.fillStyle = o.lc; cx.fillText(o.lab, 32, 34);
+        var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false })); sp.scale.set(1.5, 1.5, 1); sp.position.set(q.x, 1.5, q.z); sp.userData = { k: k }; group.add(sp); pickables.push(sp); trailM.push({ m: sp, ph: 0, n: 0, noPulse: true });
+      }
     });
   };
   function hop(pc, p, i, from, to, ptOf) {
@@ -166,7 +170,7 @@
     var t = now / 1000;
     Object.keys(pcs).forEach(function (id) { var pc = pcs[id], pulse = .5 + .5 * Math.sin(t * 6); pc.mat.emissiveIntensity = pc.can ? .6 + .9 * pulse : .35; if (pc.can) pc.mat.emissive.copy(pc.base).lerp(new THREE.Color(0xffffff), .25 * pulse); else pc.mat.emissive.copy(pc.base).multiplyScalar(.25); });
     rings.forEach(function (m, k) { m.scale.setScalar(1 + .12 * Math.sin(t * 5 + k)); });
-    trailM.forEach(function (o) { o.m.material.opacity = .35 + .65 * Math.max(0, Math.sin(t * 8 - o.ph * 1.1)); });
+    trailM.forEach(function (o) { if (o.noPulse) return; o.m.material.opacity = .35 + .65 * Math.max(0, Math.sin(t * 8 - o.ph * 1.1)); });
     arrowM.forEach(function (o) { o.m.material.opacity = .25 + .75 * Math.max(0, Math.sin(t * 3.6 - o.ph * .8)); });
     controls.update(); r.render(scene, camera);
   }
