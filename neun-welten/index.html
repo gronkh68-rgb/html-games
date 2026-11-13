@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neun Welten</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<script src="engine.js"></script>
+<script src="art.js"></script>
+<style>
+.wrap{max-width:1560px}
+.hk-layout{grid-template-columns:minmax(0,1fr) 300px}
+#game{--gold:#d9b25a;font-family:Georgia,'Times New Roman',serif}
+.ni{width:1.5em;height:1.5em;vertical-align:middle;flex:none}
+.ne{display:inline-flex;align-items:center;gap:.1em;margin:0 .18em;white-space:nowrap}.ne b{font-weight:700}
+.ninf{display:inline-flex;width:1.5em;height:1.5em;border-radius:50%;align-items:center;justify-content:center;border:1px solid var(--gold);color:#f6e2a0}.ninf .ni{width:1.05em;height:1.05em}
+/* ---------- Karten ---------- */
+.nc{--w:var(--cw,132px);width:var(--w);font-size:calc(var(--w)/13.2);position:relative;flex:none;border-radius:.9em;padding:.55em;background:var(--tx-knot);background-size:2.4em 1.2em;box-shadow:0 .2em .5em rgba(0,0,0,.55),0 0 0 1px #000;color:#2a1d10;user-select:none;transition:transform .12s,box-shadow .12s}
+.nc-in{background:#eadcb8 var(--tx-parch);border-radius:.45em;padding:.35em .4em .45em;display:flex;flex-direction:column;gap:.3em;min-height:17.2em}
+.nc-name{background:#3a2a14;color:#f6e2a0;font-weight:700;text-align:center;letter-spacing:.06em;text-transform:uppercase;font-size:.86em;border-radius:.3em;padding:.2em 1.5em;line-height:1.15;min-height:2.6em;display:flex;align-items:center;justify-content:center}
+.nc-art{height:5.6em;border-radius:.3em;border:.12em solid #3a2a14;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 1.4em rgba(0,0,0,.55),inset 0 .5em 1.6em rgba(255,255,255,.14)}
+.nc-art .ni{width:5em;height:5em;filter:drop-shadow(0 .15em .2em rgba(0,0,0,.6))}
+.nc-go{display:flex;justify-content:center;gap:.25em;min-height:1.9em;align-items:center}.nc-go span{width:1.9em;height:1.9em;border-radius:50%;border:.1em solid var(--gold);display:flex;align-items:center;justify-content:center}.nc-go .ni{width:1.3em;height:1.3em}.nc-go i{font-size:.8em;color:#7a6a48}
+.nc-row{text-align:center;line-height:1.2}.nc-row small{display:block;font-size:.66em;letter-spacing:.18em;text-transform:uppercase;color:#6b4420;font-weight:700}
+.nc-row.th{border-top:.08em solid #8a6420;padding-top:.25em}.nc-row .ne.buy{display:flex;justify-content:center;font-size:.8em;color:#1f5a22}
+.nc-cost,.nc-fac{position:absolute;top:-.25em;width:2.3em;height:2.3em;border-radius:50%;border:.2em solid var(--gold);display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 .1em .3em #000}
+.nc-cost{left:-.25em;background:#8c2b22;color:#fff6dc;font-weight:700;font-size:1.15em;width:2em;height:2em}.nc-fac{right:-.25em}.nc-fac .ni{width:1.5em;height:1.5em}
+.nc.can{cursor:pointer;box-shadow:0 0 0 .2em #ffd23f,0 .3em .8em rgba(0,0,0,.6)}.nc.can:hover{transform:translateY(-.5em)}
+.nc.sel{transform:translateY(-.9em);box-shadow:0 0 0 .25em #fff,0 0 1.4em #ffd23f}
+.nc.dim{filter:brightness(.62) saturate(.7)}
+.nc.plot .nc-in{min-height:0;background-color:#d6dbe6}.nc.plot{--w:var(--pw,110px)}
+/* ---------- Brett ---------- */
+#board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
+.blk{background:#1b1814 var(--tx-stone);border:2px solid #3a3227;border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:7px}
+.blk.wide{grid-column:span 2}
+.blk h3{margin:0;display:flex;align-items:center;gap:8px;font-size:.95rem;letter-spacing:.14em;text-transform:uppercase;color:#f6e2a0}
+.blk h3 .cr{width:34px;height:34px;border-radius:8px 8px 14px 14px;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;flex:none}.blk h3 .ni{width:24px;height:24px}
+.blk h3 small{margin-left:auto;font-size:.68rem;letter-spacing:.04em;text-transform:none;color:#cbbf9f}
+.trk{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.trk span{height:26px;border-radius:6px;background:rgba(0,0,0,.4);border:1px solid #4a4030;display:flex;align-items:center;justify-content:center;gap:2px;font-size:.62rem;color:#8f8468;position:relative}
+.trk span.vp{border-color:#3f7a3a;background:rgba(63,122,58,.25)}.trk span.al{border-color:var(--gold);background:rgba(217,178,90,.2)}
+.trk i{width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;display:block}
+.sps{display:grid;gap:7px;grid-template-columns:1fr}.blk.wide .sps{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sp{position:relative;background:#7a5230 var(--tx-wood);border:2px solid #2a180a;border-radius:10px;padding:6px 8px 6px 46px;min-height:58px;color:#fff6dc;display:flex;flex-direction:column;justify-content:center;gap:2px;transition:transform .12s,box-shadow .12s}
+.sp-ic{position:absolute;left:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center}.sp-ic .ni{width:22px;height:22px}
+.sp-n{font-weight:700;font-size:.82rem;letter-spacing:.04em;text-shadow:0 1px 2px #000;line-height:1.15}
+.sp-e{font-size:.8rem;display:flex;align-items:center;flex-wrap:wrap;text-shadow:0 1px 2px #000}.sp-e .arr{margin:0 3px;color:#f6e2a0}.sp-e .k{margin-left:auto;font-size:.68rem;background:#5a1f18;border:1px solid var(--gold);border-radius:999px;padding:0 6px}
+.sp.can{cursor:pointer;box-shadow:0 0 0 3px #ffd23f,0 0 16px rgba(255,210,63,.6)}.sp.can:hover{transform:translateY(-2px)}
+.sp.occ{filter:brightness(.7)}.sp.last{box-shadow:0 0 0 3px #fff}
+.pawn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:30px;filter:drop-shadow(0 2px 2px #000)}
+/* ---------- Schlacht und Markt ---------- */
+#toprow{display:grid;grid-template-columns:260px minmax(0,1fr);gap:10px;margin-top:10px}
+#conf{background:#3a1512 var(--tx-stone);border:2px solid var(--gold);border-radius:14px;padding:10px;color:#fff6dc}
+#conf h3{margin:0 0 2px;font-size:1rem;letter-spacing:.08em;text-transform:uppercase;color:#f6e2a0}
+#conf .rd{font-size:.75rem;color:#cbbf9f;margin-bottom:6px}
+#conf .rw{display:flex;align-items:center;gap:6px;font-size:.85rem;padding:2px 0}.rw .pl{width:22px;height:22px;border-radius:50%;background:#1b1814;border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;flex:none}
+#conf .stl{margin-top:6px;border-top:1px solid #6b4420;padding-top:6px;display:flex;flex-direction:column;gap:3px;font-size:.82rem}
+.stl div{display:flex;align-items:center;gap:6px}.stl i{width:12px;height:12px;border-radius:50%;border:1.5px solid #fff;flex:none}.stl b{margin-left:auto}
+#mk{background:#1b1814 var(--tx-stone);border:2px solid #3a3227;border-radius:14px;padding:10px;min-width:0}
+#mk h3{margin:0 0 8px;font-size:.9rem;letter-spacing:.14em;text-transform:uppercase;color:#f6e2a0;display:flex;gap:10px;align-items:center}#mk h3 small{text-transform:none;letter-spacing:0;color:#cbbf9f;font-size:.75rem}
+#market{display:flex;gap:10px;overflow-x:auto;padding:8px 4px 6px;--cw:118px}
+#market .sepv{width:2px;background:#4a4030;flex:none;margin:0 2px}
+/* ---------- Hand ---------- */
+#handbar{margin-top:10px;background:#1b1814 var(--tx-stone);border:2px solid #3a3227;border-radius:14px;padding:10px}
+#handbar.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.3),0 0 30px rgba(255,210,63,.2)}
+#mine{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;color:#fff6dc;font-size:.95rem;margin-bottom:8px}
+#mine .ne{background:rgba(0,0,0,.4);border:1px solid #4a4030;border-radius:999px;padding:2px 10px 2px 6px;margin:0}#mine small{color:#cbbf9f;font-size:.72rem;margin-left:3px}
+#hand{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:12px 4px 4px;min-height:120px}
+#plots{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+#btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;align-items:center;color:#fff6dc}
+#btns .dep{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
+.pp{border:2px solid transparent;border-radius:12px;padding:7px 9px;margin-bottom:5px;font-size:.86rem}
+.pp.turn{border-color:#ffd23f;background:rgba(255,210,63,.1)}
+.pp .hd{display:flex;align-items:center;gap:7px;font-weight:800}.pp .hd i{width:14px;height:14px;border-radius:50%;border:2px solid #fff;flex:none}.pp .hd b{margin-left:auto;font-size:1.15rem}
+.pp .ln{display:flex;flex-wrap:wrap;gap:2px 8px;color:var(--muted);margin-top:3px;font-size:.8rem;align-items:center}.pp .ln .ni{width:1.25em;height:1.25em}
+@media (max-width:1100px){#board{grid-template-columns:repeat(2,minmax(0,1fr))}#toprow{grid-template-columns:1fr}}
+@media (max-width:700px){#hand{--cw:104px;gap:7px}#market{--cw:100px}.blk.wide .sps{grid-template-columns:1fr}.sp-n{font-size:.76rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div id="toprow"><div id="conf"></div><div id="mk"><h3 id="mkT"></h3><div id="market"></div></div></div>
+        <div id="board"></div>
+        <div id="handbar"><div id="mine"></div><div id="hand"></div><div id="plots"></div><div id="btns"></div></div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="players"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx,A=NWArt,C=NW.CARDS,P=NW.PLOTS;
+const TT=T('Neun Welten','Nine Worlds');document.title=TT;$('ttl').textContent=TT;A.init();
+const PC=['#d8262c','#1f6fd8','#2e9a4a','#f2c20e'];
+const RULES=()=>`<ul>
+<li>${T('<b>Ziel:</b> Wer zuerst <b>10 Siegpunkte</b> hat (oder nach 10 Runden die meisten), gewinnt.','<b>Goal:</b> first to <b>10 victory points</b> (or most after 10 rounds) wins.')}</li>
+<li>${T('Jede Runde ziehst du 5 Karten. Wer dran ist, <b>entsendet</b> einen Gefolgsmann: Karte ausspielen und auf ein freies Feld setzen, dessen Zeichen auf der Karte steht. Du zahlst die Kosten des Felds und bekommst Feld- und Kartenertrag.','Each round you draw 5 cards. On your turn you <b>send</b> a follower: play a card and place on a free space whose symbol is on the card. Pay the space cost and gain the space and card rewards.')}</li>
+<li>${T('Felder der vier Mächte (Asen, Riesen, Zwerge, Walküren) geben <b>+1 Einfluss</b>. Stufe 2 bringt 1 Siegpunkt. Wer als Erster Stufe 4 erreicht, hält das <b>Bündnis</b> (1 Siegpunkt), bis ihn jemand überholt.','Spaces of the four powers (Aesir, Giants, Dwarves, Valkyries) give <b>+1 influence</b>. Level 2 gives 1 victory point. The first to reach level 4 holds the <b>alliance</b> (1 point) until overtaken.')}</li>
+<li>${T('Statt zu entsenden hältst du <b>Thing</b>: Du deckst die restliche Hand auf. Ihr <b>Ruhm</b> kauft neue Karten vom Markt (kommen auf den Ablagestapel), ihre <b>Stärke</b> zählt in der Schlacht. Danach bist du für diese Runde fertig.','Instead of sending you hold <b>Thing</b>: reveal the rest of your hand. Its <b>fame</b> buys new cards from the market (they go to your discard pile), its <b>strength</b> counts in battle. Then you are done for the round.')}</li>
+<li>${T('<b>Schlacht:</b> Auf Kampffeldern (⚔) darfst du Krieger schicken: alle dort neu angeworbenen plus bis zu 2 aus dem Lager. Jeder Krieger zählt 2, dazu die Stärke der aufgedeckten Karten (nur mit mindestens einem Krieger). Am Rundenende gibt es Belohnungen für die Stärksten, die Krieger der Schlacht sind danach weg.','<b>Battle:</b> on battle spaces (⚔) you may send warriors: all newly recruited there plus up to 2 from your camp. Each warrior counts 2, plus the strength of revealed cards (only with at least one warrior). At round end the strongest get rewards; warriors in the battle are lost.')}</li>
+<li>${T('<b>Ränke</b> (Rabe) sind geheime Karten: manche bringen im eigenen Zug Vorräte, andere beim Thing zusätzliche Stärke.','<b>Schemes</b> (raven) are secret cards: some give supplies on your turn, others extra strength at the Thing.')}</li>
+<li>${T('Im <b>Langhaus</b> (6 Silber) bekommst du dauerhaft einen dritten Gefolgsmann.','In the <b>Longhouse</b> (6 silver) you permanently gain a third follower.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🌳 ${TT}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Deckbau und Einsetzen in der Welt der nordischen Sagen: Schicke Gefolgsleute zu Asen, Riesen, Zwergen und Walküren, kaufe Karten, gewinne Schlachten. 2 bis 4 Spieler, gegen den Computer oder online. Eine Partie dauert etwa 30 bis 45 Minuten.','Deck building and worker placement in the world of the Norse sagas: send followers to Aesir, Giants, Dwarves and Valkyries, buy cards, win battles. 2 to 4 players, against the computer or online. A game takes about 30 to 45 minutes.')}</p>
+<div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+let K,V=null,inp=null,sel=-1,pend=null,hintTxt='';
+// ---------- Host ----------
+function view(g,s){
+  const mine=g.pl[s],my=s===g.cur&&!g.over;
+  return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),round:g.round,first:g.first,cur:g.cur,over:g.over,last:g.last,seq:g.seq,
+    pl:g.pl.map((q,p)=>({res:q.res,troops:q.troops,conf:q.conf,st:NW.strength(g,p),sw:q.swords,inf:q.inf,vp:q.vp,agents:q.agents,left:q.left,hand:q.hand.length,deck:q.deck.length,disc:q.disc.length,plots:q.plots.length,revealed:q.revealed,ruhm:q.ruhm,play:q.play})),
+    hand:mine.hand,plots:mine.plots,market:g.market,mleft:g.mdeck.length,conflict:g.conflict,occ:g.occ,ally:g.ally,
+    moves:my&&!mine.revealed?NW.agentMoves(g,s):[],pMain:my&&!mine.revealed?NW.plotOpts(g,s,'main'):[],pThing:my&&mine.revealed?NW.plotOpts(g,s,'thing'):[],buys:my&&mine.revealed?NW.buyOpts(g,s).map(o=>o.m):[],log:K.logFor(s)};
+}
+function valid(spec,a,g,p){if(spec.k!=='turn')return true;return spec.mode==='main'?NW.validMain(g,p,a):NW.validThing(g,p,a);}
+const effTxt=(e,l)=>!e?'':Object.keys(e).map(k=>k==='inf'?(l==='de'?'+1 Einfluss':'+1 influence'):k==='agent'?(l==='de'?'3. Gefolgsmann':'3rd follower'):e[k]+' '+({met:['Met','mead'],eisen:['Eisen','iron'],silber:['Silber','silver'],troop:['Krieger','warriors'],draw:['Karte(n)','card(s)'],list:['Ränke','scheme'],vp:['Siegpunkt(e)','point(s)'],ruhm:['Ruhm','fame']}[k]||[k,k])[l==='de'?0:1]).join(', ');
+async function main(){
+  const g=K.G;
+  while(!g.over){
+    const p=g.cur,q=g.pl[p],nm=K.nm(p),cpu=g.seats[p].type==='cpu';
+    K.snap('turn');K.push();
+    if(!q.revealed){      // (nach einem Host-Wechsel kann der Spieler am Zug schon aufgedeckt haben)
+    if(cpu)await K.sleep(750);
+    const a=await K.ask(p,{k:'turn',mode:'main'},()=>NW.aiMain(g,p));
+    if(!a)continue;
+    if(a.t==='plot'){const id=NW.doPlot(g,p,a.i);K.say(-1,L2(nm+' spielt die Ränke „'+P[id].n.de+'“.',nm+' plays the scheme “'+P[id].n.en+'”.'));K.sfx('take');continue;}
+    if(a.t==='agent'){
+      const r=NW.doAgent(g,p,a);
+      K.say(p,L2(nm+' schickt „'+C[r.card].n.de+'“ nach '+r.space.n.de+(r.dep?' und '+r.dep+' Krieger in die Schlacht':'')+'.',nm+' sends “'+C[r.card].n.en+'” to '+r.space.n.en+(r.dep?' and '+r.dep+' warriors into battle':'')+'.'));K.sfx('lay');
+    }else{
+      const r=NW.doReveal(g,p);
+      K.say(p,L2(nm+' hält Thing: '+r.ruhm+' Ruhm, '+r.st+' Stärke.',nm+' holds Thing: '+r.ruhm+' fame, '+r.st+' strength.'));K.sfx('ping');
+      for(let k=0;k<40;k++){
+        if(!NW.buyOpts(g,p).length&&!NW.plotOpts(g,p,'thing').length)break;
+        K.push();if(cpu)await K.sleep(550);
+        const b=await K.ask(p,{k:'turn',mode:'thing'},()=>NW.aiThing(g,p));
+        if(!b||b.t==='done')break;
+        if(b.t==='plot'){const id=NW.doPlot(g,p,b.i);K.say(-1,L2(nm+' spielt die Ränke „'+P[id].n.de+'“ (+'+P[id].c+' Stärke).',nm+' plays the scheme “'+P[id].n.en+'” (+'+P[id].c+' strength).'));K.sfx('take');}
+        else{const id=NW.doBuy(g,p,b.m);K.say(p,L2(nm+' kauft „'+C[id].n.de+'“.',nm+' buys “'+C[id].n.en+'”.'));K.sfx('take');}
+      }
+    }
+    }
+    const nx=NW.nextPlayer(g);
+    if(nx>=0){g.cur=nx;continue;}
+    // Rundenende
+    const rd=g.round,out=NW.endRound(g);
+    const pl=['1.','2.','3.'],lines=l=>out.st.map((v,i)=>{const r=out.res.find(x=>x.p===i);return esc(g.seats[i].name)+': <b>'+v+'</b>'+(r?' → '+pl[r.place]+' '+(l==='de'?'Platz':'place')+': '+effTxt(out.conflict.rw[r.place],l):'');}).join('<br>');
+    out.res.forEach(r=>K.say(-1,L2(K.nm(r.p)+' wird '+pl[r.place]+' in der Schlacht „'+out.conflict.n.de+'“: '+effTxt(out.conflict.rw[r.place],'de')+'.',K.nm(r.p)+' places '+pl[r.place]+' in “'+out.conflict.n.en+'”: '+effTxt(out.conflict.rw[r.place],'en')+'.')));
+    if(!out.res.length)K.say(-1,L2('Niemand kämpft in der Schlacht „'+out.conflict.n.de+'“.','Nobody fights in “'+out.conflict.n.en+'”.'));
+    K.push();K.sfx(g.over?'win':'take');
+    if(!g.over)await K.dlgAll(()=>({ico:'⚔',title:L2('Runde '+rd+': '+out.conflict.n.de,'Round '+rd+': '+out.conflict.n.en),html:L2('Stärke in der Schlacht:<br>'+lines('de')+'<br><br>Siegpunkte: '+g.seats.map((s,i)=>esc(s.name)+' <b>'+g.pl[i].vp+'</b>').join(' · '),'Strength in battle:<br>'+lines('en')+'<br><br>Victory points: '+g.seats.map((s,i)=>esc(s.name)+' <b>'+g.pl[i].vp+'</b>').join(' · ')),btns:[L2('Nächste Runde','Next round')]}),0);
+  }
+  K.push();const w=g.over.w;K.sfx('win');
+  const tbl=g.seats.map((s,i)=>esc(s.name)+': <b>'+g.pl[i].vp+'</b>').join('<br>');
+  const again=await K.vote(q=>({ico:'🏆',title:q===w?L2('Du hast gewonnen!','You won!'):L2(g.seats[w].name+' gewinnt!',g.seats[w].name+' wins!'),html:L2(tbl+'<br><br><b>Abstimmung:</b> Noch eine Partie?',tbl+'<br><br><b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function startGame(seats,opts){K.reset();K.G=NW.setup(seats,opts||{});K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' beginnt.','New game. '+K.nm(K.G.cur)+' starts.'));K.push();K.run(main);}
+// ---------- Anzeige ----------
+const pawn=c=>`<svg class="pawn" viewBox="0 0 64 92"><path d="M32 86 C12 86 8 80 12 70 C16 56 20 50 22 40 C14 38 12 30 16 24 C10 20 12 10 20 12 C24 4 40 4 44 12 C52 10 54 20 48 24 C52 30 50 38 42 40 C44 50 48 56 52 70 C56 80 52 86 32 86 Z" fill="${c}" stroke="#000" stroke-width="3"/><path d="M18 14 C14 6 8 6 6 2 C12 2 20 6 22 12 M46 14 C50 6 56 6 58 2 C52 2 44 6 42 12" fill="#f4efe2" stroke="#000" stroke-width="2"/></svg>`;
+function spaceHtml(s,v,can){
+  const o=v.occ[s.id],cost=A.eff(s.c,T);
+  return `<div class="sp${can?' can':''}${o!=null?' occ':''}${v.last&&v.last.sp===s.id?' last':''}" data-sp="${s.id}"><span class="sp-ic" style="background:${A.FACC[s.t]}">${A.ic(A.TYPE[s.t])}</span><div class="sp-n">${esc(tx(s.n))}</div><div class="sp-e">${cost?cost+'<span class="arr">➜</span>':''}${A.eff(s.e,T)}${s.k?'<span class="k">⚔</span>':''}</div>${o!=null?pawn(PC[o]):''}</div>`;
+}
+function render(v,prev){
+  V=v;$('setup').hidden=true;$('game').hidden=false;
+  const me=v.pl[v.me],mine=v.cur===v.me&&!!inp&&!v.over,mode=inp?inp.mode:'';
+  if(sel>=v.hand.length)sel=-1;
+  // Schlacht
+  const pls=v.pl.length>=4?3:2;
+  $('conf').innerHTML=`<h3>⚔ ${esc(tx(v.conflict.n))}</h3><div class="rd">${T('Runde','Round')} ${v.round} / ${NW.ROUNDS} · ${T('Belohnungen','Rewards')}</div>${v.conflict.rw.slice(0,pls).map((r,i)=>`<div class="rw"><span class="pl">${i+1}</span>${A.eff(r,T)}</div>`).join('')}
+    <div class="stl">${v.names.map((n,i)=>`<div><i style="background:${PC[i]}"></i>${i===v.me?T('Du','You'):esc(n)}<span style="color:#cbbf9f;font-size:.74rem">${v.pl[i].conf} ${T('Krieger','warriors')}${v.pl[i].revealed&&v.pl[i].conf?' +'+(v.pl[i].st-v.pl[i].conf*2):''}</span><b>${v.pl[i].st}</b></div>`).join('')}</div>`;
+  // Markt
+  $('mkT').innerHTML=`${T('Markt','Market')}<small>${mine&&mode==='thing'?T('Dein Ruhm: ','Your fame: ')+'<b style="color:#ffd23f">'+me.ruhm+'</b>':T('Karten kaufst du beim Thing mit Ruhm','you buy cards with fame at the Thing')} · ${v.mleft} ${T('im Stapel','in the deck')}</small>`;
+  const buy=new Set(mine&&mode==='thing'?v.buys:[]);
+  $('market').innerHTML=v.market.map((id,i)=>id?A.card(id,C[id],T,tx,{cls:buy.has(i)?'can':mine&&mode==='thing'?'dim':'',attr:'data-m="'+i+'"'}):'').join('')+'<div class="sepv"></div>'+['skalde','saga'].map(id=>A.card(id,C[id],T,tx,{cls:buy.has(id)?'can':mine&&mode==='thing'?'dim':'',attr:'data-m="'+id+'"'})).join('');
+  // Brett
+  const canSp=new Set();if(mine&&mode==='main'&&sel>=0&&!pend)v.moves.filter(m=>v.hand[m.c]===v.hand[sel]).forEach(m=>canSp.add(m.sp));
+  let h='';
+  'arzw'.split('').forEach(f=>{
+    const al=v.ally[f];let trk='';
+    for(let i=0;i<=6;i++)trk+=`<span class="${i===2?'vp':i===4?'al':''}" title="${i===2?T('1 Siegpunkt','1 victory point'):i===4?T('Bündnis','Alliance'):''}">${v.pl.map((q,p)=>q.inf[f]===i?`<i style="background:${PC[p]}"></i>`:'').join('')||(i===2?'🍃':i===4?'👑':i)}</span>`;
+    h+=`<div class="blk"><h3><span class="cr" style="background:${A.FACC[f]}">${A.ic(A.TYPE[f])}</span>${esc(tx(NW.FAC[f]))}<small>${al!=null?'👑 '+(al===v.me?T('du','you'):esc(v.names[al])):''}</small></h3><div class="trk">${trk}</div><div class="sps">${NW.SPACES.filter(s=>s.f===f).map(s=>spaceHtml(s,v,canSp.has(s.id))).join('')}</div></div>`;
+  });
+  [['s',T('Siedlungen','Settlements')],['k',T('Schlachtfelder','Battlefields')]].forEach(x=>{h+=`<div class="blk wide"><h3><span class="cr" style="background:${A.FACC[x[0]]}">${A.ic(A.TYPE[x[0]])}</span>${x[1]}</h3><div class="sps">${NW.SPACES.filter(s=>s.t===x[0]&&!s.f).map(s=>spaceHtml(s,v,canSp.has(s.id))).join('')}</div></div>`;});
+  $('board').innerHTML=h;
+  // eigene Vorräte und Hand
+  $('mine').innerHTML=`<span class="ne">${A.ic('sTree')}<b>${me.vp}</b><small>/ ${NW.GOAL}</small></span><span class="ne">${A.ic('sHorn')}<b>${me.res.met}</b></span><span class="ne">${A.ic('sIron')}<b>${me.res.eisen}</b></span><span class="ne">${A.ic('sCoin')}<b>${me.res.silber}</b></span><span class="ne">${A.ic('sHelm')}<b>${me.troops}</b><small>${T('im Lager','in camp')}</small></span><span class="ne">${A.ic('sSword')}<b>${me.conf}</b><small>${T('in der Schlacht','in battle')}</small></span><span class="ne">${A.ic('sCrown')}<b>${me.left}</b><small>${T('Gefolgsleute frei','followers free')}</small></span><span class="ne">${A.ic('sCard')}<b>${me.deck}</b><small>${T('Stapel','deck')} · ${me.disc} ${T('Ablage','discard')}</small></span>`;
+  const canC=new Set(mine&&mode==='main'?v.moves.map(m=>v.hand[m.c]):[]);
+  $('hand').innerHTML=v.hand.length?v.hand.map((id,i)=>A.card(id,C[id],T,tx,{cls:(sel===i?'sel ':'')+(canC.has(id)&&me.left>0?'can':mine&&mode==='main'?'dim':''),attr:'data-i="'+i+'"'})).join(''):`<div style="color:#cbbf9f;align-self:center">${me.revealed?T('Du hast Thing gehalten: ','You held Thing: ')+me.ruhm+' '+T('Ruhm übrig','fame left'):''}</div>`;
+  const pOk=new Set(mine?(mode==='main'?v.pMain:v.pThing):[]);
+  $('plots').innerHTML=v.plots.map((id,i)=>{const d=P[id];return `<div class="nc plot ${pOk.has(i)?'can':''}" data-p="${i}"><div class="nc-in"><div class="nc-name">${A.ic('sRaven')} ${esc(tx(d.n))}</div><div class="nc-row"><small>${d.m?T('Im eigenen Zug','On your turn'):T('Beim Thing (Schlacht)','At the Thing (battle)')}</small><div>${d.m?A.eff(d.m,T):A.eff({st:d.c},T)}</div></div></div></div>`;}).join('');
+  let b='';
+  if(mine&&mode==='main'){
+    if(pend)b=`<div class="dep"><span>${T('Wie viele Krieger in die Schlacht?','How many warriors into battle?')}</span>${Array.from({length:pend.max+1},(_,n)=>`<button class="btn${n===pend.max?'':' alt'}" data-dep="${n}">${n}</button>`).join('')}<button class="btn alt" data-a="cancel">✕</button></div>`;
+    else b=`<button class="btn${v.moves.length&&me.left>0?' alt':''}" data-a="reveal">🔥 ${T('Thing halten (Hand aufdecken)','Hold Thing (reveal hand)')}</button>`;
+  }else if(mine&&mode==='thing')b=`<button class="btn" data-a="done">✔ ${T('Fertig','Done')}</button>`;
+  $('btns').innerHTML=b;$('handbar').classList.toggle('myturn',mine);
+  // Mitspieler
+  $('players').innerHTML=v.names.map((n,i)=>{const q=v.pl[i];return `<div class="pp${v.cur===i&&!v.over?' turn':''}"><div class="hd"><i style="background:${PC[i]}"></i>${i===v.me?T('Du','You'):esc(n)}${v.types[i]==='cpu'?' 🤖':''}${v.first===i?' <span title="'+T('Startspieler','First player')+'">🪓</span>':''}<b>${q.vp} 🍃</b></div>
+    <div class="ln"><span class="ne">${A.ic('sHorn')}${q.res.met}</span><span class="ne">${A.ic('sIron')}${q.res.eisen}</span><span class="ne">${A.ic('sCoin')}${q.res.silber}</span><span class="ne">${A.ic('sHelm')}${q.troops}</span><span class="ne">${A.ic('sCrown')}${q.left}/${q.agents}</span><span class="ne">${A.ic('sCard')}${q.hand}</span><span class="ne">${A.ic('sRaven')}${q.plots}</span>${q.revealed?'<span>🔥 Thing</span>':''}</div></div>`;}).join('');
+  const bn=$('hkBanner');
+  if(v.over){bn.className='';bn.textContent=v.over.w===v.me?T('🏆 Du gewinnst!','🏆 You win!'):`🏆 ${v.names[v.over.w]} ${T('gewinnt!','wins!')}`;}
+  else if(mine){bn.className='me';bn.textContent=mode==='thing'?T(`▶ THING: Du hast ${me.ruhm} Ruhm zum Einkaufen`,`▶ THING: you have ${me.ruhm} fame to spend`):me.left>0&&v.moves.length?T('▶ DU BIST DRAN: Karte wählen, dann ein leuchtendes Feld','▶ YOUR TURN: pick a card, then a glowing space'):T('▶ DU BIST DRAN: Halte Thing','▶ YOUR TURN: hold Thing');}
+  else{bn.className='';bn.textContent=T(`⏳ ${v.names[v.cur]} ist dran`,`⏳ ${v.names[v.cur]}'s turn`);}
+  document.title=mine?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if(v.cur===v.me&&!v.over&&!(prev&&prev.cur===v.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(v.log[0]?tx(v.log[0]):'');
+  $('hkLog').innerHTML=v.log.slice(1,60).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+}
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,mode:spec.mode};sel=-1;pend=null;hintTxt='';K.apply();}else res(null);});}
+function answer(a){if(!inp)return;const r=inp.res;inp=null;sel=-1;pend=null;hintTxt='';K.apply();r(a);}
+$('hand').addEventListener('click',e=>{
+  const el=e.target.closest('.nc');if(!el||!inp||inp.mode!=='main'||pend)return;const i=+el.dataset.i;
+  if(!V.moves.some(m=>V.hand[m.c]===V.hand[i])){hintTxt=V.pl[V.me].left<=0?T('Du hast keinen freien Gefolgsmann mehr. Halte Thing.','You have no free follower left. Hold Thing.'):C[V.hand[i]].go.length?T('Für diese Karte ist gerade kein passendes Feld frei oder bezahlbar.','No matching space is free or affordable for this card.'):T('Diese Karte kann nicht entsandt werden, sie zählt beim Thing.','This card cannot be sent, it counts at the Thing.');K.sfx('bad');sel=-1;K.apply();return;}
+  sel=sel===i?-1:i;hintTxt=sel>=0?T('Jetzt ein leuchtendes Feld antippen.','Now tap a glowing space.'):'';K.apply();
+});
+$('board').addEventListener('click',e=>{
+  const el=e.target.closest('.sp');if(!el||!inp||inp.mode!=='main'||sel<0||pend)return;
+  const m=V.moves.find(x=>V.hand[x.c]===V.hand[sel]&&x.sp===el.dataset.sp);if(!m)return;
+  if(m.max>0){pend={c:sel,sp:m.sp,max:m.max};K.apply();}else answer({t:'agent',c:sel,sp:m.sp,dep:0});
+});
+$('btns').addEventListener('click',e=>{
+  const d=e.target.closest('[data-dep]');if(d&&pend){answer({t:'agent',c:pend.c,sp:pend.sp,dep:+d.dataset.dep});return;}
+  const b=e.target.closest('[data-a]');if(!b||!inp)return;
+  if(b.dataset.a==='cancel'){pend=null;K.apply();}
+  else if(b.dataset.a==='done')answer({t:'done'});
+  else if(b.dataset.a==='reveal'){
+    if(V.moves.length&&V.pl[V.me].left>0)K.dlg({ico:'🔥',title:L2('Schon Thing halten?','Hold Thing already?'),html:L2('Du könntest noch einen Gefolgsmann entsenden. Nach dem Thing bist du für diese Runde fertig.','You could still send a follower. After the Thing you are done for this round.'),btns:[L2('Thing halten','Hold Thing'),L2('Abbrechen','Cancel')]}).then(i=>{if(i===0)answer({t:'reveal'});});
+    else answer({t:'reveal'});
+  }
+});
+$('market').addEventListener('click',e=>{const el=e.target.closest('.nc');if(!el||!inp||inp.mode!=='thing')return;const m=/^\d+$/.test(el.dataset.m)?+el.dataset.m:el.dataset.m;if(V.buys.includes(m))answer({t:'buy',m});else{hintTxt=T('Dafür reicht dein Ruhm nicht.','You do not have enough fame for that.');K.sfx('bad');K.apply();}});
+$('plots').addEventListener('click',e=>{const el=e.target.closest('.nc');if(!el||!inp)return;const i=+el.dataset.p,ok=(inp.mode==='main'?V.pMain:V.pThing).includes(i);if(ok)answer({t:'plot',i});else{hintTxt=P[V.plots[i]].c?T('Diese Ränke spielst du beim Thing, wenn du Krieger in der Schlacht hast.','You play this scheme at the Thing when you have warriors in battle.'):T('Diese Ränke spielst du in deinem Zug vor dem Thing.','You play this scheme on your turn before the Thing.');K.apply();}});
+K=HK.init({
+  prefix:'nwl-v1-',title:L2('Neun Welten','Nine Worlds'),minPlayers:2,
+  seats:PC.map((c,i)=>({name:String(i+1),color:c})),
+  cpuNames:['Sigrun','Leif','Astrid','Bjarne','Freydis','Ragnar'],
+  view,valid,render,ui,
+  cancelUi(){inp=null;sel=-1;pend=null;K.apply();},
+  start:s=>startGame(s,{}),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;sel=-1;pend=null;$('game').hidden=true;$('setup').hidden=false;document.title=TT;}
+});
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nopp').value);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>
