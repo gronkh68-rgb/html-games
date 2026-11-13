@@ -122,7 +122,7 @@
       L.backup = null; var si = -1;
       L.seats.forEach(function (s, k) { if (si < 0 && s.type === 'remote' && s.conn && s.conn.open) si = k; });
       L.pendingSucc = si; if (si < 0) return;
-      var info = L.seats.map(function (s) { return { type: s.type, name: s.name || '', rid: s.rid || null }; });
+      var info = L.seats.map(function (s) { return { type: s.type, name: s.name || '', rid: s.rid || (s.type === 'host' ? myRid() : null) }; });
       try { L.seats[si].conn.send({ t: 'standby', seats: info, hostSeat: hostSeat() }); } catch (e) {}
     }
     function broadcastBackup() {
@@ -182,7 +182,7 @@
       }
       if (conn.slot === undefined) return;
       if (m.t === 'standbyReady') {
-        if (cfg.migrate && !L.backup && conn.slot === L.pendingSucc) { L.backup = { seat: conn.slot, code: String(m.code || '') }; broadcastBackup(); if (L.lastSnap) L.snap(L.lastSnap); }
+        if (cfg.migrate && !L.backup && conn.slot === L.pendingSucc) { L.backup = { seat: conn.slot, code: String(m.code || '') }; saveLast(L.backup.code); broadcastBackup(); if (L.lastSnap) L.snap(L.lastSnap); }
         return;
       }
       if (m.t === 'color') {
@@ -353,7 +353,7 @@
       var me = L.you;
       L.seats = sd.seats.map(function (s, i) {
         if (i === me) return { type: 'host', name: myName(), rid: myRid() };
-        if (i === sd.hostSeat) return { type: cfg.bots ? 'cpu' : 'left', name: '' };
+        if (i === sd.hostSeat) return { type: cfg.bots ? 'cpu' : 'left', name: '', rid: s.rid || undefined, away: !!cfg.rejoin, was: s.name };      // der alte Host darf wieder auf seinen Platz (Kennung, Name oder Raumcode)
         if (s.type === 'remote') return { type: cfg.bots ? 'cpu' : 'left', name: '', rid: s.rid, away: true };
         return { type: s.type === 'off' ? 'off' : (s.type === 'cpu' ? 'cpu' : 'left'), name: '' };
       });
