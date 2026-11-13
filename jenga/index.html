@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Wackelturm</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<style>
+.wrap{max-width:1300px}
+#stage{position:relative;height:min(72vh,760px);min-height:420px;border-radius:18px;overflow:hidden;border:2px solid var(--border);background:#1b1410;touch-action:none}
+#stage.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.35),0 0 40px rgba(255,210,63,.2)}
+#stage canvas{display:block;width:100%;height:100%}
+#pick{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:rgba(10,12,22,.82);border-radius:14px;padding:8px 12px;color:#fff;font-weight:700;z-index:3;max-width:94%}
+#pick .rk{padding:2px 10px;border-radius:999px;font-size:.85rem}
+#mini{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:26px;background:linear-gradient(transparent 55%,rgba(0,0,0,.6));cursor:pointer}
+#mini .t{color:#fff;font-weight:900;margin-bottom:10px;text-shadow:0 2px 6px #000;text-align:center;padding:0 10px}
+#bar{position:relative;width:min(86%,520px);height:34px;border-radius:10px;background:#3a1010;border:2px solid #fff;overflow:hidden}
+#zone{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,#c9a400,#2fd66b 30%,#2fd66b 70%,#c9a400)}
+#mark{position:absolute;top:-4px;bottom:-4px;width:6px;margin-left:-3px;background:#fff;box-shadow:0 0 8px #fff}
+.ps{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:10px;border:2px solid transparent}
+.ps.turn{border-color:#ffd23f;background:rgba(255,210,63,.12)}
+.wob{height:14px;border-radius:8px;background:var(--bg);border:1px solid var(--border);overflow:hidden;margin-top:6px}
+.wob b{display:block;height:100%;width:0;background:linear-gradient(90deg,#2fd66b,#ffd23f,#ff3b3b);transition:width .4s}
+#nogl{padding:30px;color:#fff;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div id="stage"><div id="pick" hidden></div><div id="mini" hidden><div class="t" id="miniT"></div><div id="bar"><div id="zone"></div><div id="mark"></div></div></div></div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="players"></div><div style="margin-top:8px;font-size:.85rem;color:var(--muted)" id="wobL"></div><div class="wob"><b id="wobB"></b></div><div id="info" style="margin-top:8px;color:var(--muted);font-size:.85rem"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const TT=T('Wackelturm','Wobble Tower');document.title=TT;$('ttl').textContent=TT;
+const RULES=()=>`<ul>
+<li>${T('Der Turm besteht aus 18 Lagen mit je 3 Klötzen. Wer dran ist, zieht einen Klotz heraus und legt ihn oben auf.','The tower has 18 layers of 3 blocks. On your turn you pull one block out and place it on top.')}</li>
+<li>${T('Aus der obersten Lage darf nicht gezogen werden (und nicht aus der Lage darunter, solange die oberste unvollständig ist).','You may not pull from the top layer (nor from the one below while the top is incomplete).')}</li>
+<li>${T('Nach der Wahl kommt die <b>ruhige Hand</b>: Stoppe den Zeiger im grünen Bereich. Je mehr auf dem Klotz lastet und je wackeliger der Turm, desto kleiner ist der Bereich.','After choosing comes the <b>steady hand</b>: stop the pointer in the green zone. The more weight on the block and the wobblier the tower, the smaller the zone.')}</li>
+<li>${T('Daneben getroffen wackelt der Turm stärker. Bei 100 % fällt er um. Eine Lage braucht den mittleren Klotz oder beide äußeren, sonst stürzt der Turm sofort ein.','Missing makes the tower wobble more. At 100% it falls. A layer needs its middle block or both outer blocks, otherwise the tower collapses at once.')}</li>
+<li>${T('Wer den Turm umwirft, verliert.','Whoever knocks the tower over loses.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🧱 ${T('Wackelturm','Wobble Tower')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Der Klötzchenturm in 3D für 2 bis 4 Spieler: Klotz ziehen, oben auflegen, nicht umwerfen. Gegen den Computer oder online.','The block tower in 3D for 2 to 4 players: pull a block, put it on top, do not knock it over. Against the computer or online.')}</p>
+<div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></div>
+<div class="row"><label for="lvl">${T('Stärke des Computers','Computer strength')}</label><select id="lvl"><option value="0">${T('Zittrig','Shaky')}</option><option value="1" selected>${T('Normal','Normal')}</option><option value="2">${T('Ruhige Hand','Steady hand')}</option></select></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+const readOpts=()=>({lvl:+$('lvl').value});
+// ---------- Regeln (Host und Anzeige teilen sich diese Funktionen) ----------
+const topI=lv=>lv.length-1,full=a=>a[0]&&a[1]&&a[2];
+function legal(lv,l,s){const t=topI(lv);if(l<0||l>=t||!lv[l][s])return false;if(!full(lv[t])&&l>=t-1)return false;return true;}
+const stable=a=>!!(a[1]||(a[0]&&a[2]));
+function diff(lv,wob,l,s){      // Schwierigkeit 0..100 (höher = kleinerer grüner Bereich), -1 = Turm fällt sicher
+  const a=lv[l].slice();a[s]=0;if(!stable(a))return -1;
+  const n=lv[l][0]+lv[l][1]+lv[l][2],base=n===3?(s===1?8:15):22,above=(topI(lv)-l)/lv.length;
+  return Math.min(100,base*(.7+1.1*above)+wob*.25);
+}
+const zoneOf=d=>Math.max(.06,.36-d/100*.7);
+function allLegal(lv){const o=[];for(let l=0;l<lv.length;l++)for(let s=0;s<3;s++)if(legal(lv,l,s))o.push([l,s]);return o;}
+function setup(seats,opts){return {seats,opts,log:[],lv:Array.from({length:18},()=>[1,1,1]),wob:0,cur:HK.rnd(seats.length),over:null,last:null,seq:0,moves:0};}
+function view(g,s){return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),lv:g.lv,wob:g.wob,cur:g.cur,over:g.over,last:g.last,seq:g.seq,moves:g.moves,log:K.logFor(s)};}
+function valid(spec,a,g,p){return spec.k!=='turn'||(a&&Number.isInteger(a.l)&&Number.isInteger(a.s)&&a.s>=0&&a.s<3&&legal(g.lv,a.l,a.s)&&isFinite(a.x));}
+function aiMove(g){
+  const opts=allLegal(g.lv).map(o=>({l:o[0],s:o[1],d:diff(g.lv,g.wob,o[0],o[1])})),ok=opts.filter(o=>o.d>=0);
+  if(!ok.length){const o=opts[0];return {l:o.l,s:o.s,x:0};}
+  ok.sort((a,b)=>a.d-b.d);const o=ok[Math.floor(Math.random()*Math.min(3,ok.length))],sg=[.75,.5,.3][g.opts.lvl];
+  return {l:o.l,s:o.s,x:(Math.random()+Math.random()+Math.random()-1.5)*sg*zoneOf(o.d)*2.4};
+}
+let K,V=null,inp=null,selB=null,hintTxt='';
+async function main(){
+  const g=K.G;
+  while(!g.over){
+    const p=g.cur;g.wob=Math.max(0,g.wob-5);K.snap('turn');K.push();
+    if(!allLegal(g.lv).length){g.over={loser:-1};break;}
+    if(g.seats[p].type==='cpu')await K.sleep(1100);
+    const a=await K.ask(p,{k:'turn'},()=>aiMove(g));
+    if(!a)continue;
+    const d=diff(g.lv,g.wob,a.l,a.s),z=zoneOf(Math.max(0,d)),err=Math.abs(a.x)/z;
+    let fall=d<0,gain=0;
+    if(!fall){gain=err<=1?d*.2*err:Math.min(45,d*(.5+(err-1)*.9)+4);g.wob=Math.min(100,g.wob+gain);fall=g.wob>=100;}
+    g.seq++;g.moves++;
+    const nm=K.nm(p),q=err<=.35?L2('ganz ruhig','very steady'):err<=1?L2('sauber','cleanly'):err<=1.8?L2('wackelig','shakily'):L2('mit einem Ruck','with a jerk');
+    if(fall){
+      K.fx({k:'fall',l:a.l,s:a.s,seq:g.seq});K.say(-1,L2(nm+' zieht einen Klotz und der Turm stürzt ein!',nm+' pulls a block and the tower collapses!'));K.sfx('bad');
+      g.over={loser:p};g.last=null;await K.sleep(2600);break;
+    }
+    // Klotz oben auflegen
+    let t=topI(g.lv);if(full(g.lv[t])){g.lv.push([0,0,0]);t++;}
+    const ts=[0,1,2].find(i=>!g.lv[t][i]);
+    K.fx({k:'pull',l:a.l,s:a.s,tl:t,ts,seq:g.seq,shake:gain});
+    K.say(p,L2(nm+' zieht '+q.de+' einen Klotz aus Lage '+(a.l+1)+'.',nm+' pulls a block '+q.en+' from layer '+(a.l+1)+'.'),L2('Du ziehst '+q.de+' einen Klotz aus Lage '+(a.l+1)+'.','You pull a block '+q.en+' from layer '+(a.l+1)+'.'));
+    K.sfx(err<=1?'lay':'bad');
+    await K.sleep(1500);
+    g.lv[a.l][a.s]=0;g.lv[t][ts]=1;g.last={p,l:a.l,s:a.s,tl:t,ts,seq:g.seq};
+    g.cur=(g.cur+1)%g.seats.length;
+  }
+  K.push();const lo=g.over.loser;K.sfx(lo===K.ME?'bad':'win');
+  const again=await K.vote(q=>({ico:lo===q?'💥':'🏆',title:lo<0?L2('Kein Zug mehr möglich','No move left'):q===lo?L2('Du hast den Turm umgeworfen!','You knocked the tower over!'):L2(g.seats[lo].name+' hat den Turm umgeworfen','{n} knocked the tower over'.replace('{n}',g.seats[lo].name)),html:L2('Der Turm hat '+g.moves+' Züge gehalten.<br><br><b>Abstimmung:</b> Noch eine Partie?','The tower lasted '+g.moves+' moves.<br><br><b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function startGame(seats,opts){K.reset();K.G=setup(seats,opts);K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' beginnt.','New game. '+K.nm(K.G.cur)+' starts.'));K.push();K.run(main);}
+// ---------- 3D ----------
+const BL=3,BH=.6,BW=1;let T3=null,glFail=false,loading=null;
+const loadJs=u=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>rej(new Error(u));document.head.appendChild(s);});
+const isCyber=()=>document.documentElement.getAttribute('data-style')==='cyber';
+function posOf(l,s){const y=l*BH+BH/2,o=(s-1)*BW;return l%2?{x:o,y,z:0,ry:Math.PI/2}:{x:0,y,z:o,ry:0};}
+async function init3(){
+  if(T3||glFail)return;if(loading)return loading;
+  loading=(async()=>{
+    try{
+      if(!window.THREE)await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');
+      if(!THREE.OrbitControls)await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+      const host=$('stage'),r=new THREE.WebGLRenderer({antialias:true});r.setPixelRatio(Math.min(2,devicePixelRatio||1));host.insertBefore(r.domElement,host.firstChild);
+      const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,1,.1,200);cam.position.set(14,10,18);
+      const ctl=new THREE.OrbitControls(cam,r.domElement);ctl.target.set(0,5.4,0);ctl.enablePan=false;ctl.minDistance=8;ctl.maxDistance=34;ctl.maxPolarAngle=Math.PI*.52;ctl.enableDamping=true;
+      scene.add(new THREE.AmbientLight(0xffffff,.6));const dl=new THREE.DirectionalLight(0xffffff,.85);dl.position.set(8,20,10);scene.add(dl);
+      const tower=new THREE.Group();scene.add(tower);
+      T3={r,scene,cam,ctl,tower,meshes:{},style:'',anims:[],falling:null,ray:new THREE.Raycaster(),geo:new THREE.BoxGeometry(BL-.04,BH-.03,BW-.04),t0:performance.now(),busy:0};
+      T3.egeo=new THREE.EdgesGeometry(T3.geo);
+      const rs=()=>{const w=host.clientWidth||600,h=host.clientHeight||500;r.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();};rs();addEventListener('resize',rs);if(window.ResizeObserver)new ResizeObserver(rs).observe(host);
+      let dn=null;r.domElement.addEventListener('pointerdown',e=>{dn={x:e.clientX,y:e.clientY};});
+      r.domElement.addEventListener('pointerup',e=>{if(!dn||Math.hypot(e.clientX-dn.x,e.clientY-dn.y)>7){dn=null;return;}dn=null;clickAt(e);});
+      requestAnimationFrame(loop3);
+    }catch(e){glFail=true;$('stage').innerHTML='<div id="nogl">'+T('3D konnte nicht geladen werden (WebGL oder Verbindung fehlt).','3D could not be loaded (WebGL or connection missing).')+'</div>';}
+  })();
+  return loading;
+}
+function mkBlock(l,s){
+  const cy=isCyber(),h=((l*7+s*13)%10)/10,col=cy?new THREE.Color(0x0a1020):new THREE.Color().setHSL(.09+h*.02,.5,.56+h*.1);
+  const m=new THREE.Mesh(T3.geo,new THREE.MeshStandardMaterial({color:col,roughness:.75,metalness:cy?.4:0,emissive:cy?new THREE.Color(0x003844):new THREE.Color(0),emissiveIntensity:1}));
+  const e=new THREE.LineSegments(T3.egeo,new THREE.LineBasicMaterial({color:cy?0x00f0ff:0x5a3a18}));m.add(e);
+  const p=posOf(l,s);m.position.set(p.x,p.y,p.z);m.rotation.y=p.ry;m.userData={l,s,base:m.material.emissive.clone()};return m;
+}
+function sync3(){
+  if(!T3||!V||T3.busy||T3.falling)return;
+  const st=isCyber()?'c':'s';if(T3.style!==st){T3.style=st;Object.values(T3.meshes).forEach(m=>T3.tower.remove(m));T3.meshes={};T3.scene.background=new THREE.Color(st==='c'?0x04060c:0x241a12);
+    if(T3.floor)T3.scene.remove(T3.floor);T3.floor=new THREE.Mesh(new THREE.CylinderGeometry(9,9,.4,48),new THREE.MeshStandardMaterial({color:st==='c'?0x0a1424:0x5a3c22,roughness:.8}));T3.floor.position.y=-.2;T3.scene.add(T3.floor);}
+  const want={};V.lv.forEach((a,l)=>a.forEach((v,s)=>{if(v)want[l+'-'+s]=1;}));
+  Object.keys(T3.meshes).forEach(k=>{if(!want[k]){T3.tower.remove(T3.meshes[k]);delete T3.meshes[k];}});
+  Object.keys(want).forEach(k=>{const [l,s]=k.split('-').map(Number);if(!T3.meshes[k]){T3.meshes[k]=mkBlock(l,s);T3.tower.add(T3.meshes[k]);}else{const p=posOf(l,s),m=T3.meshes[k];m.position.set(p.x,p.y,p.z);m.rotation.set(0,p.ry,0);}});
+  const mine=V.cur===V.me&&!!inp&&!V.over;
+  Object.values(T3.meshes).forEach(m=>{const u=m.userData,sel=selB&&selB.l===u.l&&selB.s===u.s;m.material.emissive.copy(sel?new THREE.Color(0xffa000):u.base);m.material.emissiveIntensity=sel?.9:1;m.material.opacity=1;});
+  T3.ctl.target.y+=(V.lv.length*BH*.5-T3.ctl.target.y)*.2;
+}
+function loop3(now){
+  requestAnimationFrame(loop3);if(!T3||$('game').hidden)return;
+  const t=(now-T3.t0)/1000,w=V?V.wob:0;
+  if(!T3.falling){const a=(w/100)**1.4*.035+(T3.shake||0);T3.tower.rotation.z=Math.sin(t*2.3)*a;T3.tower.rotation.x=Math.sin(t*1.7+1)*a*.7;if(T3.shake)T3.shake*=.96;}
+  const fin=[];T3.anims=T3.anims.filter(an=>{const k=Math.min(1,(now-an.t0)/an.d);an.f(k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2);if(k>=1&&an.done)fin.push(an.done);return k<1;});fin.forEach(f=>f());
+  if(T3.falling){const dt=Math.min(.05,(now-T3.falling.last)/1000);T3.falling.last=now;T3.falling.b.forEach(o=>{o.v.y-=22*dt;o.m.position.addScaledVector(o.v,dt);o.m.rotation.x+=o.w.x*dt;o.m.rotation.y+=o.w.y*dt;o.m.rotation.z+=o.w.z*dt;if(o.m.position.y<BH/2){o.m.position.y=BH/2;o.v.y=-o.v.y*.25;o.v.x*=.6;o.v.z*=.6;o.w.multiplyScalar(.5);}});}
+  T3.ctl.update();T3.r.render(T3.scene,T3.cam);
+}
+function tween(d,f,done){T3.anims.push({t0:performance.now(),d,f,done});}
+function fx(d){
+  if(!T3)return;
+  if(d.k==='pull'){
+    const m=T3.meshes[d.l+'-'+d.s];if(!m)return;T3.busy++;T3.shake=Math.min(.05,d.shake/900);
+    const a=m.position.clone(),dir=new THREE.Vector3(d.l%2?0:1,0,d.l%2?1:0),out=a.clone().addScaledVector(dir,BL+.6),tp=posOf(d.tl,d.ts),up=new THREE.Vector3(out.x,tp.y+1.6,out.z),r0=m.rotation.y;
+    const top=new THREE.Vector3(tp.x,tp.y+1.6,tp.z);
+    const s4=()=>{delete T3.meshes[d.l+'-'+d.s];m.userData.l=d.tl;m.userData.s=d.ts;T3.meshes[d.tl+'-'+d.ts]=m;T3.busy--;if(V&&V.lv[d.tl]&&V.lv[d.tl][d.ts]&&!V.lv[d.l][d.s])sync3();};
+    const s3=()=>tween(160,k=>m.position.set(tp.x,tp.y+1.6*(1-k),tp.z),s4);
+    const s2=()=>tween(380,k=>{m.position.lerpVectors(up,top,k);m.rotation.y=r0+(tp.ry-r0)*k;},s3);
+    const s1=()=>tween(420,k=>m.position.lerpVectors(out,up,k),s2);
+    tween(520,k=>m.position.lerpVectors(a,out,k),s1);
+  }
+  if(d.k==='fall'){
+    const src=T3.meshes[d.l+'-'+d.s],dx=Math.random()-.5,dz=Math.random()-.5,n=Math.hypot(dx,dz)||1;
+    T3.falling={last:performance.now(),b:Object.values(T3.meshes).map(m=>{const h=m.position.y;return {m,v:new THREE.Vector3(dx/n*h*.9+(Math.random()-.5)*1.5,Math.random()*1.5,dz/n*h*.9+(Math.random()-.5)*1.5),w:new THREE.Vector3((Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5)};})};
+    T3.tower.rotation.set(0,0,0);
+  }
+}
+function resetTower(){if(!T3)return;T3.falling=null;T3.busy=0;T3.anims=[];Object.values(T3.meshes).forEach(m=>T3.tower.remove(m));T3.meshes={};T3.tower.children.slice().forEach(c=>T3.tower.remove(c));}
+// ---------- Anzeige ----------
+let lastOver=false,shownSeq=-1;
+function render(v,prev){
+  const fresh=!V||(!v.over&&lastOver)||v.moves===0&&(!prev||prev.moves>0);
+  V=v;$('setup').hidden=true;$('game').hidden=false;
+  init3().then(()=>{if(fresh&&T3&&!v.over)resetTower();lastOver=!!v.over;sync3();});
+  const mine=v.cur===v.me&&!!inp&&!v.over;
+  $('stage').classList.toggle('myturn',mine);
+  $('players').innerHTML=v.names.map((n,i)=>`<div class="ps${v.cur===i&&!v.over?' turn':''}"><span>${i===v.me?T('Du','You'):esc(n)}${v.types[i]==='cpu'?' 🤖':''}</span>${v.over&&v.over.loser===i?'💥':''}</div>`).join('');
+  $('wobL').textContent=T('Wackeln: ','Wobble: ')+Math.round(v.wob)+' %';$('wobB').style.width=v.wob+'%';
+  $('info').textContent=T(`Höhe: ${v.lv.length} Lagen · ${v.moves} Züge`,`Height: ${v.lv.length} layers · ${v.moves} moves`);
+  const pk=$('pick');
+  if(mine&&selB&&!$('mini').hidden===false){}
+  if(mine&&selB){const d=diff(v.lv,v.wob,selB.l,selB.s),lab=d<0?['☠ '+T('Turm fällt sicher','tower will fall'),'#7a0000']:d<14?[T('Risiko: niedrig','Risk: low'),'#1d7a3c']:d<26?[T('Risiko: mittel','Risk: medium'),'#a07a00']:[T('Risiko: hoch','Risk: high'),'#a02a00'];
+    pk.innerHTML=`<span>${T('Lage','Layer')} ${selB.l+1}</span><span class="rk" style="background:${lab[1]}">${lab[0]}</span><button class="btn" id="pull">${T('Ziehen','Pull')}</button>`;pk.hidden=!$('mini').hidden;}
+  else pk.hidden=true;
+  const b=$('hkBanner');
+  if(v.over){b.className='';b.textContent=v.over.loser===v.me?T('💥 Du hast den Turm umgeworfen','💥 You knocked the tower over'):v.over.loser<0?T('Unentschieden','Draw'):`💥 ${v.names[v.over.loser]} ${T('hat den Turm umgeworfen','knocked the tower over')}`;}
+  else if(mine){b.className='me';b.textContent=T('▶ DU BIST DRAN: Tippe einen Klotz an und zieh ihn heraus','▶ YOUR TURN: tap a block and pull it out');}
+  else{b.className='';b.textContent=T(`⏳ ${v.names[v.cur]} ist dran`,`⏳ ${v.names[v.cur]}'s turn`);}
+  document.title=mine?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if(v.cur===v.me&&!v.over&&!(prev&&prev.cur===v.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(v.log[0]?tx(v.log[0]):T('Ziehen zum Drehen, Mausrad oder zwei Finger zum Zoomen','Drag to rotate, wheel or two fingers to zoom'));
+  $('hkLog').innerHTML=v.log.slice(1,50).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+}
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res};selB=null;hintTxt='';K.apply();}else res(null);});}
+function clickAt(e){
+  if(!inp||!V||!T3||T3.busy||!$('mini').hidden)return;
+  const b=T3.r.domElement.getBoundingClientRect(),m=new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-((e.clientY-b.top)/b.height)*2+1);
+  T3.ray.setFromCamera(m,T3.cam);const hit=T3.ray.intersectObjects(Object.values(T3.meshes),false)[0];
+  if(!hit){selB=null;hintTxt='';K.apply();return;}
+  const u=hit.object.userData;
+  if(!legal(V.lv,u.l,u.s)){hintTxt=T('Aus den obersten Lagen darf nicht gezogen werden.','You may not pull from the top layers.');K.sfx('bad');selB=null;}
+  else{selB={l:u.l,s:u.s};hintTxt='';}
+  K.apply();
+}
+let mg=null;
+function startMini(){
+  if(!inp||!selB)return;const d=diff(V.lv,V.wob,selB.l,selB.s),z=zoneOf(Math.max(0,d));
+  $('zone').style.left=(50-z*50)+'%';$('zone').style.width=(z*100)+'%';$('miniT').textContent=T('Ruhige Hand: Tippe, wenn der Zeiger im grünen Bereich ist','Steady hand: tap when the pointer is in the green zone');
+  mg={t0:performance.now(),sp:1.5+Math.max(0,d)/45,x:0};$('mini').hidden=false;$('pick').hidden=true;
+  const tick=now=>{if(!mg)return;mg.x=Math.sin((now-mg.t0)/1000*mg.sp*Math.PI)*1;$('mark').style.left=(50+mg.x*50)+'%';requestAnimationFrame(tick);};requestAnimationFrame(tick);
+}
+function stopMini(){
+  if(!mg||!inp||performance.now()-mg.t0<250)return;const x=mg.x;mg=null;$('mini').hidden=true;
+  const r=inp.res,a={l:selB.l,s:selB.s,x};inp=null;selB=null;hintTxt='';K.apply();r(a);
+}
+$('pick').addEventListener('click',e=>{if(e.target.closest('#pull'))startMini();});
+$('mini').addEventListener('pointerdown',e=>{e.preventDefault();stopMini();});
+addEventListener('keydown',e=>{if(e.key===' '&&!$('game').hidden){if(mg){e.preventDefault();stopMini();}else if(selB&&inp){e.preventDefault();startMini();}}});
+K=HK.init({
+  prefix:'jng-v1-',title:L2('Wackelturm','Wobble Tower'),minPlayers:2,
+  seats:[{name:'1',color:'#e53935'},{name:'2',color:'#1e88e5'},{name:'3',color:'#43a047'},{name:'4',color:'#f9a825'}],
+  cpuNames:['Kira','Bolt','Nova','Pixel'],
+  view,valid,render,ui,fx,
+  cancelUi(){inp=null;mg=null;$('mini').hidden=true;K.apply();},
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;mg=null;selB=null;V=null;$('mini').hidden=true;$('game').hidden=true;$('setup').hidden=false;document.title=TT;}
+});
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nopp').value);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>

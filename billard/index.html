@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Billard</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<style>
+.wrap{max-width:1400px}
+#cv{display:block;width:100%;height:auto;border-radius:18px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+#cv.myturn{box-shadow:0 0 0 3px rgba(255,210,63,.6),0 0 40px rgba(255,210,63,.25)}
+.ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;justify-content:center}
+.ctl label{font-weight:700;font-size:.85rem;color:var(--muted)}
+#pow{flex:1;min-width:160px;max-width:420px;accent-color:#ff5a3c}
+#powV{font-weight:900;min-width:3.2em;text-align:right;font-variant-numeric:tabular-nums}
+.ctl .btn{padding:10px 22px}
+.fine{display:flex;gap:4px}.fine .btn{padding:8px 12px}
+.ps{padding:8px 10px;border-radius:10px;border:2px solid transparent;margin-bottom:4px}
+.ps.turn{border-color:#ffd23f;background:rgba(255,210,63,.12)}
+.ps .nm{font-weight:800}.ps .grp{font-size:.8rem;color:var(--muted)}
+.ps .bl{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+.ps .bl i{width:16px;height:16px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.4);font-style:normal}
+.ps .bl i.st{background-image:linear-gradient(#fff 0 28%,transparent 28% 72%,#fff 72%)}
+.ps .bl i.gone{opacity:.2}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <canvas id="cv" width="1040" height="560"></canvas>
+        <div class="ctl" id="ctl">
+          <div class="fine"><button class="btn alt" data-f="-1">↺</button><button class="btn alt" data-f="1">↻</button></div>
+          <label for="pow" id="powL"></label><input type="range" id="pow" min="5" max="100" value="55"><span id="powV">55%</span>
+          <button class="btn" id="shoot"></button>
+        </div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="players"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const TT=T('Billard','Pool');document.title=TT;$('ttl').textContent=TT;
+const RULES=()=>`<ul>
+<li>${T('8-Ball: Einer spielt die <b>Vollen</b> (1–7), der andere die <b>Halben</b> (9–15). Wer nach dem Anstoß zuerst eine Kugel versenkt, bekommt deren Gruppe.','8-ball: one player has <b>solids</b> (1–7), the other <b>stripes</b> (9–15). Whoever pots first after the break gets that group.')}</li>
+<li>${T('Versenkst du eine eigene Kugel, bist du weiter dran.','Pot one of your own balls and you shoot again.')}</li>
+<li>${T('<b>Foul:</b> Weiße versenkt, keine Kugel getroffen oder zuerst eine falsche Kugel getroffen. Der Gegner darf die Weiße dann frei hinlegen.','<b>Foul:</b> cue ball potted, no ball hit, or a wrong ball hit first. The opponent may then place the cue ball anywhere.')}</li>
+<li>${T('Sind alle eigenen Kugeln weg, muss die <b>Schwarze 8</b> rein. Wer die 8 zu früh oder mit einem Foul versenkt, verliert.','Once all your balls are gone you must pot the <b>black 8</b>. Potting the 8 early or with a foul loses the game.')}</li>
+<li>${T('Zielen: auf den Tisch tippen oder ziehen. Feinjustieren mit ↺ ↻ oder den Pfeiltasten. Stärke am Regler, Stoßen mit dem Knopf oder der Leertaste.','Aim: tap or drag on the table. Fine-tune with ↺ ↻ or the arrow keys. Set the power with the slider, shoot with the button or space.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🎱 ${T('Billard: 8-Ball','Pool: 8-ball')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Pool-Billard für zwei mit echter Kugelphysik. Gegen den Computer oder online.','Pool for two with real ball physics. Against the computer or online.')}</p>
+<div class="row"><label for="lvl">${T('Stärke des Computers','Computer strength')}</label><select id="lvl"><option value="0">${T('Leicht','Easy')}</option><option value="1" selected>${T('Mittel','Medium')}</option><option value="2">${T('Schwer','Hard')}</option></select></div>
+<div class="row"><button class="btn" id="start">${T('Gegen den Computer','Against the computer')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+$('powL').textContent=T('Stärke','Power');$('shoot').textContent=T('🎱 Stoßen','🎱 Shoot');
+const readOpts=()=>({lvl:+$('lvl').value});
+// ---------- Physik (läuft beim Host als Entscheidung, bei allen als Animation) ----------
+const TW=200,TH=100,R=2.6,DT=1/240;
+const POCK=[[0,0,5.6],[100,-1.4,4.9],[200,0,5.6],[0,100,5.6],[100,101.4,4.9],[200,100,5.6]];
+function mkSim(balls,shot){
+  const b=balls.map(o=>({id:o.id,x:o.x,y:o.y,vx:0,vy:0}));
+  const cue=b.find(o=>o.id===0),sp=45+shot.p*360;cue.vx=Math.cos(shot.a)*sp;cue.vy=Math.sin(shot.a)*sp;
+  const S={b,first:null,potted:[],t:0,done:false,clicks:[],rail:false};
+  S.step=function(){
+    if(S.done)return;S.t+=DT;let moving=false;
+    for(const o of b){
+      const v=Math.hypot(o.vx,o.vy);if(!v)continue;
+      const nv=Math.max(0,v-(14+v*.38)*DT);if(nv<1.2){o.vx=o.vy=0;continue;}
+      o.vx*=nv/v;o.vy*=nv/v;o.x+=o.vx*DT;o.y+=o.vy*DT;moving=true;
+    }
+    for(let i=0;i<b.length;i++)for(let j=i+1;j<b.length;j++){
+      const p=b[i],q=b[j],dx=q.x-p.x,dy=q.y-p.y,d2=dx*dx+dy*dy;if(d2>=4*R*R||d2===0)continue;
+      const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,ov=(2*R-d)/2;p.x-=nx*ov;p.y-=ny*ov;q.x+=nx*ov;q.y+=ny*ov;
+      const rel=(q.vx-p.vx)*nx+(q.vy-p.vy)*ny;if(rel>=0)continue;
+      const imp=-(1+.96)*rel/2;p.vx-=imp*nx;p.vy-=imp*ny;q.vx+=imp*nx;q.vy+=imp*ny;
+      if(S.first===null&&(p.id===0||q.id===0))S.first=p.id===0?q.id:p.id;
+      S.clicks.push(Math.min(1,-rel/200));
+    }
+    for(let i=b.length-1;i>=0;i--){
+      const o=b[i];let pot=false;
+      for(const pk of POCK)if(Math.hypot(o.x-pk[0],o.y-pk[1])<pk[2]){pot=true;break;}
+      if(!pot&&(o.x<-R||o.x>TW+R||o.y<-R||o.y>TH+R))pot=true;
+      if(pot){S.potted.push(o.id);b.splice(i,1);S.clicks.push(-1);continue;}
+      const cx=o.x<8||o.x>TW-8,cy=o.y<8||o.y>TH-8,mid=Math.abs(o.x-100)<4.4;
+      if(!(cx&&cy)){
+        if(o.x<R&&o.vx<0){o.x=R;o.vx=-o.vx*.78;S.rail=true;}else if(o.x>TW-R&&o.vx>0){o.x=TW-R;o.vx=-o.vx*.78;S.rail=true;}
+        if(!mid){if(o.y<R&&o.vy<0){o.y=R;o.vy=-o.vy*.78;S.rail=true;}else if(o.y>TH-R&&o.vy>0){o.y=TH-R;o.vy=-o.vy*.78;S.rail=true;}}
+      }
+    }
+    if(!moving||S.t>25){S.done=true;b.forEach(o=>{o.vx=o.vy=0;});}
+  };
+  return S;
+}
+const grpOf=id=>id===0||id===8?null:id<8?'s':'t';
+function rack(){
+  const out=[{id:0,x:50,y:50}],ids=HK.shuffle([2,3,4,5,6,7,9,10,11,12,13,14]),rows=[[null],[null,null],[null,8,null],[null,null,null,null],[1,null,null,null,15]];
+  const d=2*R+.06;
+  rows.forEach((row,r)=>row.forEach((v,k)=>{const id=v!=null?v:ids.pop();out.push({id,x:150+r*d*Math.sqrt(3)/2,y:50+(k-r/2)*d});}));
+  const fr=out.find(o=>o.x===150);if(fr.id===8){const sw=out.find(o=>o.id===1);sw.id=8;fr.id=1;}
+  return out;
+}
+const free=(balls,x,y,skip)=>x>=R&&x<=TW-R&&y>=R&&y<=TH-R&&balls.every(o=>o.id===skip||Math.hypot(o.x-x,o.y-y)>=2*R+.05);
+function setup(seats,opts){return {seats,opts,log:[],balls:rack(),cur:HK.rnd(2),grp:[null,null],hand:'kitchen',brk:true,over:null,seq:0};}
+function view(g,s){return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),balls:g.balls,cur:g.cur,grp:g.grp,hand:g.hand,brk:g.brk,over:g.over,seq:g.seq,log:K.logFor(s)};}
+function valid(spec,a,g,p){
+  if(spec.k!=='turn')return true;
+  if(!a||!isFinite(a.a)||!(a.p>0&&a.p<=1))return false;
+  if(a.c){if(!g.hand||!isFinite(a.c[0])||!isFinite(a.c[1]))return false;if(!free(g.balls,a.c[0],a.c[1],0))return false;if(g.hand==='kitchen'&&a.c[0]>50.01)return false;}
+  return true;
+}
+const left=(g,p)=>g.balls.filter(o=>grpOf(o.id)===g.grp[p]).length;
+function legalIds(g,p){if(!g.grp[p])return g.balls.filter(o=>o.id!==0&&o.id!==8).map(o=>o.id);const own=g.balls.filter(o=>grpOf(o.id)===g.grp[p]).map(o=>o.id);return own.length?own:[8];}
+// ---------- Computer ----------
+function segFree(balls,ax,ay,bx,by,skip){
+  const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;
+  return balls.every(o=>{if(skip.includes(o.id))return true;const t=Math.max(0,Math.min(1,((o.x-ax)*dx+(o.y-ay)*dy)/l2));return Math.hypot(ax+t*dx-o.x,ay+t*dy-o.y)>2*R-.1;});
+}
+function aiShot(g,p){
+  const lvl=g.opts.lvl,legal=legalIds(g,p),cue0=g.balls.find(o=>o.id===0);let best=null;
+  const tryFrom=(cx,cy)=>{
+    g.balls.filter(o=>legal.includes(o.id)).forEach(o=>POCK.forEach(pk=>{
+      const tx_=pk[0]+(pk[0]===0?2:pk[0]===200?-2:0),ty_=pk[1]+(pk[1]<50?2.4:-2.4),dx=tx_-o.x,dy=ty_-o.y,d2=Math.hypot(dx,dy),gx=o.x-dx/d2*2*R,gy=o.y-dy/d2*2*R;
+      const ax=gx-cx,ay=gy-cy,d1=Math.hypot(ax,ay);if(d1<.5)return;
+      const cut=Math.acos(Math.max(-1,Math.min(1,(ax*dx+ay*dy)/(d1*d2))));if(cut>1.2)return;
+      if(!segFree(g.balls,cx,cy,gx,gy,[0,o.id])||!segFree(g.balls,o.x,o.y,tx_,ty_,[0,o.id]))return;
+      const sc=cut*60+d1*.12+d2*.25;if(!best||sc<best.sc)best={sc,a:Math.atan2(ay,ax),p:Math.max(.3,Math.min(.95,.3+(d1+d2*1.4)/380+cut*.18)),c:[cx,cy]};
+    }));
+  };
+  let c=null;
+  if(g.hand){
+    const spots=[];for(let i=0;i<60;i++){const x=R+Math.random()*((g.hand==='kitchen'?50:TW)-2*R),y=R+Math.random()*(TH-2*R);if(free(g.balls,x,y,0))spots.push([x,y]);}
+    if(g.brk)spots.length=0,spots.push([50,50+ (Math.random()-.5)*20]);
+    spots.forEach(s=>tryFrom(s[0],s[1]));
+    if(best)c=best.c;else{c=spots[0]||[50,50];}
+  }else tryFrom(cue0.x,cue0.y);
+  const cx=c?c[0]:cue0.x,cy=c?c[1]:cue0.y;
+  if(g.brk)return {a:Math.atan2(50-cy,150-cx)+(Math.random()-.5)*.01,p:.97,c};
+  const noise=[.035,.014,.004][lvl]*(Math.random()+Math.random()+Math.random()-1.5)*1.6;
+  if(best)return {a:best.a+noise,p:best.p,c};
+  const tb=g.balls.filter(o=>legal.includes(o.id)).sort((a,b)=>Math.hypot(a.x-cx,a.y-cy)-Math.hypot(b.x-cx,b.y-cy))[0];
+  return {a:Math.atan2(tb.y-cy,tb.x-cx)+noise,p:.5,c};
+}
+// ---------- Spielablauf (Host) ----------
+let K,V=null,inp=null,aim=0,cuePos=null,anim=null,hintTxt='';
+async function main(){
+  const g=K.G;
+  while(!g.over){
+    const p=g.cur;K.snap('turn');K.push();
+    if(g.seats[p].type==='cpu')await K.sleep(900);
+    const a=await K.ask(p,{k:'turn'},()=>aiShot(g,p));
+    if(!a)continue;
+    if(a.c&&g.hand){const cb=g.balls.find(o=>o.id===0);cb.x=a.c[0];cb.y=a.c[1];}
+    const legal=legalIds(g,p),wasBrk=g.brk,cleared=g.grp[p]&&left(g,p)===0;
+    const start=g.balls.map(o=>({id:o.id,x:o.x,y:o.y})),S=mkSim(start,a);
+    while(!S.done)S.step();
+    g.seq++;K.fx({k:'shot',balls:start,shot:{a:a.a,p:a.p},seq:g.seq});
+    await K.sleep(S.t*1000+350);
+    g.balls=S.b.map(o=>({id:o.id,x:Math.round(o.x*100)/100,y:Math.round(o.y*100)/100}));g.hand=false;g.brk=false;
+    const pot=S.potted,scratch=pot.includes(0),obj=pot.filter(id=>id!==0&&id!==8),eight=pot.includes(8);
+    let foul=scratch||S.first===null||!legal.includes(S.first),why=scratch?L2('Weiße versenkt','cue ball potted'):S.first===null?L2('keine Kugel getroffen','no ball hit'):L2('falsche Kugel zuerst getroffen','wrong ball hit first');
+    if(wasBrk&&S.first!==null&&!scratch)foul=false;
+    if(scratch)g.balls.push({id:0,x:-50,y:-50});
+    const o=1-p,nm=K.nm(p);
+    if(eight){
+      if(wasBrk){let x=150;while(!free(g.balls,x,50,-1))x+=1;g.balls.push({id:8,x,y:50});K.say(-1,L2('Die 8 fällt beim Anstoß und wird wieder aufgesetzt.','The 8 drops on the break and is re-spotted.'));}
+      else{const win=cleared&&!foul;g.over={w:win?p:o,why:win?'8':'bad8'};K.say(-1,win?L2(nm+' versenkt die 8 und gewinnt!',nm+' pots the 8 and wins!'):L2(nm+' versenkt die 8 '+(foul?'mit Foul':'zu früh')+' und verliert.',nm+' pots the 8 '+(foul?'with a foul':'too early')+' and loses.'));if(scratch){const cb=g.balls.find(b=>b.id===0);cb.x=50;cb.y=50;}break;}
+    }
+    if(!wasBrk&&!g.grp[p]&&!foul&&obj.length){const gr=grpOf(obj[0]);g.grp[p]=gr;g.grp[o]=gr==='s'?'t':'s';K.say(-1,L2(nm+' spielt die '+(gr==='s'?'Vollen':'Halben')+'.',nm+' plays '+(gr==='s'?'solids':'stripes')+'.'));}
+    const own=obj.filter(id=>!g.grp[p]||grpOf(id)===g.grp[p]);
+    if(foul){K.say(p,L2('Foul von '+nm+' ('+why.de+'). '+K.nm(o)+' darf die Weiße frei legen.','Foul by '+nm+' ('+why.en+'). '+K.nm(o)+' has ball in hand.'));g.hand=true;g.cur=o;K.sfx('bad');
+      const cb=g.balls.find(b=>b.id===0);if(scratch){let x=50,y=50;while(!free(g.balls,x,y,0)){x+=1.3;if(x>TW-R){x=R;y+=6;}}cb.x=x;cb.y=y;}}
+    else if(own.length){K.say(p,L2(nm+' versenkt '+obj.join(', ')+' und bleibt dran.',nm+' pots '+obj.join(', ')+' and continues.'),L2('Du versenkst '+obj.join(', ')+' und bleibst dran.','You pot '+obj.join(', ')+' and continue.'));K.sfx('win');}
+    else{K.say(p,L2(nm+(obj.length?' versenkt nur fremde Kugeln ('+obj.join(', ')+').':' versenkt nichts.'),nm+(obj.length?' only pots opponent balls ('+obj.join(', ')+').':' pots nothing.')));g.cur=o;}
+  }
+  K.push();const w=g.over.w;K.sfx('win');
+  const again=await K.vote(q=>({ico:'🏆',title:q===w?L2('Du hast gewonnen!','You won!'):L2(g.seats[w].name+' gewinnt!',g.seats[w].name+' wins!'),html:L2('<b>Abstimmung:</b> Noch eine Partie?','<b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function startGame(seats,opts){K.reset();anim=null;K.G=setup(seats,opts);K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' stößt an.','New game. '+K.nm(K.G.cur)+' breaks.'));K.push();K.run(main);}
+// ---------- Anzeige ----------
+const cv=$('cv'),ctx=cv.getContext('2d'),SC=4.7,OX=50,OY=45;
+const COL=['#f7f7f2','#f2c20e','#1f4fd8','#d8262c','#6a2aa8','#f07a17','#1d8a3c','#7a1f1f','#111'];
+const isCyber=()=>document.documentElement.getAttribute('data-style')==='cyber';
+const PX=x=>OX+x*SC,PY=y=>OY+y*SC;
+function curBalls(){return anim?anim.S.b:(V?V.balls.filter(o=>o.x>-10):[]);}
+function drawBall(o,x,y){
+  const r=R*SC,c=COL[o.id>8?o.id-8:o.id];
+  ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.clip();
+  ctx.fillStyle=o.id>8?'#f7f7f2':c;ctx.fillRect(x-r,y-r,2*r,2*r);
+  if(o.id>8){ctx.fillStyle=c;ctx.fillRect(x-r,y-r*.55,2*r,r*1.1);}
+  const g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.1,x,y,r);g.addColorStop(0,'rgba(255,255,255,.55)');g.addColorStop(.4,'rgba(255,255,255,0)');g.addColorStop(1,'rgba(0,0,0,.35)');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,2*r,2*r);
+  ctx.restore();
+  if(o.id){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,r*.48,0,7);ctx.fill();ctx.fillStyle='#111';ctx.font='bold '+(r*.72)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(o.id,x,y+.5);}
+}
+function rayHit(balls,ox,oy,a){      // erste Berührung der Weißen auf der Ziellinie (Kugel oder Bande)
+  const dx=Math.cos(a),dy=Math.sin(a);let bt=1e9,hit=null;
+  balls.forEach(o=>{if(o.id===0)return;const fx=o.x-ox,fy=o.y-oy,pr=fx*dx+fy*dy;if(pr<=0)return;const d2=fx*fx+fy*fy-pr*pr;if(d2>=4*R*R)return;const t=pr-Math.sqrt(4*R*R-d2);if(t<bt){bt=t;hit=o;}});
+  let tw=1e9;if(dx>0)tw=Math.min(tw,(TW-R-ox)/dx);if(dx<0)tw=Math.min(tw,(R-ox)/dx);if(dy>0)tw=Math.min(tw,(TH-R-oy)/dy);if(dy<0)tw=Math.min(tw,(R-oy)/dy);
+  if(tw<bt)return {t:tw,hit:null};return {t:bt,hit};
+}
+function draw(){
+  const cy=isCyber(),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=cy?'#0a0d18':'#5a3418';rr(4,4,W-8,H-8,26);ctx.fill();
+  if(cy){ctx.strokeStyle='#00f0ff';ctx.lineWidth=2;ctx.shadowColor='#00f0ff';ctx.shadowBlur=12;rr(4,4,W-8,H-8,26);ctx.stroke();ctx.shadowBlur=0;}
+  const g=ctx.createRadialGradient(W/2,H/2,60,W/2,H/2,W*.6);g.addColorStop(0,cy?'#0c3a40':'#1f8a55');g.addColorStop(1,cy?'#051a22':'#0f5a36');ctx.fillStyle=g;ctx.fillRect(PX(0)-6,PY(0)-6,TW*SC+12,TH*SC+12);
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(PX(50),PY(0));ctx.lineTo(PX(50),PY(TH));ctx.stroke();
+  POCK.forEach(p=>{ctx.fillStyle='#050505';ctx.beginPath();ctx.arc(PX(p[0]),PY(p[1]),p[2]*SC*1.02,0,7);ctx.fill();});
+  const balls=curBalls(),mine=V&&!!inp&&V.cur===V.me&&!V.over&&!anim;
+  const cb=balls.find(o=>o.id===0),cx=cuePos&&mine?cuePos[0]:cb?cb.x:null,cyy=cuePos&&mine?cuePos[1]:cb?cb.y:null;
+  if(mine&&cx!=null){
+    const h=rayHit(balls,cx,cyy,aim),gx=cx+Math.cos(aim)*h.t,gy=cyy+Math.sin(aim)*h.t;
+    ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1.6;ctx.setLineDash([7,6]);ctx.beginPath();ctx.moveTo(PX(cx),PY(cyy));ctx.lineTo(PX(gx),PY(gy));ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(PX(gx),PY(gy),R*SC,0,7);ctx.stroke();
+    if(h.hit){const nx=h.hit.x-gx,ny=h.hit.y-gy,d=Math.hypot(nx,ny);ctx.strokeStyle='rgba(255,210,63,.9)';ctx.beginPath();ctx.moveTo(PX(h.hit.x),PY(h.hit.y));ctx.lineTo(PX(h.hit.x+nx/d*16),PY(h.hit.y+ny/d*16));ctx.stroke();}
+    const pw=+$('pow').value/100,bk=8+pw*26;                                                  // Queue
+    ctx.save();ctx.translate(PX(cx),PY(cyy));ctx.rotate(aim+Math.PI);ctx.fillStyle='#d9b676';ctx.fillRect(bk,-3,300,6);ctx.fillStyle='#3a2a1a';ctx.fillRect(bk+190,-3.5,110,7);ctx.fillStyle='#7fd0ff';ctx.fillRect(bk,-3,6,6);ctx.restore();
+    if(V.hand){ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(PX(cx),PY(cyy),R*SC+6,0,7);ctx.stroke();ctx.setLineDash([]);}
+  }
+  balls.forEach(o=>{const x=o.id===0&&mine&&cuePos?cuePos[0]:o.x,y=o.id===0&&mine&&cuePos?cuePos[1]:o.y;ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(PX(x)+3,PY(y)+4,R*SC,R*SC*.9,0,0,7);ctx.fill();drawBall(o,PX(x),PY(y));});
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+let lastF=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  if(anim){const n=Math.min(40,Math.max(1,Math.round((now-lastF)/1000/DT)));for(let i=0;i<n&&!anim.S.done;i++){anim.S.step();}
+    if(anim.S.clicks.length){const c=anim.S.clicks;if(c.some(x=>x<0))K.sfx('take');else if(Math.max(...c)>.05)K.sfx('lay');c.length=0;}
+    if(anim.S.done&&!anim.end)anim.end=now;if(anim.end&&now-anim.end>1500)anim=null;}
+  lastF=now;if(!$('game').hidden)draw();
+}
+requestAnimationFrame(frame);
+function fx(d){if(d.k==='shot'){anim={S:mkSim(d.balls,d.shot),seq:d.seq,end:0};lastF=performance.now();}}
+function render(v,prev){
+  V=v;$('setup').hidden=true;$('game').hidden=false;
+  if(anim&&anim.S.done&&v.seq>=anim.seq)anim=null;
+  const mine=v.cur===v.me&&!!inp&&!v.over;
+  cv.classList.toggle('myturn',mine);$('ctl').style.visibility=mine?'visible':'hidden';
+  const gn=g=>g==='s'?T('Volle (1–7)','Solids (1–7)'):g==='t'?T('Halbe (9–15)','Stripes (9–15)'):T('noch offen','still open');
+  $('players').innerHTML=v.names.map((n,i)=>{const ids=v.grp[i]==='s'?[1,2,3,4,5,6,7]:v.grp[i]==='t'?[9,10,11,12,13,14,15]:[];
+    return `<div class="ps${v.cur===i&&!v.over?' turn':''}"><div class="nm">${i===v.me?T('Du','You'):esc(n)}${v.types[i]==='cpu'?' 🤖':''}</div><div class="grp">${gn(v.grp[i])}</div><div class="bl">${ids.map(id=>`<i class="${id>8?'st ':''}${v.balls.some(o=>o.id===id)?'':'gone'}" style="background-color:${COL[id>8?id-8:id]}"></i>`).join('')}${ids.length&&!ids.some(id=>v.balls.some(o=>o.id===id))?' → 🎱':''}</div></div>`;}).join('');
+  const b=$('hkBanner');
+  if(v.over){b.className='';b.textContent=v.over.w===v.me?T('🏆 Du gewinnst!','🏆 You win!'):`🏆 ${v.names[v.over.w]} ${T('gewinnt!','wins!')}`;}
+  else if(mine){b.className='me';b.textContent=v.brk?T('▶ DU BIST DRAN: Anstoß (Weiße links frei legen)','▶ YOUR TURN: break (place the cue ball on the left)'):v.hand?T('▶ DU BIST DRAN: Weiße frei legen (ziehen) und stoßen','▶ YOUR TURN: ball in hand (drag it) and shoot'):T('▶ DU BIST DRAN: Zielen und stoßen','▶ YOUR TURN: aim and shoot');}
+  else{b.className='';b.textContent=T(`⏳ ${v.names[v.cur]} ist dran`,`⏳ ${v.names[v.cur]}'s turn`);}
+  document.title=mine?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if(v.cur===v.me&&!v.over&&!(prev&&prev.cur===v.me&&prev.seq===v.seq))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(v.log[0]?tx(v.log[0]):'');
+  $('hkLog').innerHTML=v.log.slice(1,50).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+}
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res};cuePos=null;hintTxt='';const cb=V&&V.balls.find(o=>o.id===0);if(cb){if(V.hand)cuePos=[cb.x>-10?cb.x:50,cb.y>-10?cb.y:50];const tg=V.balls.filter(o=>o.id!==0).sort((a,b)=>Math.hypot(a.x-cb.x,a.y-cb.y)-Math.hypot(b.x-cb.x,b.y-cb.y))[0];if(tg)aim=Math.atan2(tg.y-(cuePos?cuePos[1]:cb.y),tg.x-(cuePos?cuePos[0]:cb.x));}K.apply();}else res(null);});}
+function shoot(){if(!inp||anim)return;const r=inp.res,a={a:aim,p:+$('pow').value/100};if(cuePos&&V.hand)a.c=[cuePos[0],cuePos[1]];inp=null;hintTxt='';K.apply();r(a);}
+const toTable=e=>{const b=cv.getBoundingClientRect();return [((e.clientX-b.left)/b.width*cv.width-OX)/SC,((e.clientY-b.top)/b.height*cv.height-OY)/SC];};
+let dragCue=false,down=false;
+cv.addEventListener('pointerdown',e=>{
+  if(!inp||!V||anim)return;e.preventDefault();cv.setPointerCapture(e.pointerId);down=true;const [x,y]=toTable(e),cb=V.balls.find(o=>o.id===0),c=cuePos||[cb.x,cb.y];
+  dragCue=!!V.hand&&Math.hypot(x-c[0],y-c[1])<R*2.4;if(!dragCue)aim=Math.atan2(y-c[1],x-c[0]);
+});
+cv.addEventListener('pointermove',e=>{
+  if(!down||!inp)return;const [x,y]=toTable(e),cb=V.balls.find(o=>o.id===0),c=cuePos||[cb.x,cb.y];
+  if(dragCue){const nx=Math.max(R,Math.min((V.hand==='kitchen'?50:TW)-R*(V.hand==='kitchen'?0:1),x)),ny=Math.max(R,Math.min(TH-R,y));if(free(V.balls,nx,ny,0))cuePos=[nx,ny];}
+  else aim=Math.atan2(y-c[1],x-c[0]);
+});
+addEventListener('pointerup',()=>{down=false;dragCue=false;});
+$('pow').oninput=()=>{$('powV').textContent=$('pow').value+'%';};
+$('shoot').onclick=shoot;
+document.querySelectorAll('.fine .btn').forEach(b=>{let iv=0;const go=()=>{aim+=(+b.dataset.f)*.004;};b.addEventListener('pointerdown',e=>{e.preventDefault();go();iv=setInterval(go,40);});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>clearInterval(iv)));});
+addEventListener('keydown',e=>{
+  if(!inp||$('game').hidden)return;
+  if(e.key==='ArrowLeft'){aim-=e.shiftKey?.001:.006;e.preventDefault();}else if(e.key==='ArrowRight'){aim+=e.shiftKey?.001:.006;e.preventDefault();}
+  else if(e.key==='ArrowUp'){$('pow').value=Math.min(100,+$('pow').value+3);$('pow').oninput();e.preventDefault();}else if(e.key==='ArrowDown'){$('pow').value=Math.max(5,+$('pow').value-3);$('pow').oninput();e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();shoot();}
+});
+K=HK.init({
+  prefix:'bil-v1-',title:L2('Billard','Pool'),minPlayers:2,
+  seats:[{name:'1',color:'#e53935'},{name:'2',color:'#1e88e5'}],
+  cpuNames:['Kira','Bolt','Nova','Pixel'],
+  view,valid,render,ui,fx,
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;anim=null;$('game').hidden=true;$('setup').hidden=false;document.title=TT;}
+});
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(1);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>

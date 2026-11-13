@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Domino</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<style>
+.wrap{max-width:1300px}
+.table{background:radial-gradient(ellipse at 50% 40%,#1f6b46,#0d3a25);border:3px solid #072417;border-radius:20px;padding:10px;min-height:300px;transition:border-color .3s,box-shadow .3s}
+.table.myturn{border-color:#ffd23f;box-shadow:0 0 0 3px rgba(255,210,63,.35),0 0 40px rgba(255,210,63,.2)}
+html[data-style="cyber"] .table{background:radial-gradient(ellipse at 50% 40%,#0c1a2c,#04070d);border-color:#00f0ff66}
+html[data-style="dark"] .table{background:#15171d;border-color:#2a2f3a}
+#chain{display:block;width:100%;height:auto;max-height:62vh}
+.tile rect{fill:#f8f3e6;stroke:#1d1a14;stroke-width:.06}
+.tile circle{fill:#1d1a14}.tile line{stroke:#1d1a14;stroke-width:.05}
+.tile.last rect{stroke:#ffd23f;stroke-width:.12}
+html[data-style="cyber"] .tile rect{fill:#0a1020;stroke:#00f0ff}html[data-style="cyber"] .tile circle{fill:#fcee09}html[data-style="cyber"] .tile line{stroke:#00f0ff}
+.endm{fill:rgba(255,210,63,.3);stroke:#ffd23f;stroke-width:.1;cursor:pointer;animation:endp .7s ease-in-out infinite alternate}
+@keyframes endp{to{fill:rgba(255,210,63,.65)}}
+.link{fill:none;stroke:rgba(255,255,255,.55);stroke-width:.12;stroke-dasharray:.25 .2}
+.handbar{margin-top:10px;display:flex;flex-direction:column;gap:8px;align-items:center}
+#hand{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:96px}
+.ht{width:44px;height:88px;cursor:default;transition:transform .12s;flex:none}
+.ht svg{width:100%;height:100%;display:block}
+.ht.can{cursor:pointer;filter:drop-shadow(0 0 6px #ffd23f)}.ht.can:hover{transform:translateY(-6px)}
+.ht.sel{transform:translateY(-12px);filter:drop-shadow(0 0 10px #fff)}
+.ht.no{opacity:.55}
+#btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.ps{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:2px solid transparent}
+.ps.turn{border-color:#ffd23f;background:rgba(255,210,63,.12)}.ps small{color:var(--muted)}.ps b{font-size:1.2rem}
+@media (max-width:700px){.ht{width:36px;height:72px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="table" id="table"><svg id="chain" viewBox="0 0 20 8"></svg></div>
+        <div class="handbar"><div id="hand"></div><div id="btns"></div></div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="scores"></div><div id="info" style="margin-top:8px;color:var(--muted);font-size:.88rem"></div></div>
+        <div class="panel"><div id="hkLog"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=(d,e)=>SITE.T(d,e),L2=HK.L2,esc=HK.esc,tx=HK.tx;
+const TT='Domino';document.title=TT;$('ttl').textContent=TT;
+const RULES=()=>`<ul>
+<li>${T('Gespielt wird mit 28 Steinen (0|0 bis 6|6). Jeder bekommt 7 Steine (zu viert 6), der Rest ist der Vorrat.','Played with 28 tiles (0|0 to 6|6). Everyone gets 7 tiles (6 with four players), the rest is the boneyard.')}</li>
+<li>${T('Wer dran ist, legt einen Stein an eines der beiden offenen Enden. Die Augenzahl muss passen.','On your turn you lay a tile on one of the two open ends. The number must match.')}</li>
+<li>${T('Wer nicht legen kann, zieht aus dem Vorrat, bis ein Stein passt. Ist der Vorrat leer, wird gepasst.','If you cannot play you draw from the boneyard until a tile fits. If it is empty you pass.')}</li>
+<li>${T('Die Runde endet, wenn jemand alle Steine gelegt hat oder niemand mehr legen kann. Der Sieger bekommt die Augen aller Gegner (bei Blockade gewinnt, wer die wenigsten Augen hat).','The round ends when someone has laid all tiles or nobody can play. The winner scores the pips of all opponents (if blocked, the fewest pips win).')}</li>
+<li>${T('Gespielt wird bis zur eingestellten Punktzahl.','Play continues up to the chosen score.')}</li></ul>`;
+$('setup').innerHTML=`<h2>🁫 Domino</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Das klassische Legespiel für 2 bis 4 Spieler. Gegen den Computer oder online.','The classic tile game for 2 to 4 players. Against the computer or online.')}</p>
+<div class="row"><label for="nopp">${T('Computer-Gegner','Computer opponents')}</label><select id="nopp"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></div>
+<div class="row"><label for="goal">${T('Spielziel','Goal')}</label><select id="goal"><option value="0">${T('Eine Runde','One round')}</option><option value="50" selected>50 ${T('Punkte','points')}</option><option value="100">100 ${T('Punkte','points')}</option></select></div>
+<div class="row"><button class="btn" id="start">${T('Spielen','Play')}</button><button class="btn alt" id="online">🌐 ${T('Online spielen','Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel','Back into the running game')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln','Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('again').textContent=T('Zur Auswahl','Back to menu');
+const readOpts=()=>({goal:+$('goal').value});
+let K,V=null,inp=null,sel=-1,hintTxt='';
+// ---------- Regeln (Host) ----------
+const pips=h=>h.reduce((s,t)=>s+t[0]+t[1],0);
+function ends(g){return g.chain.length?[g.chain[0][0],g.chain[g.chain.length-1][1]]:null;}
+function movesOf(g,p){
+  const e=ends(g),out=[];
+  g.hands[p].forEach((t,i)=>{
+    if(!e){out.push({t:'play',i,e:'R'});return;}
+    if(t[0]===e[0]||t[1]===e[0])out.push({t:'play',i,e:'L'});
+    if((t[0]===e[1]||t[1]===e[1])&&!(e[0]===e[1]&&(t[0]===e[0]||t[1]===e[0])))out.push({t:'play',i,e:'R'});
+  });
+  return out;
+}
+function deal(g){
+  const all=[];for(let a=0;a<=6;a++)for(let b=a;b<=6;b++)all.push([a,b]);
+  const s=HK.shuffle(all),n=g.seats.length===4?6:7;
+  g.hands=g.seats.map(()=>s.splice(0,n));g.stock=s;g.chain=[];g.last=null;g.round++;g.passes=0;
+}
+function setup(seats,opts){const g={seats,opts,log:[],scores:seats.map(()=>0),cur:HK.rnd(seats.length),round:0,over:null,rend:null,seq:0};deal(g);return g;}
+function view(g,s){return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),hand:g.hands[s],counts:g.hands.map(h=>h.length),chain:g.chain,stock:g.stock.length,scores:g.scores,cur:g.cur,over:g.over,rend:g.rend,last:g.last,round:g.round,goal:g.opts.goal,log:K.logFor(s)};}
+function valid(spec,a,g,p){return spec.k!=='turn'||(a&&spec.opts.some(o=>o.t===a.t&&o.i===a.i&&o.e===a.e));}
+function aiMove(g,p,opts){
+  const pl=opts.filter(o=>o.t==='play');if(!pl.length)return opts[0];
+  let best=pl[0],bs=-1;pl.forEach(o=>{const t=g.hands[p][o.i],sc=t[0]+t[1]+(t[0]===t[1]?4:0);if(sc>bs){bs=sc;best=o;}});return best;
+}
+function place(g,p,o){
+  const t=g.hands[p].splice(o.i,1)[0],e=ends(g);
+  if(!e)g.chain.push(t);
+  else if(o.e==='L')g.chain.unshift(t[1]===e[0]?t:[t[1],t[0]]);
+  else g.chain.push(t[0]===e[1]?t:[t[1],t[0]]);
+  g.seq++;g.last={p,e:o.e,seq:g.seq};g.passes=0;
+}
+async function main(){
+  const g=K.G;
+  while(!g.over){
+    g.rend=null;
+    // Runde
+    while(true){
+      const p=g.cur;K.snap('turn');K.push();
+      let mv=movesOf(g,p);
+      if(!mv.length){
+        if(g.stock.length){
+          const a=await K.ask(p,{k:'turn',opts:[{t:'draw'}]},()=>({t:'draw'}));
+          g.hands[p].push(g.stock.pop());K.say(p,L2(K.nm(p)+' zieht einen Stein.',K.nm(p)+' draws a tile.'),L2('Du ziehst einen Stein.','You draw a tile.'));K.sfx('take');
+          if(g.seats[p].type==='cpu')await K.sleep(350);
+          continue;
+        }
+        g.passes++;K.say(p,L2(K.nm(p)+' kann nicht legen und passt.',K.nm(p)+' cannot play and passes.'),L2('Du kannst nicht legen und passt.','You cannot play and pass.'));
+        if(g.passes>=g.seats.length)break;
+        g.cur=(g.cur+1)%g.seats.length;K.push();await K.sleep(700);continue;
+      }
+      if(g.seats[p].type==='cpu')await K.sleep(650);
+      const a=await K.ask(p,{k:'turn',opts:mv},()=>aiMove(g,p,mv));
+      if(!a)continue;
+      const t=g.hands[p][a.i];
+      K.say(p,L2(K.nm(p)+' legt '+t[0]+'|'+t[1]+'.',K.nm(p)+' plays '+t[0]+'|'+t[1]+'.'),L2('Du legst '+t[0]+'|'+t[1]+'.','You play '+t[0]+'|'+t[1]+'.'));
+      place(g,p,a);K.sfx('lay');
+      if(!g.hands[p].length)break;
+      g.cur=(g.cur+1)%g.seats.length;
+    }
+    // Wertung
+    const sums=g.hands.map(pips);let w=g.hands.findIndex(h=>!h.length),pts=0,blocked=w<0;
+    if(blocked){const m=Math.min(...sums),c=sums.filter(x=>x===m).length;w=c===1?sums.indexOf(m):-1;if(w>=0)pts=sums.reduce((a,b)=>a+b,0)-2*sums[w];}
+    else pts=sums.reduce((a,b)=>a+b,0);
+    if(w>=0){g.scores[w]+=pts;K.say(-1,L2((blocked?'Blockade. ':'')+K.nm(w)+' gewinnt die Runde: +'+pts+' Punkte.',(blocked?'Blocked. ':'')+K.nm(w)+' wins the round: +'+pts+' points.'));}
+    else K.say(-1,L2('Blockade mit Gleichstand: keine Punkte.','Blocked with a tie: no points.'));
+    g.rend={w,pts,blocked,sums,hands:g.hands};
+    const top=Math.max(...g.scores);
+    if(!g.opts.goal||top>=g.opts.goal){
+      const ws=g.scores.indexOf(top);g.over={w:g.opts.goal?ws:(w>=0?w:ws)};K.push();break;
+    }
+    K.push();K.sfx(w>=0?'win':'bad');
+    await K.dlgAll(q=>({ico:blocked?'🔒':'🏁',title:w<0?L2('Runde ohne Sieger','Round without winner'):q===w?L2('Du gewinnst die Runde!','You win the round!'):L2(g.seats[w].name+' gewinnt die Runde',g.seats[w].name+' wins the round'),html:L2(g.seats.map((s,i)=>esc(s.name)+': '+sums[i]+' Augen übrig · <b>'+g.scores[i]+'</b> Punkte').join('<br>'),g.seats.map((s,i)=>esc(s.name)+': '+sums[i]+' pips left · <b>'+g.scores[i]+'</b> points').join('<br>')),btns:[L2('Nächste Runde','Next round')]}),0);
+    g.cur=w>=0?w:(g.cur+1)%g.seats.length;deal(g);
+  }
+  const w=g.over.w;K.sfx('win');
+  const again=await K.vote(q=>({ico:'🏆',title:q===w?L2('Du hast gewonnen!','You won!'):L2(g.seats[w].name+' gewinnt!',g.seats[w].name+' wins!'),html:L2(g.seats.map((s,i)=>esc(s.name)+': <b>'+g.scores[i]+'</b>').join('<br>')+'<br><br><b>Abstimmung:</b> Noch eine Partie?',g.seats.map((s,i)=>esc(s.name)+': <b>'+g.scores[i]+'</b>').join('<br>')+'<br><br><b>Vote:</b> play again?'),btns:[L2('Nochmal spielen','Play again'),L2('Beenden','Quit')]}));
+  if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
+}
+function startGame(seats,opts){K.reset();K.G=setup(seats,opts);K.say(-1,L2('Neues Spiel. '+K.nm(K.G.cur)+' beginnt.','New game. '+K.nm(K.G.cur)+' starts.'));K.push();K.run(main);}
+// ---------- Anzeige ----------
+const PIP={0:[],1:[[.5,.5]],2:[[.25,.25],[.75,.75]],3:[[.25,.25],[.5,.5],[.75,.75]],4:[[.25,.25],[.75,.25],[.25,.75],[.75,.75]],5:[[.25,.25],[.75,.25],[.5,.5],[.25,.75],[.75,.75]],6:[[.25,.2],[.75,.2],[.25,.5],[.75,.5],[.25,.8],[.75,.8]]};
+// Stein als SVG-Gruppe: (x,y) linke obere Ecke, horizontal (2x1) oder vertikal (1x2); a = linke/obere Hälfte
+function tileSvg(a,b,x,y,vert,cls){
+  const w=vert?1:2,h=vert?2:1,half=(n,ox,oy)=>PIP[n].map(p=>{const q=vert?p:[p[1],p[0]];return `<circle cx="${(ox+q[0]).toFixed(3)}" cy="${(oy+q[1]).toFixed(3)}" r=".085"/>`;}).join('');
+  return `<g class="tile ${cls||''}"><rect x="${x+.04}" y="${y+.04}" width="${w-.08}" height="${h-.08}" rx=".14"/>${vert?`<line x1="${x+.15}" y1="${y+1}" x2="${x+.85}" y2="${y+1}"/>`:`<line x1="${x+1}" y1="${y+.15}" x2="${x+1}" y2="${y+.85}"/>`}${half(a,x,y)}${half(b,vert?x:x+1,vert?y+1:y)}</g>`;
+}
+// Schlangenlinie: Reihen laufen abwechselnd nach rechts und links, Pasch steht quer
+function layout(chain,maxW){
+  const out=[];let x=0,row=0,dir=1;
+  chain.forEach((t,i)=>{
+    const dbl=t[0]===t[1],w=dbl?1:2;
+    if(x+w>maxW){row++;dir=-dir;x=0;}
+    const px=dir>0?x:maxW-x-w;
+    out.push({a:dir>0?t[0]:t[1],b:dir>0?t[1]:t[0],x:px,y:row*2.7+(dbl?0:.5),vert:dbl,i,row,dir,w});x+=w;
+  });
+  return {tiles:out,rows:row+1};
+}
+function render(v,prev){
+  V=v;$('setup').hidden=true;$('game').hidden=false;const mine=v.cur===v.me&&!!inp&&!v.over;
+  const maxW=innerWidth<700?11:innerWidth<1100?16:22,L=layout(v.chain,maxW),H=Math.max(1,L.rows)*2.7+.3;
+  let h='';
+  for(let i=1;i<L.tiles.length;i++){const a=L.tiles[i-1],b=L.tiles[i];if(a.row!==b.row){const ax=a.dir>0?a.x+a.w:a.x,ay=a.y+(a.vert?1:.5),by=b.y+(b.vert?1:.5);const ex=a.dir>0?maxW+.6:-.6;const bx=b.dir>0?b.x:b.x+b.w;h+=`<path class="link" d="M${ax},${ay} C${ex},${ay} ${ex},${by} ${bx},${by}"/>`;}}
+  L.tiles.forEach((t,k)=>{const isLast=v.last&&((v.last.e==='L'&&k===0)||(v.last.e==='R'&&k===L.tiles.length-1));h+=tileSvg(t.a,t.b,t.x,t.y,t.vert,isLast?'last':'');});
+  // Endmarken, wenn ein gewählter Stein an beide Enden passt
+  if(mine&&sel>=0&&L.tiles.length){
+    const os=inp.opts.filter(o=>o.t==='play'&&o.i===sel);
+    if(os.length>1)os.forEach(o=>{const t=o.e==='L'?L.tiles[0]:L.tiles[L.tiles.length-1],left=(o.e==='L')===(t.dir>0);const cx=left?t.x-.75:t.x+t.w+.75,cy=t.y+(t.vert?1:.5);h+=`<circle class="endm" data-e="${o.e}" cx="${cx}" cy="${cy}" r=".62"/><text x="${cx}" y="${cy+.2}" text-anchor="middle" font-size=".6" font-weight="900" fill="#fff" pointer-events="none">+</text>`;});
+  }
+  if(!L.tiles.length)h+=`<text x="${maxW/2}" y="1.6" text-anchor="middle" font-size=".7" fill="rgba(255,255,255,.6)">${T('Der erste Stein kann frei gelegt werden','The first tile can be any tile')}</text>`;
+  const sv=$('chain');sv.setAttribute('viewBox',`-1.6 -.4 ${maxW+3.2} ${H+.6}`);sv.innerHTML=h;
+  $('table').classList.toggle('myturn',mine);
+  // Hand
+  const can=new Set(mine?inp.opts.filter(o=>o.t==='play').map(o=>o.i):[]);
+  $('hand').innerHTML=v.hand.map((t,i)=>`<div class="ht${can.has(i)?' can':mine?' no':''}${sel===i?' sel':''}" data-i="${i}"><svg viewBox="0 0 1 2">${tileSvg(t[0],t[1],0,0,true,'')}</svg></div>`).join('');
+  const drawOpt=mine&&inp.opts.some(o=>o.t==='draw');
+  $('btns').innerHTML=drawOpt?`<button class="btn" data-a="draw">🁢 ${T('Stein ziehen','Draw a tile')} (${v.stock})</button>`:'';
+  $('scores').innerHTML=v.names.map((n,i)=>`<div class="ps${v.cur===i&&!v.over?' turn':''}"><span>${i===v.me?T('Du','You'):esc(n)}${v.types[i]==='cpu'?' 🤖':''}<br><small>${v.counts[i]} ${T('Steine','tiles')}</small></span><b>${v.scores[i]}</b></div>`).join('');
+  $('info').textContent=T(`Runde ${v.round} · Vorrat: ${v.stock} Steine`,`Round ${v.round} · boneyard: ${v.stock} tiles`)+(v.goal?T(` · Ziel: ${v.goal}`,` · goal: ${v.goal}`):'');
+  const b=$('hkBanner');
+  if(v.over){b.className='';b.textContent=v.over.w===v.me?T('🏆 Du gewinnst!','🏆 You win!'):`🏆 ${v.names[v.over.w]} ${T('gewinnt!','wins!')}`;}
+  else if(mine){b.className='me';b.textContent=drawOpt?T('▶ DU BIST DRAN: Kein Stein passt, zieh einen','▶ YOUR TURN: nothing fits, draw a tile'):T('▶ DU BIST DRAN: Lege einen Stein','▶ YOUR TURN: play a tile');}
+  else{b.className='';b.textContent=T(`⏳ ${v.names[v.cur]} ist dran`,`⏳ ${v.names[v.cur]}'s turn`);}
+  document.title=mine?T('▶ Du bist dran! – ','▶ Your turn! – ')+TT:TT;
+  if(v.cur===v.me&&!v.over&&!(prev&&prev.cur===v.me))K.sfx('ping');
+  $('hkStatus').textContent=hintTxt||(v.log[0]?tx(v.log[0]):'');
+  $('hkLog').innerHTML=v.log.slice(1,50).map(l=>`<div>${esc(tx(l))}</div>`).join('');
+}
+// ---------- Eingabe ----------
+function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res,opts:spec.opts};sel=-1;hintTxt='';K.apply();}else res(null);});}
+function answer(o){if(!inp||!o)return;const r=inp.res;inp=null;sel=-1;hintTxt='';K.apply();r(o);}
+$('hand').addEventListener('click',e=>{
+  const el=e.target.closest('.ht');if(!el||!inp)return;const i=+el.dataset.i,os=inp.opts.filter(o=>o.t==='play'&&o.i===i);
+  if(!os.length){hintTxt=T('Dieser Stein passt an kein Ende.','This tile fits neither end.');K.sfx('bad');K.apply();return;}
+  if(os.length===1){answer(os[0]);return;}
+  sel=sel===i?-1:i;hintTxt=sel>=0?T('Der Stein passt an beide Enden: tippe auf das gewünschte Ende (+).','The tile fits both ends: tap the end you want (+).'):'';K.apply();
+});
+$('chain').addEventListener('click',e=>{const m=e.target.closest('.endm');if(!m||!inp||sel<0)return;answer(inp.opts.find(o=>o.t==='play'&&o.i===sel&&o.e===m.dataset.e));});
+$('btns').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||!inp)return;answer(inp.opts.find(o=>o.t==='draw'));});
+addEventListener('resize',()=>{if(K&&K.V)K.apply();});
+K=HK.init({
+  prefix:'dom-v1-',title:L2('Domino','Dominoes'),minPlayers:2,
+  seats:[{name:'1',color:'#e53935'},{name:'2',color:'#1e88e5'},{name:'3',color:'#43a047'},{name:'4',color:'#f9a825'}],
+  cpuNames:['Kira','Bolt','Nova','Pixel'],
+  view,valid,render,ui,
+  start:s=>startGame(s,readOpts()),
+  resume(){K.run(main);},
+  onGame(){$('setup').hidden=true;$('game').hidden=false;},
+  onSetup(){inp=null;sel=-1;$('game').hidden=true;$('setup').hidden=false;document.title=TT;}
+});
+K.sndBtn($('snd'));
+$('start').onclick=()=>K.startLocal(+$('nopp').value);
+$('again').onclick=()=>K.exit(true);
+</script>
+</body>
+</html>
