@@ -1,0 +1,23 @@
+{
+  "name": "html-games-desktop",
+  "version": "1.0.0",
+  "description": "Spieleportal als Windows-Programm (lädt immer die aktuelle Version von GitHub Pages)",
+  "main": "main.js",
+  "author": "gronkh68-rgb",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "io.github.gronkh68rgb.htmlgames",
+    "productName": "HTML Games",
+    "files": ["main.js", "offline.html"],
+    "directories": { "output": "dist" },
+    "win": { "target": "portable", "artifactName": "HTML-Games.exe" }
+  }
+}

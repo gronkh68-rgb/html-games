@@ -1,0 +1,23 @@
+name: Windows-EXE bauen
+on:
+  workflow_dispatch:
+  push:
+    tags: ['exe-*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults: { run: { working-directory: desktop } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with: { name: HTML-Games-exe, path: desktop/dist/HTML-Games.exe }
+      - name: Release anhängen (nur bei Tag)
+        if: startsWith(github.ref, 'refs/tags/exe-')
+        uses: softprops/action-gh-release@v2
+        with: { files: desktop/dist/HTML-Games.exe }
