@@ -64,6 +64,7 @@
       if (!K._dock && window.Dice3D && cfg.diceDock) { K._dock = 1; if (!(cfg.dviewFor && cfg.dviewFor(0))) K.dview().show(); }      // Würfel-Tablett im Dock zeigen
       K.V = cfg.view(K.G, K.ME); K.apply();
       if (K.ROLE === 'host') K.G.seats.forEach(function (x, i) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'v', v: cfg.view(K.G, i) }); });
+      if (K.ROLE === 'host' && K.L.specs && K.L.specs.length) K.L.sendSpecs({ k: 'v', v: cfg.view(K.G, -1) });      // Zuschauer sehen die Sicht ohne eigenen Platz
     };
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
     K.fxLocal = function (d) {
@@ -72,7 +73,7 @@
     };
     K.fx = function (d) {          // Effekt auf allen Geräten (z. B. Würfelwurf)
       K.fxLocal(d);
-      if (K.ROLE === 'host') K.G.seats.forEach(function (x) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'fx', d: d }); });
+      if (K.ROLE === 'host') { K.G.seats.forEach(function (x) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'fx', d: d }); }); if (K.L.sendSpecs) K.L.sendSpecs({ k: 'fx', d: d }); }
     };
 
     // ---------- Fragen an Spieler ----------
@@ -260,6 +261,7 @@
       var o = K.G.seats[p].orig; K.G.seats[p] = { type: 'remote', name: o, seat: seat };
       K.say(-1, HK.L2(o + ' ist zurück im Spiel.', o + ' is back in the game.')); K.push();
     }
+    function specBadge(on) { var b = document.getElementById('hkSpec'); if (!b) { b = document.createElement('div'); b.id = 'hkSpec'; b.textContent = T('👁 Du schaust zu', '👁 You are watching'); b.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;background:rgba(10,14,28,.85);color:#fff;font-weight:800;padding:6px 14px;border-radius:999px;border:2px solid #00cfff;pointer-events:none'; document.body.appendChild(b); } b.hidden = !on; }
     function onMigrate(snap, info) {
       K.reset(); K.ROLE = 'host';
       K.G = snap.G;
@@ -276,7 +278,8 @@
     domReady(function () {
       if (!window.MP) return;
       K.L = MP.init({
-        prefix: cfg.prefix, title: HK.tx(cfg.title), seats: cfg.seats, minPlayers: cfg.minPlayers || 2, bots: true, rejoin: true, migrate: true,
+        prefix: cfg.prefix, title: HK.tx(cfg.title), seats: cfg.seats, minPlayers: cfg.minPlayers || 2, bots: true, rejoin: true, migrate: true, spectators: !!cfg.spectators,
+        onSpectator: function () { if (K.G) K.L.sendSpecs({ k: 'v', v: cfg.view(K.G, -1) }); },
         onRejoin: onRejoin, onMigrate: onMigrate,
         onStart: function (info) {
           K.reset(); K.ROLE = info.role;
@@ -288,12 +291,12 @@
             });
             K.ME = seats.findIndex(function (s) { return s.type === 'host'; });
             cfg.start(seats);
-          } else { K.G = null; if (cfg.onGame) cfg.onGame(); K.toast(HK.L2('Warte auf den Host …', 'Waiting for the host …')); K.L.send({ k: 'sync' }); }
+          } else { K.SPEC = !!info.spec; specBadge(K.SPEC); K.G = null; if (cfg.onGame) cfg.onGame(); K.toast(HK.L2('Warte auf den Host …', 'Waiting for the host …')); K.L.send({ k: 'sync' }); }
         },
         onData: function (from, m) { if (K.L.role === 'client') clientMsg(m); else hostMsg(from, m); },
         onSeatDrop: onSeatDrop,
-        onBackToLobby: function () { K.ROLE = 'local'; K.backToSetup(); },
-        onLeave: function () { K.ROLE = 'local'; K.backToSetup(); }
+        onBackToLobby: function () { K.ROLE = 'local'; specBadge(false); K.backToSetup(); },
+        onLeave: function () { K.ROLE = 'local'; specBadge(false); K.backToSetup(); }
       });
       var rb = document.getElementById('rejoinBtn');
       if (rb) { var upd = function () { rb.hidden = !K.L.hasRejoin(); }; rb.onclick = function () { K.L.rejoin(); }; upd(); setInterval(upd, 3000); }

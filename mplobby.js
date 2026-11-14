@@ -49,6 +49,7 @@
       '  <div class="mpcode" id="mpCode">…</div>' +
       '  <div class="mprow"><button class="btn alt mpmini" id="mpCopy">Link kopieren</button>' +
       '  <select id="mpPub"><option value="1">Öffentlich (in der Spieleliste)</option><option value="0">Privat (nur mit Code)</option></select></div>' +
+      '  <label class="mphint" id="mpSpecRow" hidden style="display:none;gap:8px;align-items:center;cursor:pointer;margin:4px 0"><input type="checkbox" id="mpSpec"> <span>👁 <b>Zuschauer erlauben</b>: Das laufende Spiel bleibt in der öffentlichen Liste, andere können zuschauen (nicht mitspielen).</span></label>' +
       '  <h3>Plätze</h3><div id="mpSlots"></div>' +
       '  <div class="mprow"><button class="btn" id="mpStart">Spiel starten</button></div>' +
       '</div>' +
@@ -113,8 +114,19 @@
     }
     function onConn(conn) {
       conn.on('data', function (m) { onHostMsg(conn, m); });
-      conn.on('close', function () { dropRemote(conn); });
+      conn.on('close', function () { L.specs = L.specs.filter(function (c) { return c !== conn; }); dropRemote(conn); });
     }
+    // ---------- Zuschauer: sehen das laufende Spiel, spielen nicht mit ----------
+    L.specs = [];
+    function specOn() { return !!cfg.spectators && $('mpSpec').checked; }
+    function addSpec(conn) {
+      conn.spec = true; L.specs.push(conn);
+      try { conn.send({ t: 'welcome', slot: -1, spec: true }); conn.send({ t: 'start', you: -1, spec: true, seats: lobbyInfo() }); } catch (e) {}
+      if (cfg.onSpectator) cfg.onSpectator(conn);
+    }
+    function dropSpecs(why) { L.specs.forEach(function (c) { try { c.send({ t: 'kicked', why: why }); } catch (e) {} setTimeout(function () { try { c.close(); } catch (e) {} }, 300); }); L.specs = []; }
+    L.sendSpecs = function (d) { L.specs.forEach(function (c) { if (c.open) try { c.send({ t: 'g', d: d }); } catch (e) {} }); };
+    if (cfg.spectators) { $('mpSpecRow').hidden = false; $('mpSpecRow').style.display = 'flex'; try { $('mpSpec').checked = localStorage.getItem('mp-spec') === '1'; } catch (e) {} $('mpSpec').onchange = function () { try { localStorage.setItem('mp-spec', $('mpSpec').checked ? '1' : '0'); } catch (e) {} if (!$('mpSpec').checked) dropSpecs('Der Host hat Zuschauer ausgeschaltet.'); }; }
     // ---------- Host-Wechsel: ein Mitspieler hält einen zweiten Raum bereit und bekommt laufend den Spielstand ----------
     function ensureBackup() {
       if (!cfg.migrate || L.role !== 'host' || !L.playing) return;
@@ -154,6 +166,7 @@
       if (m.t === 'hello') {
         if (conn.slot !== undefined) return;
         var full = function (why) { try { conn.send({ t: 'full', why: why }); } catch (e) {} setTimeout(function () { try { conn.close(); } catch (e) {} }, 400); };
+        if (L.playing && m.spec && specOn()) { addSpec(conn); return; }
         if (L.playing) {
           var ri = -1;
           if (cfg.rejoin) {
@@ -166,6 +179,7 @@
             if (ri < 0) L.seats.forEach(function (s, k) { if (ri < 0 && s.away) ri = k; });
             if (ri >= 0 && L.seats[ri].type === 'remote' && L.seats[ri].conn) { var oc = L.seats[ri].conn; oc.slot = undefined; try { oc.close(); } catch (e) {} }      // alte, hängende Verbindung beenden
           }
+          if (ri < 0 && specOn()) { addSpec(conn); return; }      // kein eigener Platz frei: als Zuschauer rein
           if (ri < 0) { full('Das Spiel läuft schon' + (cfg.rejoin ? ' und dein alter Platz ist nicht mehr frei' : '')); return; }
           L.seats[ri] = { type: 'remote', name: String(m.name || 'Spieler').slice(0, 14), conn: conn, rid: m.rid }; conn.slot = ri;
           try { conn.send({ t: 'welcome', slot: ri }); } catch (e) {}
@@ -180,6 +194,7 @@
         try { conn.send({ t: 'welcome', slot: i }); } catch (e) {}
         broadcastLobby(); return;
       }
+      if (conn.spec) { if (m.t === 'bye') L.specs = L.specs.filter(function (c) { return c !== conn; }); return; }
       if (conn.slot === undefined) return;
       if (m.t === 'standbyReady') {
         if (cfg.migrate && !L.backup && conn.slot === L.pendingSucc) { L.backup = { seat: conn.slot, code: String(m.code || '') }; saveLast(L.backup.code); broadcastBackup(); if (L.lastSnap) L.snap(L.lastSnap); }
@@ -260,10 +275,11 @@
     function startAnnounce() {
       if (L.ann) return;
       L.ann = Net.announce(cfg.prefix, function () {
-        if (L.role !== 'host' || L.playing || !L.room || $('mpPub').value !== '1') return null;
+        if (L.role !== 'host' || !L.room || $('mpPub').value !== '1') return null;
         var free = L.seats.filter(function (s) { return s.type === 'open'; }).length, hum = L.seats.filter(function (s) { return s.type === 'host' || s.type === 'remote'; }).length;
-        if (!free) return null;
         var h = L.seats.filter(function (s) { return s.type === 'host'; })[0];
+        if (L.playing) return specOn() ? { code: L.room.code, host: h ? h.name : '', count: hum, max: L.seats.filter(function (s) { return s.type !== 'off'; }).length, live: 1 } : null;      // laufendes Spiel: nur mit erlaubten Zuschauern in der Liste
+        if (!free) return null;
         return { code: L.room.code, host: h ? h.name : '', count: hum, max: hum + free };
       });
     }
@@ -272,26 +288,28 @@
       if (L.watch) return; $('mpList').textContent = 'Suche …';
       L.watch = Net.watch(cfg.prefix, function (list) {
         $('mpList').innerHTML = list.length ? list.map(function (g) {
-          return '<div class="mpslot"><span class="who">' + esc(g.host || 'Spiel') + '</span><span class="nm">' + g.count + '/' + g.max + ' Spieler</span><button class="btn mpmini" data-join="' + esc(g.code) + '">Beitreten</button></div>';
+          return '<div class="mpslot"><span class="who">' + esc(g.host || 'Spiel') + '</span><span class="nm">' + (g.live ? 'Spiel läuft' : g.count + '/' + g.max + ' Spieler') + '</span><button class="btn mpmini' + (g.live ? ' alt' : '') + '" data-join="' + esc(g.code) + '"' + (g.live ? ' data-spec="1"' : '') + '>' + (g.live ? '👁 Zuschauen' : 'Beitreten') + '</button></div>';
         }).join('') : 'Keine offenen Spiele gefunden. Erstelle selbst eins oder gib einen Code ein.';
       });
     }
     function stopWatch() { if (L.watch) { L.watch.stop(); L.watch = null; } }
 
     // ---------- Mitspieler ----------
-    function joinRoom(codeArg) {
+    function joinRoom(codeArg, spec) {
+      L.wantSpec = !!spec;
       var code = ((typeof codeArg === 'string' ? codeArg : '') || $('mpJoinCode').value || '').trim().toUpperCase();
       if (code.length < 4) { err('Bitte den Raumcode eingeben.'); return; }
       L.joinCode = code; var name = myName(); err('Verbinde …'); $('mpJoinBtn').disabled = true; stopWatch();
       L.joiner = Net.join(cfg.prefix, code, {
         attach: function (c) { L.hostConn = c; c.on('data', onClientMsg); c.on('close', onClientClose); },
-        open: function (c) { L.role = 'client'; err(''); try { c.send({ t: 'hello', name: name, rid: myRid() }); } catch (e) {} },
+        open: function (c) { L.role = 'client'; err(''); try { c.send({ t: 'hello', name: name, rid: myRid(), spec: L.wantSpec || undefined }); } catch (e) {} },
         fail: function (msg) { clearLast(); $('mpJoinBtn').disabled = false; L.hostConn = null; L.joiner = null; err(msg || 'Verbindung fehlgeschlagen.'); showMode('join'); }
       });
     }
     function onClientMsg(m) {
       if (!m || typeof m !== 'object') return;
-      if (m.t === 'welcome') { if (L.migrating) { L.migrating = false; toast(''); L.backup = null; } saveLast(L.joinCode); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
+      if (m.t === 'welcome' && m.spec) { L.spec = true; L.you = -1; err('Verbunden. Warte auf den Spielstand …'); return; }
+      if (m.t === 'welcome') { L.spec = false; if (L.migrating) { L.migrating = false; toast(''); L.backup = null; } saveLast(L.joinCode); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
       else if (m.t === 'lobby') {
         L.you = m.you; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false;
         if (L.playing || m.back) { L.playing = false; if (cfg.onBackToLobby) cfg.onBackToLobby(); ov.hidden = false; showMode('join'); $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
@@ -305,7 +323,7 @@
       else if (m.t === 'backup') { L.backup = { seat: m.seat, code: m.code }; }
       else if (m.t === 'snap') { L.snapData = m.d; }
       else if (m.t === 'migrate') { startMigration(); }
-      else if (m.t === 'start') { L.playing = true; L.you = m.you; ov.hidden = true; if (cfg.onStart) cfg.onStart({ role: 'client', you: m.you, seats: m.seats }); }
+      else if (m.t === 'start') { L.playing = true; L.you = m.you; ov.hidden = true; if (cfg.onStart) cfg.onStart({ role: 'client', you: m.you, seats: m.seats, spec: !!m.spec }); }
       else if (m.t === 'g') { if (cfg.onData) cfg.onData(-1, m.d); }
       else if (m.t === 'full') { var w = m.why || 'Der Raum ist voll'; L.leave(); clearLast(); err(w); showMode('join'); }
       else if (m.t === 'kicked') { var why = m.why || 'Verbindung beendet'; if (/Host/.test(why)) clearLast(); L.leave(); ov.hidden = false; showMode('join'); err(why); if (cfg.onLeave) cfg.onLeave(why); }
@@ -372,16 +390,16 @@
     $('mpRejoinBtn').onclick = function () { var l = getLast(); if (l) joinRoom(l.code); };
     $('mpJoinCode').addEventListener('keydown', function (e) { if (e.key === 'Enter') joinRoom(); });
     $('mpJoinSlots').addEventListener('click', function (e) { var b = e.target.closest('[data-take]'); if (b) L.send2host({ t: 'color', slot: +b.dataset.take }); });
-    $('mpList').addEventListener('click', function (e) { var b = e.target.closest('[data-join]'); if (b) { $('mpJoinCode').value = b.dataset.join; joinRoom(b.dataset.join); } });
+    $('mpList').addEventListener('click', function (e) { var b = e.target.closest('[data-join]'); if (b) { $('mpJoinCode').value = b.dataset.join; joinRoom(b.dataset.join, !!b.dataset.spec); } });
     L.send2host = function (m) { try { if (L.hostConn && L.hostConn.open) L.hostConn.send(m); } catch (e) {} };
 
     // ---------- Spiel-Schnittstelle ----------
     L.send = function (d) { L.send2host({ t: 'g', d: d }); };                       // Mitspieler -> Host
     L.sendTo = function (seat, d) { var s = L.seats[seat]; if (s && s.conn && s.conn.open) try { s.conn.send({ t: 'g', d: d }); } catch (e) {} };
-    L.broadcast = function (d) { L.seats.forEach(function (s) { if (s.conn && s.conn.open) try { s.conn.send({ t: 'g', d: d }); } catch (e) {} }); };
+    L.broadcast = function (d) { L.seats.forEach(function (s) { if (s.conn && s.conn.open) try { s.conn.send({ t: 'g', d: d }); } catch (e) {} }); L.sendSpecs(d); };
     L.backToLobby = function () {                                                    // Host: nach dem Spiel zurück in die Lobby
       if (L.role !== 'host') return;
-      L.playing = false;
+      L.playing = false; dropSpecs('Das Spiel ist zu Ende.');
       L.seats = L.seats.map(function (s) { return s.away ? { type: 'open' } : (s.type === 'off' ? { type: 'open' } : (s.type === 'left' ? { type: 'open' } : s)); });
       broadcastLobby(true); ov.hidden = false; showMode('host'); renderHost();
     };
@@ -389,13 +407,13 @@
       var wasIn = L.role === 'client' && L.playing;
       L.leaving = true;
       if (L.role === 'host') {
-        L.seats.forEach(function (s) { if (s.conn) try { if (!L.handedOver) s.conn.send({ t: 'kicked', why: 'Der Host hat den Raum geschlossen' }); s.conn.close(); } catch (e) {} });
+        L.seats.forEach(function (s) { if (s.conn) try { if (!L.handedOver) s.conn.send({ t: 'kicked', why: 'Der Host hat den Raum geschlossen' }); s.conn.close(); } catch (e) {} }); dropSpecs('Der Host hat den Raum geschlossen');
         try { L.room && L.room.close(); } catch (e) {}
       }
       if (L.role === 'client') { try { L.hostConn && (L.hostConn.send({ t: 'bye' }), L.hostConn.close()); } catch (e) {} if (L.joiner) L.joiner.cancel(); }
       stopAnnounce(); stopWatch();
       L.room = null; L.seats = []; L.hostConn = null; L.joiner = null; L.role = 'local'; L.playing = false; L.you = -1; L.opening = false;
-      L.backup = null; L.migrating = false; L.handedOver = false; L.snapData = null; L.lastSnap = null;
+      L.backup = null; L.migrating = false; L.handedOver = false; L.snapData = null; L.lastSnap = null; L.spec = false;
       try { if (L.standby && L.standby.room) L.standby.room.close(); } catch (e) {} L.standby = null; L.standbySeats = null; L.leaving = false;
       $('mpJoinForm').hidden = false; $('mpLobby').hidden = true; $('mpJoinBtn').disabled = false;
       if (wasIn && L.showRejoin) L.showRejoin();      // aus Versehen gegangen? Sofort den Weg zurück anbieten

@@ -281,7 +281,7 @@
       mq.onmessage = function (t, s) {
         var m; try { m = JSON.parse(s); } catch (e) { return; }
         if (!m || typeof m.code !== 'string' || !/^[A-Z2-9]{4,8}$/.test(m.code)) return;
-        seen[m.code] = { code: m.code, host: String(m.host || '').slice(0, 14), count: +m.count || 0, max: +m.max || 4, t: Date.now() };
+        seen[m.code] = { code: m.code, host: String(m.host || '').slice(0, 14), count: +m.count || 0, max: +m.max || 4, live: !!m.live, t: Date.now() };
         emit();
       };
       mq.onclose = function () { if (!closed) setTimeout(function () { open().catch(function () {}); }, 3000); };
