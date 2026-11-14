@@ -12,9 +12,13 @@
 <script src="../net.js"></script>
 <script src="../mplobby.js"></script>
 <script src="../hostkit.js"></script>
+<script src="../perf3d.js"></script>
 <style>
 .wrap{max-width:1400px}
 #cv{display:block;width:100%;height:auto;border-radius:18px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+#stage3{position:relative;width:100%;height:min(68vh,calc((100vw - 24px)*.62));min-height:260px;border-radius:18px;overflow:hidden;background:#15110d;cursor:crosshair}
+#stage3.myturn{box-shadow:0 0 0 3px rgba(255,210,63,.6),0 0 40px rgba(255,210,63,.25)}
+.views{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}.views .btn{padding:6px 12px;font-size:.82rem}.views .btn.on{outline:2px solid #ffd23f}
 #cv.myturn{box-shadow:0 0 0 3px rgba(255,210,63,.6),0 0 40px rgba(255,210,63,.25)}
 .ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;justify-content:center}
 .ctl label{font-weight:700;font-size:.85rem;color:var(--muted)}
@@ -41,6 +45,8 @@
         <div id="hkBanner"></div>
         <div id="hkStatus"></div>
         <canvas id="cv" width="1040" height="560"></canvas>
+        <div id="stage3" hidden></div>
+        <div class="views"><button class="btn alt" id="v3d"></button><span id="camBtns" hidden><button class="btn alt" data-view="iso"></button> <button class="btn alt" data-view="top"></button> <button class="btn alt" data-view="cue"></button></span></div>
         <div class="ctl" id="ctl">
           <div class="fine"><button class="btn alt" data-f="-1">↺</button><button class="btn alt" data-f="1">↻</button></div>
           <label for="pow" id="powL"></label><input type="range" id="pow" min="5" max="100" value="55"><span id="powV">55%</span>
@@ -246,15 +252,36 @@ function frame(now){
   if(anim){const n=Math.min(40,Math.max(1,Math.round((now-lastF)/1000/DT)));for(let i=0;i<n&&!anim.S.done;i++){anim.S.step();}
     if(anim.S.clicks.length){const c=anim.S.clicks;if(c.some(x=>x<0))K.sfx('take');else if(Math.max(...c)>.05)K.sfx('lay');c.length=0;}
     if(anim.S.done&&!anim.end)anim.end=now;if(anim.end&&now-anim.end>1500)anim=null;}
-  lastF=now;if(!$('game').hidden)draw();
+  lastF=now;if($('game').hidden)return;
+  if(use3d&&window.B3&&B3.ready){
+    const mine=V&&!!inp&&V.cur===V.me&&!V.over&&!anim,src=curBalls(),cb=src.find(o=>o.id===0);let aimS=null,balls=src;
+    if(mine&&cb){const cx=cuePos?cuePos[0]:cb.x,cy=cuePos?cuePos[1]:cb.y;if(cuePos)balls=src.map(o=>o.id===0?{id:0,x:cx,y:cy}:o);const h=rayHit(balls,cx,cy,aim);aimS={x:cx,y:cy,a:aim,t:h.t,hit:h.hit,pow:+$('pow').value/100,hand:!!V.hand};}
+    B3.frame({balls,cy:isCyber(),aim:aimS},now,!!anim&&!anim.S.done);
+  }else draw();
 }
+// ---------- 3D-Ansicht (wird bei Bedarf nachgeladen) ----------
+let use3d=false,load3=null;
+const loadJs=u=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>rej(new Error(u));document.head.appendChild(s);});
+async function set3d(on){
+  if(on&&!(window.B3&&B3.ready)){
+    if(!load3)load3=(async()=>{if(!window.THREE)await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');if(!THREE.OrbitControls)await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');if(!window.B3)await loadJs('view3d.js');$('stage3').hidden=false;B3.init($('stage3'),{pockets:POCK,colors:COL});bindPtr(B3.dom());})();
+    try{await load3;}catch(e){load3=null;on=false;$('stage3').hidden=true;K.toast(T('3D konnte nicht geladen werden.','3D could not be loaded.'),3000);}
+  }
+  use3d=on;try{localStorage.setItem('bil-3d',on?'1':'0');}catch(e){}
+  $('stage3').hidden=!on;cv.hidden=on;$('camBtns').hidden=!on;$('v3d').textContent=on?T('2D-Ansicht','2D view'):T('🧊 3D-Ansicht','🧊 3D view');
+  if(on){B3.resize();syncViewBtns();}
+}
+function syncViewBtns(){document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',window.B3&&B3.view()===b.dataset.view));}
+$('v3d').onclick=()=>set3d(!use3d);$('v3d').textContent=T('🧊 3D-Ansicht','🧊 3D view');
+document.querySelectorAll('[data-view]').forEach(b=>{b.textContent={iso:T('Schräg','Angled'),top:T('Von oben','Top'),cue:T('Queue-Sicht','Cue view')}[b.dataset.view];b.onclick=()=>{if(window.B3&&B3.ready){B3.setView(b.dataset.view);syncViewBtns();}};});
 requestAnimationFrame(frame);
 function fx(d){if(d.k==='shot'){anim={S:mkSim(d.balls,d.shot),seq:d.seq,end:0};lastF=performance.now();}}
 function render(v,prev){
   V=v;$('setup').hidden=true;$('game').hidden=false;
+  if(want3){want3=false;set3d(true);}
   if(anim&&anim.S.done&&v.seq>=anim.seq)anim=null;
   const mine=v.cur===v.me&&!!inp&&!v.over;
-  cv.classList.toggle('myturn',mine);$('ctl').style.visibility=mine?'visible':'hidden';
+  cv.classList.toggle('myturn',mine);$('stage3').classList.toggle('myturn',mine);$('ctl').style.visibility=mine?'visible':'hidden';
   const gn=g=>g==='s'?T('Volle (1–7)','Solids (1–7)'):g==='t'?T('Halbe (9–15)','Stripes (9–15)'):T('noch offen','still open');
   $('players').innerHTML=v.names.map((n,i)=>{const ids=v.grp[i]==='s'?[1,2,3,4,5,6,7]:v.grp[i]==='t'?[9,10,11,12,13,14,15]:[];
     return `<div class="ps${v.cur===i&&!v.over?' turn':''}"><div class="nm">${i===v.me?T('Du','You'):esc(n)}${v.types[i]==='cpu'?' 🤖':''}</div><div class="grp">${gn(v.grp[i])}</div><div class="bl">${ids.map(id=>`<i class="${id>8?'st ':''}${v.balls.some(o=>o.id===id)?'':'gone'}" style="background-color:${COL[id>8?id-8:id]}"></i>`).join('')}${ids.length&&!ids.some(id=>v.balls.some(o=>o.id===id))?' → 🎱':''}</div></div>`;}).join('');
@@ -270,17 +297,20 @@ function render(v,prev){
 // ---------- Eingabe ----------
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res};cuePos=null;hintTxt='';const cb=V&&V.balls.find(o=>o.id===0);if(cb){if(V.hand)cuePos=[cb.x>-10?cb.x:50,cb.y>-10?cb.y:50];const tg=V.balls.filter(o=>o.id!==0).sort((a,b)=>Math.hypot(a.x-cb.x,a.y-cb.y)-Math.hypot(b.x-cb.x,b.y-cb.y))[0];if(tg)aim=Math.atan2(tg.y-(cuePos?cuePos[1]:cb.y),tg.x-(cuePos?cuePos[0]:cb.x));}K.apply();}else res(null);});}
 function shoot(){if(!inp||anim)return;const r=inp.res,a={a:aim,p:+$('pow').value/100};if(cuePos&&V.hand)a.c=[cuePos[0],cuePos[1]];inp=null;hintTxt='';K.apply();r(a);}
-const toTable=e=>{const b=cv.getBoundingClientRect();return [((e.clientX-b.left)/b.width*cv.width-OX)/SC,((e.clientY-b.top)/b.height*cv.height-OY)/SC];};
+const toTable=e=>{if(use3d&&window.B3&&B3.ready)return B3.pick(e.clientX,e.clientY)||[-999,-999];const b=cv.getBoundingClientRect();return [((e.clientX-b.left)/b.width*cv.width-OX)/SC,((e.clientY-b.top)/b.height*cv.height-OY)/SC];};
 let dragCue=false,down=false;
-cv.addEventListener('pointerdown',e=>{
-  if(!inp||!V||anim)return;e.preventDefault();cv.setPointerCapture(e.pointerId);down=true;const [x,y]=toTable(e),cb=V.balls.find(o=>o.id===0),c=cuePos||[cb.x,cb.y];
+function bindPtr(el){
+el.addEventListener('pointerdown',e=>{
+  if(!inp||!V||anim||e.button>0||(e.pointerType==='touch'&&!e.isPrimary))return;if(el===cv)e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(x){}down=true;const [x,y]=toTable(e),cb=V.balls.find(o=>o.id===0),c=cuePos||[cb.x,cb.y];
   dragCue=!!V.hand&&Math.hypot(x-c[0],y-c[1])<R*2.4;if(!dragCue)aim=Math.atan2(y-c[1],x-c[0]);
 });
-cv.addEventListener('pointermove',e=>{
-  if(!down||!inp)return;const [x,y]=toTable(e),cb=V.balls.find(o=>o.id===0),c=cuePos||[cb.x,cb.y];
+el.addEventListener('pointermove',e=>{
+  if(!down||!inp||(e.pointerType==='touch'&&!e.isPrimary))return;const [x,y]=toTable(e),cb=V.balls.find(o=>o.id===0),c=cuePos||[cb.x,cb.y];
   if(dragCue){const nx=Math.max(R,Math.min((V.hand==='kitchen'?50:TW)-R*(V.hand==='kitchen'?0:1),x)),ny=Math.max(R,Math.min(TH-R,y));if(free(V.balls,nx,ny,0))cuePos=[nx,ny];}
-  else aim=Math.atan2(y-c[1],x-c[0]);
+  else if(x>-900)aim=Math.atan2(y-c[1],x-c[0]);
 });
+}
+bindPtr(cv);
 addEventListener('pointerup',()=>{down=false;dragCue=false;});
 $('pow').oninput=()=>{$('powV').textContent=$('pow').value+'%';};
 $('shoot').onclick=shoot;
@@ -303,6 +333,7 @@ K=HK.init({
 });
 K.sndBtn($('snd'));
 $('start').onclick=()=>K.startLocal(1);
+let want3=true;try{want3=localStorage.getItem('bil-3d')!=='0';}catch(e){}
 $('again').onclick=()=>K.exit(true);
 </script>
 </body>
