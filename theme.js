@@ -3,6 +3,12 @@
   var KEY = 'html-games-style', FX = 'html-games-fx', RAIN = 'html-games-rain';
   var script = document.currentScript;
   var base = script.src.replace(/theme\.js.*$/, '');
+  // Seiten-Icon, Handy-Symbol, Manifest und Farbe der Adressleiste für alle Spiele
+  (function () {
+    var h = document.head, add = function (rel, href, extra) { if (rel === 'icon' && h.querySelector('link[rel~="icon"]')) return; var l = document.createElement('link'); l.rel = rel; l.href = href; if (extra) for (var k in extra) l.setAttribute(k, extra[k]); h.appendChild(l); };
+    add('icon', base + 'icons/favicon.svg', { type: 'image/svg+xml' }); add('icon', base + 'icons/favicon-32.png', { sizes: '32x32', type: 'image/png' }); add('apple-touch-icon', base + 'icons/apple-touch-icon.png'); add('manifest', base + 'icons/manifest.webmanifest');
+    if (!h.querySelector('meta[name="theme-color"]')) { var m = document.createElement('meta'); m.name = 'theme-color'; m.content = '#080c12'; h.appendChild(m); }
+  })();
   var root = document.documentElement;
   if (script.hasAttribute('data-legacy')) root.setAttribute('data-legacy', '');
 
@@ -104,7 +110,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.24.0';
+  var VERSION = '3.25.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }

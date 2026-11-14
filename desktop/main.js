@@ -10,7 +10,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 function create() {
   Menu.setApplicationMenu(null);
   const w = new BrowserWindow({
-    width: 1400, height: 900, minWidth: 420, minHeight: 500, backgroundColor: '#080c12', autoHideMenuBar: true, title: 'HTML Games',
+    width: 1400, height: 900, minWidth: 420, minHeight: 500, backgroundColor: '#080c12', autoHideMenuBar: true, title: 'HTML Games', icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   const load = () => w.loadURL(URL_SITE).catch(() => {});

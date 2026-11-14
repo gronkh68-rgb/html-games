@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Meine HTML-Spiele</title>
+<meta name="description" content="Brettspiele, Kartenspiele und Arcade im Browser, allein oder online mit Freunden.">
+<meta property="og:title" content="HTML Games"><meta property="og:description" content="Brettspiele, Kartenspiele und Arcade im Browser, allein oder online mit Freunden."><meta property="og:image" content="icons/og-image.png"><meta property="og:type" content="website">
 <style>
 :root{
   --bg:#0f1220;--card:#1a1e33;--card-hover:#232845;--text:#eef0ff;--muted:#9aa0c3;
@@ -26,6 +28,8 @@ h1{
   background:linear-gradient(90deg,var(--accent),var(--accent2));
   -webkit-background-clip:text;background-clip:text;color:transparent;
 }
+header .logo{display:block;margin:0 auto 6px;width:min(620px,92vw);height:auto}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 header p{margin:0;color:var(--muted);font-size:1.05rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
 .game{
@@ -56,7 +60,8 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
 <body>
 <main>
   <header>
-    <h1>Meine HTML-Spiele</h1>
+    <img class="logo" src="icons/logo.svg" alt="HTML Games" width="460" height="150">
+    <h1 class="sr">Meine HTML-Spiele</h1>
     <p>Direkt im Browser spielen. Keine Installation nötig.</p>
     <div class="menu" id="menu">
       <span class="hello" id="hello"></span>

@@ -16,8 +16,8 @@
   "build": {
     "appId": "io.github.gronkh68rgb.htmlgames",
     "productName": "HTML Games",
-    "files": ["main.js", "offline.html"],
+    "files": ["main.js", "offline.html", "build/icon.png"],
     "directories": { "output": "dist" },
-    "win": { "target": "portable", "artifactName": "HTML-Games.exe" }
+    "win": { "target": "portable", "artifactName": "HTML-Games.exe", "icon": "build/icon.png" }
   }
 }
