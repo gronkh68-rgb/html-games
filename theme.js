@@ -30,7 +30,7 @@
     if (mode === 'dark') {
       root.setAttribute('data-style', 'dark');
       addLink('dark-fonts', 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Share+Tech+Mono&display=swap');
-      addLink('dark-css', base + 'dark.css?v=4');
+      addLink('dark-css', base + 'dark.css?v=5');
     } else if (mode === 'cyber') {
       root.setAttribute('data-style', 'cyber');
       addLink('cyber-fonts', 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@700;800&family=Share+Tech+Mono&display=swap');
@@ -114,7 +114,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.31.0';
+  var VERSION = '3.32.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }

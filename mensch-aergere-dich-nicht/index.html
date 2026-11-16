@@ -178,13 +178,23 @@ html:not([data-style]) .basebox.off{fill-opacity:.08;stroke-opacity:.3}
 html:not([data-style]) .cell.bc{fill:var(--c);fill-opacity:.55;stroke:#fff;stroke-opacity:.8}
 html:not([data-style]) .cell.lane{fill-opacity:.8}
 /* Standard-Stil bei hellem Browser-Design: Die Felder waren weiß auf weiß und damit unsichtbar */
-@media (prefers-color-scheme:light){
-  html:not([data-style]) #board{background:#eef0f8}
-  html:not([data-style]) .cell:not(.start):not(.lane):not(.bc){fill:#fff;stroke:#7d84a8;stroke-width:2}
-  html:not([data-style]) .cell.start{stroke:#1b1e33}
-  html:not([data-style]) .midlbl{fill:rgba(27,30,51,.4)}
-  html:not([data-style]) .cell.lane,html:not([data-style]) .cell.bc{stroke:#1b1e33;stroke-opacity:.45}
-}
+/* Standard (hell) und Dunkel (Obsidian): ruhig, ohne Neon. Der Stil „Cyber“ behält seine Leuchteffekte. */
+html:not([data-style]) #board{background:#f6f1e6;border-color:#cdbf9a;box-shadow:0 12px 34px rgba(60,48,20,.14)}
+html:not([data-style]) .cell:not(.start):not(.lane):not(.bc){fill:#fff;stroke:#a89f86;stroke-width:2}
+html:not([data-style]) .cell.start{stroke:#2a2a33;stroke-width:2.5}
+html:not([data-style]) .midlbl{fill:rgba(60,50,30,.4)}
+html:not([data-style]) .cell.lane,html:not([data-style]) .cell.bc{stroke:#2a2a33;stroke-opacity:.5}
+html:not([data-style]) .piece circle.main{stroke:#2a2a33;stroke-width:2.5}
+html:not([data-style]) #board text{fill:rgba(60,50,30,.35)}
+html:not([data-style]) #stage3d{box-shadow:0 12px 34px rgba(0,0,0,.25)}
+html:not([data-style]) #turnFrame,html[data-style="dark"] #turnFrame{box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--pc,#888) 80%,transparent);animation:none}
+html:not([data-style]) #turnBanner,html[data-style="dark"] #turnBanner{background:var(--card);color:var(--text);border:2px solid var(--pc,#888);box-shadow:0 10px 30px rgba(0,0,0,.3);letter-spacing:.06em;font-weight:800;animation:none}
+html[data-style="dark"] #turnBanner{background:rgba(14,16,24,.88);backdrop-filter:blur(8px);color:#fff}
+html:not([data-style]) .turn,html[data-style="dark"] .turn{background:color-mix(in srgb,var(--pc,#888) 14%,var(--card));color:var(--text);border-left:5px solid var(--pc,#888);border-radius:10px;font-size:1rem;letter-spacing:.05em;margin:0 0 10px;padding:11px 12px;text-align:left}
+html:not([data-style]) .turn.bump,html[data-style="dark"] .turn.bump{animation:none}
+html:not([data-style]) #rollBtn:not(:disabled),html[data-style="dark"] #rollBtn:not(:disabled){animation:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--pc,#888) 55%,transparent)}
+html:not([data-style]) #board,html[data-style="dark"] #board{transition:border-color .6s}
+html:not([data-style]) .piece.can circle.main,html[data-style="dark"] .piece.can circle.main{animation-duration:1s}
 #turnFrame{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;transition:opacity .25s;
   box-shadow:inset 0 0 0 5px var(--pc,#fff),inset 0 0 80px 8px color-mix(in srgb,var(--pc,#fff) 55%,transparent);animation:tfp 1s ease-in-out infinite alternate}
 #turnFrame.on{opacity:1}
@@ -330,14 +340,16 @@ const PAL=[
  {n:'Orange',c:'#ff8a1f',a:'#ff9a3d',k:'#e8710a'},{n:'Violett',c:'#b06cff',a:'#b98aff',k:'#7b3fc4'},
  {n:'Pink',c:'#ff5fd2',a:'#ff8ad8',k:'#d6338f'},{n:'Türkis',c:'#00d8e8',a:'#35d6e0',k:'#0e9aa7'},
  {n:'Weiß',c:'#f2f4ff',a:'#ffffff',k:'#d9dce6'},{n:'Limette',c:'#a6e22e',a:'#b5e84d',k:'#7fb21f'}];
-const COLORS=[0,1,2,3].map(i=>({n:PAL[i].n,c:PAL[i].c,k:i}));      // k = Index in PAL
+const styleKey=()=>{const s=document.documentElement.getAttribute('data-style');return s==='cyber'?'c':s==='dark'?'a':'k';};      // Cyber: Neon, Dunkel: weiche Farben, Standard: klassisch
+const COLORS=[0,1,2,3].map(i=>({n:PAL[i].n,c:PAL[i][styleKey()],k:i}));      // k = Index in PAL
+function applyPalette(){COLORS.forEach(o=>{if(typeof o.k==='number')o.c=PAL[o.k][styleKey()];});}
 const HEXRE=/^#[0-9a-f]{6}$/i;
 const validCol=k=>typeof k==='string'?HEXRE.test(k):(Number.isInteger(k)&&!!PAL[k]);
 const palOf=p=>{const k=COLORS[p].k;return typeof k==='string'?{c:k,a:k,k}:PAL[k];};   // freie HEX-Farbe: überall gleich
 function setSeatColor(p,k){
   if(!COLORS[p])return;
   if(typeof k==='string'){if(!HEXRE.test(k))return;k=k.toLowerCase();COLORS[p].n='Eigene';COLORS[p].c=k;COLORS[p].k=k;return;}
-  const q=PAL[k];if(!q)return;COLORS[p].n=q.n;COLORS[p].c=q.c;COLORS[p].k=k;
+  const q=PAL[k];if(!q)return;COLORS[p].n=q.n;COLORS[p].c=q[styleKey()];COLORS[p].k=k;
 }
 function colorChange(e){                 // Farbfeld oder HEX-Eingabe geändert -> {p,k} oder null
   const t=e.target.closest&&e.target.closest('[data-pcx]');if(!t)return null;
@@ -977,6 +989,7 @@ function startGame(){
   launch();
 }
 function launch(res){            // startet das Spiel mit den Werten in cfg und names (res: gespeicherter Stand zum Fortsetzen)
+  applyPalette();
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
   token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);cancelDice();syncDock(physOn());bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
   pieces=res?res.pieces.map(a=>a.slice()):[0,1,2,3].map(()=>[-1,-1,-1,-1]);
