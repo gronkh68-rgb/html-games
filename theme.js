@@ -111,7 +111,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.29.1';
+  var VERSION = '3.29.2';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -301,6 +301,7 @@
   });
   var shownV = null, lastCheck = 0;
   function cmpV(a, b) { a = String(a).split('.').map(Number); b = String(b).split('.').map(Number); for (var i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) - (b[i] || 0); } return 0; }
+  try { if (/[?&]_v=/.test(location.search) && history.replaceState) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])_v=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash); } catch (e) {}
   function checkUpdate() {
     if (Date.now() - lastCheck < 20000 || location.protocol === 'file:') return; lastCheck = Date.now();
     fetch(base + 'version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
@@ -309,7 +310,16 @@
       var d = document.createElement('div'); d.id = 'siteUpd'; d.setAttribute('data-noi18n', '');
       var note = j.notes ? (j.notes[lang] || j.notes.de || '') : '';
       d.innerHTML = '<span>✨ ' + SITE.T('Neue Version', 'New version') + ' ' + String(j.v).replace(/[<>&]/g, '') + ' ' + SITE.T('verfügbar', 'available') + (note ? '<br><small style="font-weight:400;opacity:.8">' + String(note).replace(/[<>&]/g, '') + '</small>' : '') + '</span><button class="go">' + SITE.T('Neu laden', 'Reload') + '</button><button class="x" title="' + SITE.T('Später', 'Later') + '">✕</button>';
-      d.querySelector('.go').onclick = function () { location.reload(); };
+      d.querySelector('.go').onclick = function () {
+        // Der Browser behält Skripte und Stile oft im Zwischenspeicher: erst alle Dateien dieser Seite neu laden (cache: reload), dann die Seite.
+        // Sonst startet die alte theme.js erneut und die Meldung erscheint sofort wieder.
+        var b = this; b.disabled = true; b.textContent = SITE.T('Lädt …', 'Loading …');
+        var urls = [location.href.split('#')[0], base + 'version.json'];
+        [].forEach.call(document.querySelectorAll('script[src],link[rel~="stylesheet"][href]'), function (e) { var u = e.src || e.href; if (u && u.indexOf(location.origin) === 0 && urls.indexOf(u) < 0) urls.push(u); });
+        var done = false, go = function () { if (done) return; done = true; try { sessionStorage.setItem('site-upd-tried', j.v); } catch (e) {} var u = location.href.split('#')[0].replace(/([?&])_v=[^&]*&?/, '$1').replace(/[?&]$/, ''); location.replace(u + (u.indexOf('?') < 0 ? '?' : '&') + '_v=' + encodeURIComponent(j.v)); };
+        Promise.all(urls.map(function (u) { return fetch(u, { cache: 'reload' }).catch(function () {}); })).then(go, go);
+        setTimeout(go, 6000);
+      };
       d.querySelector('.x').onclick = function () { d.remove(); };
       document.body.appendChild(d);
     }).catch(function () {});
