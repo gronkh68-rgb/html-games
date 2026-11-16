@@ -43,6 +43,7 @@ html:not([data-style]) .brand small{color:var(--dim)}
 .search kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:400 .7rem var(--mono);color:var(--dim);border:1px solid var(--line2);border-radius:5px;padding:1px 6px}
 .menu{display:flex;align-items:center;gap:8px;flex:none}
 .menu .hello{color:var(--muted);font:400 .85rem var(--mono);white-space:nowrap}
+#install{border-color:var(--cy)!important;color:var(--cy)!important}
 .menu button{font:600 .82rem var(--ui);color:var(--text);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:7px 11px;cursor:pointer;transition:border-color .15s,color .15s}
 .menu button:hover{border-color:var(--cy);color:var(--cy)}
 .menu .lang{display:inline-flex;gap:4px}.menu .lang button{padding:7px 9px;font-size:.78rem}.menu .lang button.on{border-color:var(--cy);color:var(--cy);box-shadow:inset 0 0 0 1px var(--cy)}
@@ -165,6 +166,7 @@ html[data-fx="off"][data-style="dark"] .gc,html[data-fx="off"][data-style="dark"
   <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" autocomplete="off" spellcheck="false" aria-label="Spiele suchen"><kbd>/</kbd></label>
   <div class="menu" id="menu">
     <span class="hello" id="hello"></span>
+    <button id="install" hidden></button>
     <button id="mName">👤 Profil</button>
     <span class="lang" data-noi18n><button data-l="de">DE</button><button data-l="en">EN</button></span>
   </div>
@@ -414,6 +416,19 @@ function paintHero(){
 }
 document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.gc');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');}});
 cards.forEach((c,i)=>c.style.setProperty('--n',Math.min(i,14)));
+// ---------- App installieren (Handy und Desktop) ----------
+let ip=null;const inst=document.getElementById('install');
+const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function paintInstall(){inst.textContent='📲 '+T('App','App');inst.title=T('Als App installieren','Install as app');inst.hidden=standalone()||!(ip||ios);}      // Chrome/Edge/Android: eigener Dialog; iPhone/iPad: Anleitung
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e;paintInstall();});
+addEventListener('appinstalled',()=>{ip=null;inst.hidden=true;});
+inst.onclick=async()=>{
+  if(ip){ip.prompt();try{await ip.userChoice;}catch(e){}ip=null;paintInstall();return;}
+  const msg=ios?T('So installierst du die App auf iPhone oder iPad:\n\n1. Unten (iPad: oben) auf das Teilen-Symbol tippen\n2. „Zum Home-Bildschirm“ wählen\n3. „Hinzufügen“ tippen\n\nDanach öffnet sie sich wie eine normale App im Vollbild.','To install the app on iPhone or iPad:\n\n1. Tap the Share icon at the bottom (iPad: top)\n2. Choose “Add to Home Screen”\n3. Tap “Add”\n\nIt then opens full-screen like a normal app.'):T('Installieren: Im Browser-Menü „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.','To install: use “Install app” or “Add to Home Screen” in the browser menu.');
+  alert(msg);
+};
+paintInstall();
 paintHero();paintGrid();
 // ---------- Offene Spiele: eigene (zum Wiederaufnehmen) und öffentliche Räume aller Spiele ----------
 const PF={'mensch-aergere-dich-nicht':'mdn-v1-','mensch-teams':'mtm-v1-','hoellen-tycoon':'htc-v1-','heldengilde':'hgl-v1-','auf-und-ab':'aua-v1-','wortgitter':'wgt-v1-','domino':'dom-v1-','billard':'bil-v1-','jenga':'jng-v1-','neun-welten':'nwl-v1-','farbchaos':'fch-v1-','hanafuda':'hnf-v1-','muehle':'mue-v1-','netrunner-aergere-dich-nicht':'ndn-v1-','poker':'pkr-v1-','blackjack':'bjk-v1-','schiffe-versenken':'sv-v1-','tron':'tron-v1-','vier-gewinnt':'c4-v1-'};

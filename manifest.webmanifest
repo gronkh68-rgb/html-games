@@ -1,0 +1,102 @@
+{
+ "id": "./",
+ "name": "HTML Games",
+ "short_name": "HTML Games",
+ "description": "Brettspiele, Kartenspiele und Arcade im Browser, allein oder online mit Freunden.",
+ "lang": "de",
+ "start_url": "./?source=pwa",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#080c12",
+ "theme_color": "#080c12",
+ "categories": [
+  "games",
+  "entertainment"
+ ],
+ "icons": [
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icons/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "icons/favicon.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  }
+ ],
+ "screenshots": [
+  {
+   "src": "icons/shot-wide.png",
+   "sizes": "1280x720",
+   "type": "image/png",
+   "form_factor": "wide",
+   "label": "Startseite"
+  },
+  {
+   "src": "icons/shot-narrow.png",
+   "sizes": "540x960",
+   "type": "image/png",
+   "form_factor": "narrow",
+   "label": "Startseite auf dem Handy"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Mensch ärgere dich nicht",
+   "short_name": "Mädn",
+   "url": "mensch-aergere-dich-nicht/",
+   "icons": [
+    {
+     "src": "icons/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Tetris",
+   "url": "tetris/",
+   "icons": [
+    {
+     "src": "icons/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Billard",
+   "url": "billard/",
+   "icons": [
+    {
+     "src": "icons/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Domino",
+   "url": "domino/",
+   "icons": [
+    {
+     "src": "icons/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  }
+ ]
+}

@@ -6,7 +6,10 @@
   // Seiten-Icon, Handy-Symbol, Manifest und Farbe der Adressleiste für alle Spiele
   (function () {
     var h = document.head, add = function (rel, href, extra) { if (rel === 'icon' && h.querySelector('link[rel~="icon"]')) return; var l = document.createElement('link'); l.rel = rel; l.href = href; if (extra) for (var k in extra) l.setAttribute(k, extra[k]); h.appendChild(l); };
-    add('icon', base + 'icons/favicon.svg', { type: 'image/svg+xml' }); add('icon', base + 'icons/favicon-32.png', { sizes: '32x32', type: 'image/png' }); add('apple-touch-icon', base + 'icons/apple-touch-icon.png'); add('manifest', base + 'icons/manifest.webmanifest');
+    add('icon', base + 'icons/favicon.svg', { type: 'image/svg+xml' }); add('icon', base + 'icons/favicon-32.png', { sizes: '32x32', type: 'image/png' }); add('apple-touch-icon', base + 'icons/apple-touch-icon.png'); add('manifest', base + 'manifest.webmanifest');
+    [['apple-mobile-web-app-capable', 'yes'], ['mobile-web-app-capable', 'yes'], ['apple-mobile-web-app-title', 'HTML Games'], ['apple-mobile-web-app-status-bar-style', 'black-translucent']].forEach(function (a) { if (!h.querySelector('meta[name="' + a[0] + '"]')) { var m = document.createElement('meta'); m.name = a[0]; m.content = a[1]; h.appendChild(m); } });
+    // Service Worker: macht die Seite installierbar und offline nutzbar (nur über https oder localhost)
+    try { if ('serviceWorker' in navigator && /^(https:|http:\/\/localhost)/.test(location.href) && !window.__noSW) addEventListener('load', function () { navigator.serviceWorker.register(base + 'sw.js').catch(function () {}); }); } catch (e) {}
     if (!h.querySelector('meta[name="theme-color"]')) { var m = document.createElement('meta'); m.name = 'theme-color'; m.content = '#080c12'; h.appendChild(m); }
   })();
   var root = document.documentElement;
@@ -111,7 +114,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.30.0';
+  var VERSION = '3.31.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }

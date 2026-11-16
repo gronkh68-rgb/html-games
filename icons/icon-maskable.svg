@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs>
+  <linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9ff3ff"/><stop offset="1" stop-color="#2fd0ff"/></linearGradient>
+  <linearGradient id="left" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16a8dc"/><stop offset="1" stop-color="#0b5f8c"/></linearGradient>
+  <linearGradient id="right" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d78a8"/><stop offset="1" stop-color="#073d5c"/></linearGradient>
+  <filter id="glow" filterUnits="userSpaceOnUse" x="-400" y="-400" width="2000" height="2000"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <radialGradient id="bg" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#10243a"/><stop offset="1" stop-color="#05080e"/></radialGradient>
+</defs><rect width="512" height="512" rx="0" fill="url(#bg)"/><g transform="translate(256 256) scale(.74) translate(-256 -256)"><g stroke="#00cfff" stroke-opacity=".07" stroke-width="2"><path d="M32 0V512M0 32H512"/><path d="M80 0V512M0 80H512"/><path d="M128 0V512M0 128H512"/><path d="M176 0V512M0 176H512"/><path d="M224 0V512M0 224H512"/><path d="M272 0V512M0 272H512"/><path d="M320 0V512M0 320H512"/><path d="M368 0V512M0 368H512"/><path d="M416 0V512M0 416H512"/><path d="M464 0V512M0 464H512"/></g><polygon points="256,40 442,148 442,364 256,472 70,364 70,148" fill="none" stroke="#00cfff" stroke-width="8" stroke-linejoin="round" filter="url(#glow)"/><polygon points="256,62 423,159 423,353 256,450 89,353 89,159" fill="none" stroke="#00cfff" stroke-opacity=".35" stroke-width="2" stroke-dasharray="3 9"/><path d="M70 148 L70 118 L96 118 M442 364 L442 394 L416 394" fill="none" stroke="#ff8a1f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><g filter="url(#glow)">
+  <polygon points="256,152 351,207 256,262 161,207" fill="url(#top)"/>
+  <polygon points="161,207 256,262 256,372 161,317" fill="url(#left)"/>
+  <polygon points="351,207 351,317 256,372 256,262" fill="url(#right)"/>
+  <path d="M256 152 L351 207 L351 317 L256 372 L161 317 L161 207 Z M161 207 L256 262 L351 207 M256 262 V372" fill="none" stroke="#bff6ff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+</g>
+<g fill="#06101a">
+  <circle r=".105" transform="matrix(95 -55 95 55 161 207)" cx=".5" cy=".5" fill="#39ff14"/>
+  <g transform="matrix(95 55 0 110 161 207)"><circle cx=".3" cy=".3" r=".085"/><circle cx=".7" cy=".7" r=".085"/></g>
+  <g transform="matrix(95 -55 0 110 256 262)"><circle cx=".26" cy=".22" r=".08"/><circle cx=".5" cy=".5" r=".08"/><circle cx=".74" cy=".78" r=".08"/></g>
+</g></g></svg>
