@@ -9,7 +9,7 @@
    conn: on('data'|'close'|'open', fn), send(obj), close(), open (bool)                              */
 (function () {
   var BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt'];
-  var TIMEOUT = 20000;
+  var TIMEOUT = 60000;      // Relay: so lange darf ein Mitspieler still sein (Handys drosseln Hintergrund-Tabs stark, 20 s warfen sonst Spieler raus)
   var Net = window.Net = { debug: false };
   function log() { if (Net.debug) console.log.apply(console, ['[Net]'].concat([].slice.call(arguments))); }
 
@@ -199,6 +199,7 @@
       if (self.closed) return;
       if (self.conn.open) { self.pub({ t: 'ping' }); if (Date.now() - self.conn.lastSeen > TIMEOUT) self.closeConn(self.conn, false); }
     }, 5000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && !self.closed && self.conn.open) self.pub({ t: 'ping' }); });      // zurück im Vordergrund: sofort melden
   };
   RelayClient.prototype.onMsg = function (text) {
     var m; try { m = JSON.parse(text); } catch (e) { return; }
@@ -235,7 +236,9 @@
         try { if (room.relay) room.relay.close(); } catch (e) {}
         try { if (room.peer) room.peer.destroy(); } catch (e) {}
       } };
-      var done = false;
+      var done = false, wl = null, awake = function () { try { if (navigator.wakeLock && !document.hidden && !room.closed) navigator.wakeLock.request('screen').then(function (l) { wl = l; }, function () {}); } catch (e) {} };
+      document.addEventListener('visibilitychange', awake); awake();      // Host: Bildschirm nicht ausgehen lassen, sonst schläft das Handy ein und alle fliegen raus
+      var oc = room.close; room.close = function () { room.closed = true; document.removeEventListener('visibilitychange', awake); try { wl && wl.release(); } catch (e) {} oc(); };
       function finish() { if (!done) { done = true; resolve(room); } }
       try { room.relay = new RelayHost(prefix, code, onConn); room.relay.start().catch(function (e) { log('Relay-Host fehlgeschlagen', e); }); } catch (e) {}
       if (!window.Peer) { setTimeout(finish, 600); return; }
