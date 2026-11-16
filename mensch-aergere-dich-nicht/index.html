@@ -453,6 +453,8 @@ try{teamsOn=localStorage.getItem('mdn-teams')==='1';const t=JSON.parse(localStor
 const TL='ABCD';
 const tm=p=>teamsOn?team[p]:p;
 const mates=(a,b)=>a!==b&&tm(a)===tm(b);
+let placed=[];      // Reihenfolge der fertigen Spieler bzw. Teams (je ein Vertreter); die anderen spielen weiter
+const isPlaced=p=>placed.some(q=>tm(q)===tm(p));
 const teamWon=p=>active.filter(q=>tm(q)===tm(p)).every(q=>wins(q));
 function teamName(p){const m=active.filter(q=>tm(q)===tm(p));return teamsOn?`Team ${TL[tm(p)]} (${m.map(q=>COLORS[q].n).join(' + ')})`:COLORS[p].n;}
 function teamChips(p){return teamsOn?active.filter(q=>tm(q)===tm(p)).map(chip).join(''):chip(p);}
@@ -933,12 +935,20 @@ async function gameLoop(startCur){
     let i=startCur!=null&&active.includes(startCur)?active.indexOf(startCur):0;
     for(;;){
       cur=active[i%active.length];
-      if(teamsOn&&wins(cur)){i++;continue;}
+      if(isPlaced(cur)||(teamsOn&&wins(cur))){i++;continue;}
       showTurn(cur);
       if(await playTurn(cur)){
-        $('winTitle').innerHTML=winHtml(cur);
-        $('winText').textContent='Glückwunsch!';
-        $('winBox').hidden=false;netPhase={k:'win',p:cur};netPush();return;
+        if(!isPlaced(cur))placed.push(cur);
+        const left=[...new Set(active.filter(q=>!isPlaced(q)).map(tm))];
+        if(left.length<=1){
+          if(left.length)placed.push(active.find(q=>tm(q)===left[0]));
+          $('winTitle').innerHTML=winHtml(placed[0]);
+          const R=placed.map((q,k)=>`${k+1}. ${teamChips(q)}${teamName(q)}`).join('<br>');
+          $('winText').innerHTML=placed.length>2?R:'Glückwunsch!';
+          $('winBox').hidden=false;netPhase={k:'win',p:placed[0],rank:placed.slice()};netPush();return;
+        }
+        setMsg(`${teamChips(cur)}<b>${teamName(cur)}</b> ist fertig (Platz ${placed.length})! Die anderen spielen weiter.`);
+        await sleep(1600,t);
       }
       i++;
     }
@@ -995,6 +1005,7 @@ function launch(res){            // startet das Spiel mit den Werten in cfg und 
   pieces=res?res.pieces.map(a=>a.slice()):[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
   drawBoard();setDie(res?(res.die||0):0);showScores();$('rollBtn').disabled=true;
+  placed=res&&res.placed?res.placed.slice():[];
   gameLoop(res?res.cur:undefined);
 }
 function backToSetup(){
@@ -1273,7 +1284,7 @@ netPush=function(){
   pushQ=true;queueMicrotask(()=>{pushQ=false;broadcastSnap();});
 };
 function snapObj(){
-  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,phys:physOn(),msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k),teams:teamsOn?team:null};
+  return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,phys:physOn(),msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k),teams:teamsOn?team:null,placed};
 }
 function seatInfo(){return lobby.map(s=>({type:s.type,name:s.name||'',tok:s.tok||null}));}
 function ensureBackup(){
@@ -1391,7 +1402,7 @@ function resumeAsHost(s,slot,toks,roomObj){
   names[slot]=myNameVal();
   held=s.types.map((t,i)=>i!==slot&&isH(t)?{tok:(toks&&toks[i])||null,name:names[i]||''}:null);
   disarmIdle();autoN.fill(0);
-  launch({pieces:s.pieces,cur:s.cur,die:s.die});
+  launch({pieces:s.pieces,cur:s.cur,die:s.die,placed:s.placed});
   setMsg('🔁 Du bist jetzt Host. Das Spiel läuft weiter, die anderen können wieder beitreten.');
   broadcastSnap();setTimeout(ensureBackup,3000);
 }
@@ -1474,7 +1485,8 @@ function applySnap(s,you){
   document.title=(myRoll||(ph.k==='pick'&&ph.p===you))?'▶ Du bist dran! – Mensch ärgere dich nicht':'Mensch ärgere dich nicht';
   if(ph.k==='win'){
     $('winTitle').innerHTML=winHtml(ph.p);
-    $('winText').textContent=active.some(q=>q===you&&tm(q)===tm(ph.p))?'Glückwunsch, ihr habt gewonnen!':'Der Host startet eine neue Runde.';
+    const rk=ph.rank||[ph.p];
+    $('winText').innerHTML=(rk.length>2?rk.map((q,k)=>`${k+1}. ${teamChips(q)}${teamName(q)}`).join('<br>')+'<br>':'')+(active.some(q=>q===you&&tm(q)===tm(ph.p))?'Glückwunsch, ihr habt gewonnen!':'Der Host startet eine neue Runde.');
     $('winBox').hidden=false;
   }
 }
