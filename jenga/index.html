@@ -245,6 +245,7 @@ $('pick').addEventListener('click',e=>{if(e.target.closest('#pull'))startMini();
 $('mini').addEventListener('pointerdown',e=>{e.preventDefault();stopMini();});
 addEventListener('keydown',e=>{if(e.key===' '&&!$('game').hidden){if(mg){e.preventDefault();stopMini();}else if(selB&&inp){e.preventDefault();startMini();}}});
 K=HK.init({
+  spectators:true,
   prefix:'jng-v1-',title:L2('Wackelturm','Wobble Tower'),minPlayers:2,
   seats:[{name:'1',color:'#e53935'},{name:'2',color:'#1e88e5'},{name:'3',color:'#43a047'},{name:'4',color:'#f9a825'}],
   cpuNames:['Kira','Bolt','Nova','Pixel'],

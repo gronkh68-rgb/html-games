@@ -322,6 +322,7 @@ addEventListener('keydown',e=>{
   else if(e.key===' '){e.preventDefault();shoot();}
 });
 K=HK.init({
+  spectators:true,
   prefix:'bil-v1-',title:L2('Billard','Pool'),minPlayers:2,
   seats:[{name:'1',color:'#e53935'},{name:'2',color:'#1e88e5'}],
   cpuNames:['Kira','Bolt','Nova','Pixel'],

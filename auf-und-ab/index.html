@@ -232,7 +232,7 @@ async function endGame(){
 
 // ---------- Sicht ----------
 function view(G,s){
-  return {me:s,n:G.seats.length,names:G.seats.map(x=>x.name),types:G.seats.map(x=>x.type),hand:G.hands[s].slice(),counts:G.hands.map(h=>h.length),piles:G.piles.slice(),under:G.under.slice(),
+  return {me:s,n:G.seats.length,names:G.seats.map(x=>x.name),types:G.seats.map(x=>x.type),hand:(G.hands[s]||[]).slice(),counts:G.hands.map(h=>h.length),piles:G.piles.slice(),under:G.under.slice(),
     deckN:G.deck.length,cur:G.cur,played:G.played,min:minFor(G),sig:G.sig.map(a=>a.map(x=>({p:x.p,t:x.t}))),log:K.logFor(s),over:G.over,last:G.last,opts:G.opts,
     left:G.deck.length+G.hands.reduce((a,h)=>a+h.length,0)};
 }
@@ -331,6 +331,7 @@ $('piles').addEventListener('click',e=>{
 $('endBtn').onclick=()=>{if(inp&&inp.canEnd)answer({end:true});};
 
 K=HK.init({
+  spectators:true,
   prefix:'aua-v1-',title:L2('Auf & Ab','Up & Down'),minPlayers:1,
   seats:[{name:'1',color:'#e53935'},{name:'2',color:'#f9a825'},{name:'3',color:'#2e9a4a'},{name:'4',color:'#1e6fd0'},{name:'5',color:'#9c27b0'}],
   cpuNames:['Kira','Bolt','Nova','Pixel','Juno'],

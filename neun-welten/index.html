@@ -128,7 +128,7 @@ $('rulesT').textContent=T('Regeln','Rules');$('rulesSide').innerHTML=RULES();$('
 let K,V=null,inp=null,sel=-1,pend=null,hintTxt='';
 // ---------- Host ----------
 function view(g,s){
-  const mine=g.pl[s],my=s===g.cur&&!g.over;
+  const mine=g.pl[s]||{hand:[],plots:[],revealed:true,left:0},my=s===g.cur&&!g.over;      // s=-1: Zuschauer ohne eigenen Platz
   return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),round:g.round,first:g.first,cur:g.cur,over:g.over,last:g.last,seq:g.seq,
     pl:g.pl.map((q,p)=>({res:q.res,troops:q.troops,conf:q.conf,st:NW.strength(g,p),sw:q.swords,inf:q.inf,vp:q.vp,agents:q.agents,left:q.left,hand:q.hand.length,deck:q.deck.length,disc:q.disc.length,plots:q.plots.length,revealed:q.revealed,ruhm:q.ruhm,play:q.play})),
     hand:mine.hand,plots:mine.plots,market:g.market,mleft:g.mdeck.length,conflict:g.conflict,occ:g.occ,ally:g.ally,
@@ -186,7 +186,7 @@ function spaceHtml(s,v,can){
 }
 function render(v,prev){
   V=v;$('setup').hidden=true;$('game').hidden=false;
-  const me=v.pl[v.me],mine=v.cur===v.me&&!!inp&&!v.over,mode=inp?inp.mode:'';
+  const me=v.pl[v.me]||v.pl[v.cur]||v.pl[0],mine=v.cur===v.me&&!!inp&&!v.over,mode=inp?inp.mode:'';
   if(sel>=v.hand.length)sel=-1;
   // Schlacht
   const pls=v.pl.length>=4?3:2;
@@ -256,6 +256,7 @@ $('btns').addEventListener('click',e=>{
 $('market').addEventListener('click',e=>{const el=e.target.closest('.nc');if(!el||!inp||inp.mode!=='thing')return;const m=/^\d+$/.test(el.dataset.m)?+el.dataset.m:el.dataset.m;if(V.buys.includes(m))answer({t:'buy',m});else{hintTxt=T('Dafür reicht dein Ruhm nicht.','You do not have enough fame for that.');K.sfx('bad');K.apply();}});
 $('plots').addEventListener('click',e=>{const el=e.target.closest('.nc');if(!el||!inp)return;const i=+el.dataset.p,ok=(inp.mode==='main'?V.pMain:V.pThing).includes(i);if(ok)answer({t:'plot',i});else{hintTxt=P[V.plots[i]].c?T('Diese Ränke spielst du beim Thing, wenn du Krieger in der Schlacht hast.','You play this scheme at the Thing when you have warriors in battle.'):T('Diese Ränke spielst du in deinem Zug vor dem Thing.','You play this scheme on your turn before the Thing.');K.apply();}});
 K=HK.init({
+  spectators:true,
   prefix:'nwl-v1-',title:L2('Neun Welten','Nine Worlds'),minPlayers:2,
   seats:PC.map((c,i)=>({name:String(i+1),color:c})),
   cpuNames:['Sigrun','Leif','Astrid','Bjarne','Freydis','Ragnar'],

@@ -367,6 +367,7 @@ async function main(){
   if(again)startGame(g.seats.map(s=>({type:s.type,name:s.name,seat:s.seat,orig:s.orig,away:s.away})),g.opts);else K.exit(false);
 }
 K=HK.init({
+  spectators:true,
   prefix:'mtm-v1-',title:L2('Mädn Teams','Ludo Teams'),minPlayers:2,diceZoom:false,diceDock:'diceDock',bareDice:true,timeoutMs:30000,
   dviewFor:p=>use3d&&window.MT3D&&MT3D.ready?MT3D.diceView():null,
   diceObstacles:diceObstaclesT,cancelUi:()=>{inp=null;K.apply();},cancelDice:()=>{if(window.MT3D&&MT3D.ready&&MT3D.diceView)MT3D.cancelDice();},

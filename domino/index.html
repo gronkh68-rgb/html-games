@@ -97,7 +97,7 @@ function deal(g){
   g.hands=g.seats.map(()=>s.splice(0,n));g.stock=s;g.chain=[];g.last=null;g.round++;g.passes=0;
 }
 function setup(seats,opts){const g={seats,opts,log:[],scores:seats.map(()=>0),cur:HK.rnd(seats.length),round:0,over:null,rend:null,seq:0};deal(g);return g;}
-function view(g,s){return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),hand:g.hands[s],counts:g.hands.map(h=>h.length),chain:g.chain,stock:g.stock.length,scores:g.scores,cur:g.cur,over:g.over,rend:g.rend,last:g.last,round:g.round,goal:g.opts.goal,log:K.logFor(s)};}
+function view(g,s){return {me:s,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),hand:g.hands[s]||[],counts:g.hands.map(h=>h.length),chain:g.chain,stock:g.stock.length,scores:g.scores,cur:g.cur,over:g.over,rend:g.rend,last:g.last,round:g.round,goal:g.opts.goal,log:K.logFor(s)};}
 function valid(spec,a,g,p){return spec.k!=='turn'||(a&&spec.opts.some(o=>o.t===a.t&&o.i===a.i&&o.e===a.e));}
 function aiMove(g,p,opts){
   const pl=opts.filter(o=>o.t==='play');if(!pl.length)return opts[0];
@@ -219,6 +219,7 @@ $('chain').addEventListener('click',e=>{const m=e.target.closest('.endm');if(!m|
 $('btns').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||!inp)return;answer(inp.opts.find(o=>o.t==='draw'));});
 addEventListener('resize',()=>{if(K&&K.V)K.apply();});
 K=HK.init({
+  spectators:true,
   prefix:'dom-v1-',title:L2('Domino','Dominoes'),minPlayers:2,
   seats:[{name:'1',color:'#e53935'},{name:'2',color:'#1e88e5'},{name:'3',color:'#43a047'},{name:'4',color:'#f9a825'}],
   cpuNames:['Kira','Bolt','Nova','Pixel'],

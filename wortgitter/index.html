@@ -194,7 +194,7 @@ function aiMove(g,p){
 }
 // ---------- Sicht ----------
 function view(g,s){
-  return {me:s,n:g.seats.length,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),board:g.board,rack:g.racks[s].map(t=>({id:t.id,l:t.l,v:t.v})),counts:g.racks.map(r=>r.length),
+  return {me:s,n:g.seats.length,names:g.seats.map(x=>x.name),types:g.seats.map(x=>x.type),board:g.board,rack:(g.racks[s]||[]).map(t=>({id:t.id,l:t.l,v:t.v})),counts:g.racks.map(r=>r.length),
     scores:g.scores,cur:g.cur,bag:g.bag.length,first:g.first,over:g.over,last:g.last,lang:g.lang,opts:g.opts,log:K.logFor(s)};
 }
 function valid(spec,a,g,p){
@@ -316,6 +316,7 @@ addEventListener('pointerup',e=>{
   selId=null;setTimeout(()=>K.apply(),0);
 });
 K=HK.init({
+  spectators:true,
   prefix:'wgt-v1-',title:L2('Wortgitter','Word Grid'),minPlayers:2,
   seats:[{name:'1',color:'#e53935'},{name:'2',color:'#f9a825'},{name:'3',color:'#2e9a4a'},{name:'4',color:'#1e6fd0'}],
   cpuNames:['Kira','Bolt','Nova','Pixel'],
