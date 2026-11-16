@@ -38,3 +38,47 @@ html[data-style="dark"] .basebox{fill-opacity:.1;stroke-opacity:.45}
 html[data-style="dark"] #board text{fill:rgba(255,255,255,.22)}
 html[data-style="dark"] .piece circle.main{stroke:#0d0f14;stroke-width:3}
 html[data-style="dark"][data-legacy] .top h1{color:var(--text)}
+
+/* ---- Gold in den Spielen (Stil „Obsidian“): Rahmen, Auswahl, „Du bist dran“, Reglerfarben ---- */
+html[data-style="dark"]{--gold-line:rgba(232,194,122,.38);--gold-soft:rgba(232,194,122,.14)}
+/* Rahmen der Spielflächen: feine Goldlinie statt Neon (per box-shadow, damit sich nichts verschiebt) */
+html[data-style="dark"] #stage,html[data-style="dark"] #stage3d,html[data-style="dark"] #cgStage,html[data-style="dark"] #stage3,html[data-style="dark"] .table,
+html[data-style="dark"] #cv,html[data-style="dark"] .bwrap,html[data-style="dark"] #boardWrap canvas{
+  border-color:var(--gold-line)!important;box-shadow:0 0 0 1px var(--gold-line),0 22px 60px rgba(0,0,0,.5)!important}
+html[data-style="dark"] #svg,html[data-style="dark"] svg#board,html[data-style="dark"] div#board,html[data-style="dark"] .board,html[data-style="dark"] #grid,html[data-style="dark"] .boards .grid{
+  border-color:var(--gold-line)!important}
+/* Wer dran ist: Gold */
+html[data-style="dark"] .myturn,html[data-style="dark"] .board.myturn,html[data-style="dark"] #stage.myturn,html[data-style="dark"] #stage3.myturn,html[data-style="dark"] #handbar.myturn,html[data-style="dark"] .table.myturn,html[data-style="dark"] #cv.myturn{
+  border-color:var(--gold)!important;box-shadow:0 0 0 1px var(--gold),0 0 34px rgba(232,194,122,.2),0 22px 60px rgba(0,0,0,.5)!important}
+html[data-style="dark"] .ps.turn,html[data-style="dark"] .pp.turn,html[data-style="dark"] .pl.turn{border-color:var(--gold);background:var(--gold-soft)}
+html[data-style="dark"] .hk-score.turn span,html[data-style="dark"] .scores div.act,html[data-style="dark"] .scores .act{color:var(--gold2)}
+/* Beschriftungen, Zahlen, Regeln */
+html[data-style="dark"] .panel h2,html[data-style="dark"] #setup h2{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:1.3rem;letter-spacing:.01em;color:var(--gold2)}
+html[data-style="dark"] .rules summary{color:var(--gold2)}
+html[data-style="dark"] .stat b,html[data-style="dark"] .ps b,html[data-style="dark"] .hk-score b{color:var(--gold2)}
+html[data-style="dark"] .panel h2::before{display:none}
+html[data-style="dark"] input[type=range],html[data-style="dark"] input[type=checkbox],html[data-style="dark"] input[type=radio]{accent-color:var(--gold)}
+html[data-style="dark"] ::selection{background:rgba(232,194,122,.35)}
+html[data-style="dark"] :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* Auswahl, letzter Zug, Ziele */
+html[data-style="dark"] .sel{stroke:var(--gold)}
+html[data-style="dark"] .dest{fill:rgba(232,194,122,.45)}
+html[data-style="dark"] .c.last{outline-color:var(--gold)}
+html[data-style="dark"] .stone.rem{stroke:var(--gold)}
+html[data-style="dark"] .slot.win .disc{outline-color:var(--gold)}
+html[data-style="dark"] .tile.last rect{stroke:var(--gold)}
+html[data-style="dark"] .endm{stroke:var(--gold)}
+html[data-style="dark"] .line{stroke:#8d7a52}
+html[data-style="dark"] .spot{fill:var(--gold)}
+html[data-style="dark"] .cell.start{stroke:var(--gold);stroke-width:2.5}
+html[data-style="dark"] .midmark{stroke:var(--gold);fill:var(--gold);fill-opacity:.12}
+html[data-style="dark"] .midring{stroke:var(--gold)}
+html[data-style="dark"] .tgt{stroke:var(--gold);fill:rgba(232,194,122,.3)}
+html[data-style="dark"] .dlist,html[data-style="dark"] .hk-score{border-color:var(--gold-line)}
+/* Schmuckdetails: Goldlinie unter Überschriften der Spielseiten */
+html[data-style="dark"]:not([data-legacy]) .top{position:relative;padding-bottom:10px;margin-bottom:16px}
+html[data-style="dark"]:not([data-legacy]) .top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,var(--gold-line),transparent 70%)}
+
+
+html[data-style="dark"] header h1{color:var(--text)}
+html[data-style="dark"] header p{color:var(--muted)}
