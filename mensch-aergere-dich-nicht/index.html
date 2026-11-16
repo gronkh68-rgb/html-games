@@ -227,6 +227,7 @@ html:not([data-style]) .cell.lane{fill-opacity:.8}
     <div class="row"><label for="diceMode">Würfel</label>
       <select id="diceMode"><option value="phys">Echter Wurf: Würfel per Maus ziehen und werfen (Physik)</option><option value="bag">Ausgeglichen: jeder Spieler hat seinen eigenen Würfel</option><option value="rand">Echter Zufall (ein gemeinsamer Würfel)</option></select></div>
     <p class="hint" id="diceHint" style="margin:-2px 0 8px;font-size:.8rem;color:var(--muted)">Ausgeglichen: Jeder Spieler würfelt aus einem eigenen Beutel mit 1 bis 6 (alle sechs Würfe je einmal). Nach höchstens 5 Würfen ohne 6 kommt sicher eine, und zwei Sechsen direkt hintereinander gibt es nicht. Online gilt die Einstellung des Hosts.</p>
+    <div class="rejoin" id="savedBox" hidden style="flex-wrap:wrap"><span id="savedTxt" style="flex:1;min-width:200px"></span><button class="btn big" id="savedJoin">↩ Wieder beitreten</button><button class="btn" id="savedHost">▶ Fortsetzen (ich hoste)</button><button class="btn alt" id="savedX" title="Vergessen">✕</button></div>
     <div class="row" id="modeTabs">
       <button class="btn" data-m="local">Lokal</button>
       <button class="btn alt" data-m="host">Online: Raum erstellen</button>
@@ -914,10 +915,10 @@ async function playTurn(p){
     if(--tries<=0)return false;
   }
 }
-async function gameLoop(){
+async function gameLoop(startCur){
   const t=token;
   try{
-    let i=0;
+    let i=startCur!=null&&active.includes(startCur)?active.indexOf(startCur):0;
     for(;;){
       cur=active[i%active.length];
       if(teamsOn&&wins(cur)){i++;continue;}
@@ -975,13 +976,13 @@ function startGame(){
   $('setupErr').textContent='';
   launch();
 }
-function launch(){            // startet das Spiel mit den Werten in cfg und names
+function launch(res){            // startet das Spiel mit den Werten in cfg und names (res: gespeicherter Stand zum Fortsetzen)
   active=[0,1,2,3].filter(p=>cfg[p]!=='off');
   token++;pick=null;rollWait=null;remoteRoll=null;netPhase={k:'idle'};setMine(false);cancelDice();syncDock(physOn());bags=[[],[],[],[]];gap=[0,0,0,0];lastV=[0,0,0,0];
-  pieces=[0,1,2,3].map(()=>[-1,-1,-1,-1]);
+  pieces=res?res.pieces.map(a=>a.slice()):[0,1,2,3].map(()=>[-1,-1,-1,-1]);
   $('setup').hidden=true;$('game').hidden=false;$('winBox').hidden=true;
-  drawBoard();setDie(0);showScores();$('rollBtn').disabled=true;
-  gameLoop();
+  drawBoard();setDie(res?(res.die||0):0);showScores();$('rollBtn').disabled=true;
+  gameLoop(res?res.cur:undefined);
 }
 function backToSetup(){
   token++;pick=null;rollWait=null;setMine(false);cancelDice();syncDock(false);buildSetup();
@@ -1010,6 +1011,7 @@ buildSetup();setDie(0);
 // Der Host führt das Spiel und schickt nach jedem Schritt den Spielstand. Mitspieler zeigen ihn nur an
 // und melden "Würfeln" und "Figur gewählt". Verbindung: siehe ../net.js (WebRTC, Ersatzweg Relay).
 const PREFIX='mdn-v1-';
+let myTok='',backup=null,pendingSucc=-1,standby=null,standbySeats=null,standbyHostSeat=-1,backupInfo=null,migrating=false,lastSnap=null;      // Host-Wechsel: backup = Ersatz-Host (beim Host), standby = mein bereitgehaltener Raum (beim Ersatz), backupInfo = wer übernimmt (bei allen)
 let room=null,lobby=[],hostConn=null,joiner=null,netPlaying=false,opening=false,held=[];   // held[i]: Platz, den der Computer für einen weggegangenen Spieler hält (Token + Name)
 const newTok=()=>Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('');
 let cReady=false,lastCur=-1,cRolling=false,cLand=false,rollAnim=null,joinedCode='',prevNames=null;
@@ -1052,7 +1054,7 @@ function showMode(m){
   document.querySelectorAll('#modeTabs .btn').forEach(b=>b.classList.toggle('alt',b.dataset.m!==m));
   $('pLocal').hidden=m!=='local';$('pHost').hidden=m!=='host';$('pJoin').hidden=m!=='join';errMsg('');
   if(m==='join'&&netRole!=='client')startWatch();else stopWatch();
-  renderRejoin();
+  renderRejoin();renderSaved();
 }
 function leaveNet(){
   if(netRole==='host'){
@@ -1061,7 +1063,7 @@ function leaveNet(){
   }
   if(netRole==='client'){try{hostConn&&(hostConn.send({t:'bye'}),hostConn.close());}catch(e){}if(joiner)joiner.cancel();}
   stopAnnounce();
-  room=null;lobby=[];held=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;isSpec=false;syncSpecBadge();
+  room=null;lobby=[];held=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;isSpec=false;syncSpecBadge();backup=null;pendingSucc=-1;migrating=false;backupInfo=null;lastSnap=null;try{if(standby&&standby.room)standby.room.close();}catch(e){}standby=null;standbySeats=null;
   clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';
   $('joinForm').hidden=false;$('joinLobby').hidden=true;joinBtnReset();prevNames=null;
 }
@@ -1082,7 +1084,8 @@ async function openRoom(){
   opening=false;
   if(!r){errMsg('Raum konnte nicht erstellt werden. Bitte nochmal versuchen.');return;}
   room=r;netRole='host';netPlaying=false;
-  lobby=[{type:'host',name:myNameVal()},{type:'open'},{type:'open'},{type:'open'}];
+  myTok=newTok();backup=null;pendingSucc=-1;
+  lobby=[{type:'host',name:myNameVal(),tok:myTok},{type:'open'},{type:'open'},{type:'open'}];
   $('roomCode').textContent=room.code;renderHostLobby();startAnnounce();
 }
 function onConn(conn){
@@ -1102,7 +1105,7 @@ function onHostMsg(conn,m){
     if(netPlaying){
       // Wiederbeitritt: gleicher Token, sonst (ohne Token) gleicher Name; der Computer gibt den Platz zurück
       let k=held.findIndex(h=>h&&m.tok&&h.tok===m.tok);
-      if(k<0&&!m.tok){const c=held.map((h,x)=>h&&h.name.toLowerCase()===nm.toLowerCase()?x:-1).filter(x=>x>=0);if(c.length===1)k=c[0];}
+      if(k<0){const c=held.map((h,x)=>h&&(!m.tok||!h.tok)&&h.name.toLowerCase()===nm.toLowerCase()?x:-1).filter(x=>x>=0);if(c.length===1)k=c[0];}      // ohne Token (oder Token unbekannt nach einem Neustart aus dem Speicher): gleicher Name
       if(k>=0&&cfg[k]==='cpu'&&lobby[k]&&lobby[k].type==='cpu'){
         const tok=held[k].tok||newTok();held[k]=null;
         lobby[k]={type:'remote',name:nm,conn,tok};conn.slot=k;cfg[k]='remote';names[k]=nm;
@@ -1124,6 +1127,7 @@ function onHostMsg(conn,m){
   }
   if(conn.spec){if(m.t==='bye'){specs=specs.filter(c=>c!==conn);}return;}
   if(conn.slot===undefined)return;
+  if(m.t==='standbyReady'){if(!backup&&conn.slot===pendingSucc){backup={seat:conn.slot,code:String(m.code||'')};broadcastBackup();setRejoin({code:backup.code,tok:myTok,name:myNameVal(),t:Date.now()});}return;}      // wer mich ersetzen würde: bei meinem Ausfall führt "Zurück ins Spiel" in dessen Raum
   if(m.t==='roll'||m.t==='throw'){if(remoteRoll&&netPhase.k==='roll'&&netPhase.p===conn.slot){remoteThrow=m.t==='throw'?m.d:null;remoteRoll();}}
   else if(m.t==='pick'){
     if(pick&&pick.p===conn.slot&&cfg[conn.slot]==='remote'){
@@ -1139,6 +1143,7 @@ function onHostMsg(conn,m){
 function dropRemote(conn,forget){     // Mitspieler weg: in der Lobby Platz freigeben, im Spiel übernimmt der Computer (und hält den Platz für den Wiederbeitritt)
   const i=conn.slot;if(i===undefined||!lobby[i]||lobby[i].conn!==conn)return;
   const name=lobby[i].name,tok=lobby[i].tok;conn.slot=undefined;
+  if(backup&&backup.seat===i){backup=null;pendingSucc=-1;}
   if(!netPlaying){lobby[i]={type:'open'};lobbyNote(`${name} hat den Raum verlassen`);broadcastLobby();return;}
   cfg[i]='cpu';lobby[i]={type:'cpu',name:''};held[i]=forget?null:{tok,name};
   setMsg(`${chip(i)}<b>${COLORS[i].n} (${esc(name)})</b> ist weg, der Computer übernimmt${forget?'':' bis zur Rückkehr'}.`);
@@ -1250,9 +1255,30 @@ netPush=function(){
 function snapObj(){
   return {pieces,cur,active,types:cfg,names,die:lastRoll,phase:netPhase,phys:physOn(),msg:$('msg').innerHTML,cols:COLORS.map(c=>c.k),teams:teamsOn?team:null};
 }
+function seatInfo(){return lobby.map(s=>({type:s.type,name:s.name||'',tok:s.tok||null}));}
+function ensureBackup(){
+  if(netRole!=='host'||!netPlaying)return;
+  if(backup&&lobby[backup.seat]&&lobby[backup.seat].type==='remote'){const c=lobby[backup.seat].conn;if(c&&c.open)try{c.send({t:'standby',seats:seatInfo(),hostSeat:lobby.findIndex(x=>x.type==='host')});}catch(e){}return;}      // Sitzdaten aktuell halten
+  backup=null;pendingSucc=lobby.findIndex(s=>s.type==='remote'&&s.conn&&s.conn.open);if(pendingSucc<0)return;
+  try{lobby[pendingSucc].conn.send({t:'standby',seats:seatInfo(),hostSeat:lobby.findIndex(x=>x.type==='host')});}catch(e){}
+}
+function broadcastBackup(){if(!backup)return;lobby.forEach(s=>{if(s.conn&&s.conn.open)try{s.conn.send({t:'backup',seat:backup.seat,code:backup.code});}catch(e){}});}
+setInterval(ensureBackup,4000);
+// Unbeendete Spiele merken: jedes Gerät speichert den letzten Stand, damit nach einem Totalausfall jemand das Spiel fortsetzen kann
+let saveT=0;
+function saveGame(s,code,slot,toks){
+  const now=Date.now();
+  if(!s||(s.phase&&s.phase.k==='win')){clearSaved();return;}      // Spiel zu Ende: nichts mehr zum Fortsetzen
+  if(now-saveT<2500)return;saveT=now;
+  try{if(false)0;else localStorage.setItem('mdn-saved',JSON.stringify({t:now,code,slot,tok:myTok,name:myNameVal(),toks:toks||null,snap:s}));}catch(e){}
+  renderSaved();
+}
+function getSaved(){try{const r=JSON.parse(localStorage.getItem('mdn-saved')||'null');if(r&&r.snap&&r.code&&Date.now()-r.t<12*3600e3)return r;}catch(e){}return null;}
+function clearSaved(){try{localStorage.removeItem('mdn-saved');}catch(e){}renderSaved();}
 function broadcastSnap(){
   if(netRole!=='host')return;
   const s=snapObj();
+  if(netPlaying&&room)saveGame(s,room.code,lobby.findIndex(x=>x.type==='host'),seatInfo().map(x=>x.tok));
   lobby.forEach((sl,i)=>{if(sl.conn&&sl.conn.open)try{sl.conn.send({t:'snap',s,you:i});}catch(e){}});
   specs.forEach(c=>{if(c.open)try{c.send({t:'snap',s,you:-1});}catch(e){}});
 }
@@ -1277,7 +1303,9 @@ sendHost=function(m){try{hostConn&&hostConn.open&&hostConn.send(m);}catch(e){}};
 function onClientMsg(m){
   if(!m||typeof m!=='object')return;
   if(m.t==='welcome'&&m.spec){isSpec=true;mySlot=-1;joinBtnReset();errMsg('Verbunden. Warte auf den Spielstand …');return;}
-  if(m.t==='welcome'){isSpec=false;if(m.tok)setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();$('joinForm').hidden=true;$('joinLobby').hidden=false;}
+  if(m.t==='welcome'){isSpec=false;if(m.tok){myTok=m.tok;setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});}mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();
+    if(migrating){migrating=false;backupInfo=null;standby=null;setMsg('🔁 Neuer Host verbunden. Das Spiel läuft weiter.');return;}      // Host-Wechsel geschafft: im Spiel bleiben
+    $('joinForm').hidden=true;$('joinLobby').hidden=false;}
   else if(m.t==='lobby'){
     mySlot=m.you;if(m.cols)m.cols.forEach((k,i)=>setSeatColor(i,k));
     if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;cancelDice();syncDock(false);$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
@@ -1293,12 +1321,82 @@ function onClientMsg(m){
     if(prevNames){names.forEach((n,i)=>{if(n&&n!==prevNames[i]&&i!==m.you&&!prevNames.includes(n))lobbyNote(`${n} ist beigetreten`);});prevNames.forEach((n,i)=>{if(n&&!names.includes(n))lobbyNote(`${n} hat den Raum verlassen`);});}
     prevNames=names;
   }
-  else if(m.t==='snap'){applySnap(m.s,m.you);syncSpecBadge();}
+  else if(m.t==='snap'){applySnap(m.s,m.you);syncSpecBadge();if(!isSpec){lastSnap=m.s;saveGame(m.s,joinedCode,m.you,standbySeats&&standbySeats.map(x=>x.tok));}}
+  else if(m.t==='standby')onStandby(m);
+  else if(m.t==='backup'){backupInfo={seat:m.seat,code:m.code};}
   else if(m.t==='full'){const w=m.why||'Der Raum ist voll';leaveNet();showMode('join');errMsg(w);}   // Token bleibt: der Host könnte später wieder erreichbar sein
-  else if(m.t==='kicked'){const w=m.why||'Verbindung beendet';if(!isSpec)setRejoin(null);goMenu(w);}
+  else if(m.t==='kicked'){const w=m.why||'Verbindung beendet';if(!isSpec){setRejoin(null);clearSaved();}goMenu(w);}
 }
-function onClientClose(){if(netRole==='client')goMenu('Die Verbindung zum Host ist abgebrochen.');}
+function onClientClose(){
+  if(netRole!=='client'||migrating)return;
+  if(!isSpec&&backupInfo&&backupInfo.code&&cReady&&lastSnap){startMigration();return;}      // Host weg, aber ein Ersatz-Host ist bereit
+  goMenu('Die Verbindung zum Host ist abgebrochen.');
+}
+// ---------- Host-Wechsel ----------
+function onStandby(m){      // ich soll bei Ausfall des Hosts übernehmen: eigenen Raum bereithalten
+  standbySeats=m.seats;standbyHostSeat=m.hostSeat;
+  if(standby||isSpec)return;standby={room:null,queue:[]};
+  const onC=conn=>{conn.on('data',x=>{if(netRole==='host')onHostMsg(conn,x);else standby&&standby.queue.push([conn,x]);});conn.on('close',()=>{if(netRole==='host')dropRemote(conn);});};
+  Net.host(PREFIX,Net.newCode(),onC).then(r=>{if(!standby){try{r.close();}catch(e){}return;}standby.room=r;sendHost({t:'standbyReady',code:r.code});}).catch(()=>{standby=null;});
+}
+function startMigration(){
+  migrating=true;setMsg('⚠ Der Host ist weg. Ein neuer Host übernimmt …');
+  try{const hc=hostConn;hostConn=null;hc&&hc.close();}catch(e){}
+  if(standby&&standby.room&&mySlot===backupInfo.seat)setTimeout(becomeHost,300);else setTimeout(()=>migJoin(14),2000);
+}
+function migJoin(tries){
+  if(!migrating||!backupInfo)return;joinedCode=backupInfo.code;
+  joiner=Net.join(PREFIX,backupInfo.code,{
+    attach(c){hostConn=c;c.on('data',onClientMsg);c.on('close',onClientClose);},
+    open(c){netRole='client';try{c.send({t:'hello',name:myNameVal(),tok:myTok||undefined});}catch(e){}},
+    fail(){if(tries>0&&migrating)setTimeout(()=>migJoin(tries-1),1500);else giveUpMig();}
+  });
+}
+function giveUpMig(){migrating=false;standby=null;backupInfo=null;goMenu('Der Host ist weg und es konnte kein neuer Host verbunden werden. Das Spiel ist gespeichert: Unter „Unbeendetes Spiel“ kannst du es fortsetzen.');}
+// gemeinsamer Teil: aus einem Stand (Snapshot) als Host weiterspielen. slot = mein Platz, toks = bekannte Token der Plätze
+function resumeAsHost(s,slot,toks,roomObj){
+  migrating=false;netRole='host';netPlaying=true;hostConn=null;room=roomObj;backup=null;pendingSucc=-1;standby=null;backupInfo=null;isSpec=false;specs=[];
+  if(!myTok)myTok=newTok();
+  const isH=t=>t==='human'||t==='remote';
+  cfg=s.types.map((t,i)=>i===slot?'human':isH(t)?'cpu':t);
+  names=(s.names||[]).slice();teamsOn=!!s.teams;if(s.teams)team=s.teams.slice();
+  if(s.cols)s.cols.forEach((k,i)=>setSeatColor(i,k));
+  lobby=s.types.map((t,i)=>i===slot?{type:'host',name:myNameVal(),tok:myTok}:isH(t)?{type:'cpu',name:''}:{type:t==='off'?'off':'cpu',name:''});
+  names[slot]=myNameVal();
+  held=s.types.map((t,i)=>i!==slot&&isH(t)?{tok:(toks&&toks[i])||null,name:names[i]||''}:null);
+  disarmIdle();autoN.fill(0);
+  launch({pieces:s.pieces,cur:s.cur,die:s.die});
+  setMsg('🔁 Du bist jetzt Host. Das Spiel läuft weiter, die anderen können wieder beitreten.');
+  broadcastSnap();setTimeout(ensureBackup,3000);
+}
+function becomeHost(){
+  if(!standby||!standby.room||!lastSnap){giveUpMig();return;}
+  const r=standby.room,q=standby.queue.splice(0);
+  resumeAsHost(lastSnap,mySlot,standbySeats&&standbySeats.map(x=>x.tok),r);
+  q.forEach(x=>onHostMsg(x[0],x[1]));
+}
+// ---------- Unbeendetes Spiel fortsetzen ----------
+function renderSaved(){
+  const g=netRole==='local'?getSaved():null,b=$('savedBox');if(!b)return;
+  b.hidden=!g;
+  if(g){const mins=Math.max(1,Math.round((Date.now()-g.t)/60000)),pl=(g.snap.names||[]).filter((n,i)=>n&&g.snap.active.includes(i)&&g.snap.types[i]!=='cpu').join(', ');
+    $('savedTxt').innerHTML=`<b>Unbeendetes Spiel</b> · Raum ${esc(g.code)} · vor ${mins} Min.${pl?' · '+esc(pl):''}`;}
+}
+$('savedJoin').onclick=()=>{const g=getSaved();if(g){showMode('join');$('joinCode').value=g.code;joinRoom(g.code);}};
+$('savedX').onclick=()=>{clearSaved();setRejoin(null);};
+$('savedHost').onclick=async()=>{
+  const g=getSaved();if(!g||opening)return;opening=true;errMsg('Starte Raum …');
+  let r=null;
+  for(let i=0;i<5&&!r;i++){try{r=await Net.host(PREFIX,g.code,onConn);}catch(e){r=null;if(i<4)await new Promise(x=>setTimeout(x,2500));}}      // alter Code: dann klappt "Zurück ins Spiel" bei allen unverändert
+  if(!r){for(let i=0;i<3&&!r;i++){try{r=await Net.host(PREFIX,Net.newCode(),onConn);}catch(e){r=null;}}}
+  opening=false;if(!r){errMsg('Raum konnte nicht erstellt werden.');return;}
+  errMsg('');myTok=g.tok||myTok;
+  resumeAsHost(g.snap,g.slot>=0?g.slot:g.snap.types.findIndex(t=>t==='human'||t==='remote'),g.toks,r);
+  if(r.code!==g.code)lobbyNote('Neuer Raumcode: '+r.code+' (der alte war noch belegt)');
+  showMode('local');
+};
 function goMenu(why){
+  if(!why)clearSaved();
   disarmIdle();clearInterval(ctIv);ctId=-1;
   setMine(false);
   if(!why)setRejoin(null);   // freiwillig gegangen: kein Wiederbeitritt anbieten
@@ -1359,11 +1457,12 @@ $('joinSlots').addEventListener('change',e=>{const r=colorChange(e);if(r&&r.p===
 $('joinSlots').addEventListener('click',e=>{const c=e.target.closest('[data-pc]');if(c&&+c.dataset.pc===mySlot){sendHost({t:'pcol',k:+c.dataset.k});return;}const b=e.target.closest('[data-take]');if(b)sendHost({t:'color',slot:+b.dataset.take});});
 $('pubList').addEventListener('click',e=>{const b=e.target.closest('[data-join]');if(b){$('joinCode').value=b.dataset.join;joinRoom(b.dataset.join,!!b.dataset.spec);}});
 $('joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
-$('joinLeave').onclick=()=>{setRejoin(null);leaveNet();showMode('join');};
+$('joinLeave').onclick=()=>{setRejoin(null);clearSaved();leaveNet();showMode('join');};
 
 // "Neues Spiel" nach einer Runde: Host zurück in die Lobby (Online-Spieler bleiben im Raum)
 const _backToSetup=backToSetup;
 backToSetup=function(){
+  if(netRole==='host'||netRole==='local'){clearSaved();if(netRole==='host')setRejoin(null);}
   _backToSetup();
   if(netRole==='host'){netPlaying=false;dropSpecs('Das Spiel ist zu Ende.');showMode('host');broadcastLobby();}
   else if(netRole==='client'){showMode('join');}
@@ -1381,6 +1480,7 @@ $('again').onclick=()=>{if(netRole==='client'){goMenu('');}else backToSetup();};
   else if(getRejoin())showMode('join');
   else showMode('local');
 }
+renderSaved();
 addEventListener('beforeunload',()=>{try{if(netRole==='client'&&hostConn)hostConn.send({t:'bye'});}catch(e){}});
 </script>
 <script>
