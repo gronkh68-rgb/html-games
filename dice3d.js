@@ -82,6 +82,7 @@
   // obs (optional): feste Hindernisse [x, z, Radius, Höhe] in Tablett-Koordinaten (z. B. Spielfiguren und Mittelobjekte), an denen die Würfel abprallen
   D.simulate = async function (params, obs, kinds) {      // kinds (optional): pro Würfel 'd6' (Standard) oder 'd4'
     await D.ready();
+    if (window.SITE && SITE.diceBump && !SITE.diceBump()) obs = null;      // Figurenphysik aus: keine Hindernisse
     var n = params.dice.length, world = new C.World({ gravity: new C.Vec3(0, G, 0) });
     world.allowSleep = false; world.solver.iterations = 24;
     var mDie = new C.Material('die'), mFloor = new C.Material('floor'), mWall = new C.Material('wall');

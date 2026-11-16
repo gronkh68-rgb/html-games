@@ -114,7 +114,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.32.2';
+  var VERSION = '3.32.3';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -221,6 +221,9 @@
   };
   SITE.dice = function () { var v = get(DICEK); return v && SITE.DICE[v] ? v : 'auto'; };
   SITE.setDice = function (v) { if (v !== 'auto' && !SITE.DICE[v]) v = 'auto'; set(DICEK, v); applyDice(); document.dispatchEvent(new CustomEvent('site-dice', { detail: v })); };
+  // Figurenphysik: Würfel prallen an Spielfiguren ab (Standard an). Gilt für Würfe, die dieses Gerät als Host simuliert.
+  SITE.diceBump = function () { return get('html-games-dice-bump') !== '0'; };
+  SITE.setDiceBump = function (b) { set('html-games-dice-bump', b ? '1' : '0'); };
   // Das Design gilt nur für die eigenen Würfe: Spiele melden mit SITE.diceMine(false), wenn gerade jemand anderes würfelt
   var diceMine = true;
   SITE.diceMine = function (m) { diceMine = m !== false; applyDice(); };
@@ -270,6 +273,7 @@
         '<label class="lb">' + SITE.T('Standard-Stil', 'Default style') + '</label><div class="tiles" id="siteSty">' + STY.map(function (s) { return '<button type="button" class="tl" data-v="' + s[0] + '"><span class="sv" style="background:' + s[2] + ';color:' + s[3] + '">Aa</span>' + s[1] + '</button>'; }).join('') + '</div>' +
         '<small class="nt">' + SITE.T('Dunkel gibt es bisher auf der Startseite und in „Mensch ärgere dich nicht“; in den anderen Spielen gilt dann Cyber.', 'Dark currently exists on the start page and in “Ludo”; the other games then use Cyber.') + '</small>' +
         '<label class="lb">' + SITE.T('Würfel', 'Dice') + '</label><div class="tiles" id="siteDc">' + ['auto'].concat(Object.keys(SITE.DICE)).map(function (k) { return '<button type="button" class="tl" data-v="' + k + '">' + diePrev(k) + (k === 'auto' ? SITE.T('Passend zum Stil', 'Match the style') : SITE.T(SITE.DICE[k].n[0], SITE.DICE[k].n[1])) + '</button>'; }).join('') + '</div>' +
+        '<label class="lb" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0"><input type="checkbox" id="siteBump"' + (SITE.diceBump() ? ' checked' : '') + ' style="width:auto"> ' + SITE.T('Würfel prallen an Spielfiguren ab (Figurenphysik)', 'Dice bounce off pieces (piece physics)') + '</label>' +
         '<div class="rw">' + (force && cur ? '<button type="button" class="alt" id="siteCancel">' + SITE.T('Abbrechen', 'Cancel') + '</button>' : '') + '<button type="submit">' + (first ? SITE.T('Los geht’s', 'Let’s go') : SITE.T('Speichern', 'Save')) + '</button></div></form>';
       document.body.appendChild(ov);
       var inp = ov.querySelector('#siteName'); inp.value = cur; setTimeout(function () { inp.focus(); inp.select(); }, 30);
@@ -280,12 +284,12 @@
       mark();
       ov.querySelector('#siteSty').onclick = function (e) { var b = e.target.closest('[data-v]'); if (!b) return; st = b.dataset.v; if (window.SITE_STYLE) SITE_STYLE.set(st); mark(); };      // Stil sofort zeigen
       ov.querySelector('#siteDc').onclick = function (e) { var b = e.target.closest('[data-v]'); if (!b) return; dc = b.dataset.v; mark(); };
-      ov.querySelector('.lg').onclick = function (e) { var b = e.target.closest('[data-l]'); if (!b || b.dataset.l === lang) return; var n = inp.value.trim(); if (n) SITE.setName(n); SITE.setDice(dc); SITE.setLang(b.dataset.l); };
+      ov.querySelector('.lg').onclick = function (e) { var b = e.target.closest('[data-l]'); if (!b || b.dataset.l === lang) return; var n = inp.value.trim(); if (n) SITE.setName(n); SITE.setDice(dc); SITE.setDiceBump(ov.querySelector('#siteBump').checked); SITE.setLang(b.dataset.l); };
       var c = ov.querySelector('#siteCancel'); if (c) c.onclick = function () { if (window.SITE_STYLE && st !== st0) SITE_STYLE.set(st0); ov.remove(); res(cur); };
       ov.querySelector('form').onsubmit = function (e) {
         e.preventDefault(); var n = inp.value.trim();
         if (!n) { inp.style.borderColor = '#ff5c7a'; inp.focus(); return; }
-        SITE.setName(n); if (window.SITE_STYLE) SITE_STYLE.set(st); SITE.setDice(dc); set(PROF, '1');
+        SITE.setName(n); if (window.SITE_STYLE) SITE_STYLE.set(st); SITE.setDice(dc); SITE.setDiceBump(ov.querySelector('#siteBump').checked); set(PROF, '1');
         ov.remove(); paintBtns(); res(n); document.dispatchEvent(new CustomEvent('site-name', { detail: n }));
       };
     });
