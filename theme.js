@@ -40,8 +40,8 @@
     if (off) root.setAttribute('data-fx', 'off'); else root.removeAttribute('data-fx');
   }
 
-  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'dark' && window.DARK_STYLE) return 'dark'; return 'cyber'; }
-  apply(current()); // Cyber ist die Voreinstellung; Dunkel gibt es nur auf Seiten mit window.DARK_STYLE
+  function current() { var v = get(KEY); if (v === 'standard') return 'standard'; if (v === 'dark') return 'dark'; return 'cyber'; }
+  apply(current()); // Cyber ist die Voreinstellung; Dunkel (Obsidian) gibt es jetzt auf allen Seiten
   applyFx(get(FX) === 'off');
   if (get(RAIN) === 'off') root.setAttribute('data-rain', 'off');
   var repaint = null;
@@ -75,8 +75,8 @@
     // Stil-Auswahl als Aufklappmenü mit allen Stilen; Dunkel ist nur auf Seiten wählbar, die es anbieten
     var b1 = document.createElement('select');
     b1.title = 'Stil wählen'; b1.setAttribute('aria-label', 'Stil wählen');
-    [['cyber', 'Stil: Cyber'], ['standard', 'Stil: Standard'], ['dark', window.DARK_STYLE ? 'Stil: Dunkel' : 'Stil: Dunkel (hier nicht verfügbar)']].forEach(function (s) {
-      var o = document.createElement('option'); o.value = s[0]; o.textContent = s[1]; if (s[0] === 'dark' && !window.DARK_STYLE) o.disabled = true; b1.appendChild(o);
+    [['cyber', 'Stil: Cyber'], ['standard', 'Stil: Standard'], ['dark', 'Stil: Dunkel']].forEach(function (s) {
+      var o = document.createElement('option'); o.value = s[0]; o.textContent = s[1]; b1.appendChild(o);
     });
     var b2 = document.createElement('button');
     var b3 = document.createElement('button');

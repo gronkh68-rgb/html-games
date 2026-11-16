@@ -25,13 +25,13 @@
     // ---------- Oberfläche ----------
     var css = document.createElement('style');
     css.textContent =
-      '#mpOv{position:fixed;inset:0;z-index:900;display:grid;place-items:center;background:rgba(5,7,20,.72);padding:12px;overflow:auto}' +
+      '#mpOv{position:fixed;inset:0;z-index:900;display:grid;place-items:center;background:rgba(4,7,14,.74);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:12px;overflow:auto}' +
       '#mpOv[hidden]{display:none}' +
-      '#mpOv .mpbox{width:min(520px,100%);max-height:94vh;overflow:auto;background:var(--card,#1a1e33);color:var(--text,#eef0ff);border:1px solid var(--border,#2a2f4f);border-radius:18px;padding:18px}' +
+      '#mpOv .mpbox{width:min(520px,100%);max-height:94vh;overflow:auto;background:var(--card,#1a1e33);color:var(--text,#eef0ff);border:1px solid var(--line2,var(--border,#2a2f4f));border-top:3px solid var(--accent,#7c5cff);border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5)}' +
       '#mpOv h2{margin:0 0 10px;font-size:1.05rem}#mpOv h3{margin:12px 0 6px;font-size:.85rem;color:var(--muted,#9aa0c3);text-transform:uppercase;letter-spacing:.08em}' +
       '#mpOv .mprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}' +
       '#mpOv input,#mpOv select{font:inherit;color:var(--text,#eef0ff);background:var(--bg,#0f1220);border:1px solid var(--border,#2a2f4f);border-radius:10px;padding:8px 10px}' +
-      '#mpOv .mpcode{font:900 2rem ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:8px 4px 8px 14px;background:var(--bg,#0f1220);border:1px solid var(--border,#2a2f4f);margin:6px 0}' +
+      '#mpOv .mpcode{font:900 2rem var(--mono,ui-monospace,monospace);letter-spacing:.35em;text-align:center;padding:8px 4px 8px 14px;background:var(--bg,#0f1220);border:1px dashed var(--line2,var(--border,#2a2f4f));border-radius:10px;color:var(--accent,#fff);margin:6px 0}' +
       '#mpOv .mphint{color:var(--muted,#9aa0c3);font-size:.82rem;margin:6px 0}' +
       '#mpOv .mpslot{display:flex;align-items:center;gap:10px;margin:7px 0;flex-wrap:wrap}' +
       '#mpOv .mpslot .nm{min-width:84px;color:var(--muted,#9aa0c3)}#mpOv .mpslot .who{font-weight:700}' +

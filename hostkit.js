@@ -24,12 +24,12 @@
 
   var CSS = '.hk-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}@media (max-width:900px){.hk-layout{grid-template-columns:1fr}}' +
     '.hk-main{display:flex;flex-direction:column;gap:10px;min-width:0}.hk-side{display:flex;flex-direction:column;gap:12px}.hk-side .panel{margin:0}' +
-    '#hkBanner{border-radius:12px;padding:10px 14px;text-align:center;font-weight:900;letter-spacing:.03em;font-size:1.05rem;background:rgba(0,0,0,.35);color:#cfe3ff;border:2px solid rgba(255,255,255,.12);transition:all .25s}' +
+    '#hkBanner{border-radius:12px;padding:10px 14px;text-align:center;font-weight:800;letter-spacing:.03em;font-size:1.05rem;background:var(--card,rgba(0,0,0,.35));color:var(--text,#cfe3ff);border:1px solid var(--line2,rgba(255,255,255,.14));border-top:3px solid var(--accent,#7c5cff);transition:all .25s}' +
     '#hkBanner[data-t]::after{content:" \\00b7  " attr(data-t) " s";font-variant-numeric:tabular-nums}#hkBanner[data-low]{background:#7a1010!important;color:#fff!important}' +
     '#hkBanner.me{background:linear-gradient(90deg,#ffb300,#ffd23f,#ffb300);color:#1b1200;border-color:#fff;font-size:1.25rem;animation:hkPulse .8s ease-in-out infinite alternate}' +
-    'html[data-style="cyber"] #hkBanner.me{background:linear-gradient(90deg,#c9bd00,#fcee09,#c9bd00)}' +
-    '@keyframes hkPulse{from{box-shadow:0 0 6px rgba(255,210,63,.5)}to{box-shadow:0 0 26px rgba(255,210,63,.95)}}' +
-    '#hkStatus{background:rgba(0,0,0,.4);color:#fff;border-radius:10px;padding:8px 12px;text-align:center;min-height:2.6em;display:flex;align-items:center;justify-content:center;font-weight:600}' +
+    'html[data-style="cyber"] #hkBanner.me{background:linear-gradient(90deg,#00a8d6,#27d8ff,#00a8d6);color:#031018;border-color:#fff;--pc:rgba(0,207,255,.95)}html[data-style="dark"] #hkBanner.me{background:linear-gradient(90deg,#c99b4d,#f6e3b4,#c99b4d);color:#1b1200}' +
+    '@keyframes hkPulse{from{box-shadow:0 0 6px rgba(255,210,63,.4)}to{box-shadow:0 0 26px var(--pc,rgba(255,210,63,.95))}}' +
+    '#hkStatus{background:var(--card-hover,rgba(0,0,0,.4));color:var(--text,#fff);border:1px solid var(--border,transparent);border-radius:10px;padding:8px 12px;text-align:center;min-height:2.6em;display:flex;align-items:center;justify-content:center;font-weight:600}' +
     '#hkLog{font-size:.8rem;color:var(--muted);max-height:220px;overflow:auto;line-height:1.4}#hkLog div{padding:2px 0;border-top:1px solid rgba(255,255,255,.06)}' +
     '.hk-score{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:4px 0}.hk-score b{font-size:1.1rem}.hk-score.turn span{color:#ffd23f;font-weight:800}' +
     '#hkModal{z-index:900}#hkModal .box{max-width:min(560px,94vw);max-height:92vh;overflow:auto}#hkModal .ico{font-size:2.6rem;line-height:1}#hkModal p,#hkModal .tx{color:var(--text);text-align:left;margin:0 0 14px;line-height:1.45}' +
@@ -38,7 +38,7 @@
     '#hkModal.dock{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px)}#hkModal.dock>.box{max-height:calc(100vh - 34px);max-height:calc(100dvh - 34px)}' +
     '@media (max-width:900px){#hkModal.dock{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);padding-bottom:env(safe-area-inset-bottom)}#hkModal.dock>.box{max-height:calc(100vh - 28px);max-height:calc(100dvh - 28px - env(safe-area-inset-bottom))}}' +
     '.hk-btns{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}.hk-btns .btn{width:100%}.hk-btns.cols{display:grid;grid-template-columns:1fr 1fr}' +
-    '#hkToast{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:950;background:rgba(10,14,30,.92);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px 16px;font-weight:700;pointer-events:none;transition:opacity .3s;max-width:90vw;text-align:center}' +
+    '#hkToast{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:950;background:var(--card,rgba(10,14,30,.92));color:var(--text,#fff);border:1px solid var(--line2,rgba(255,255,255,.25));border-top:3px solid var(--accent,#7c5cff);border-radius:12px;padding:10px 16px;box-shadow:0 12px 36px rgba(0,0,0,.45);font-weight:700;pointer-events:none;transition:opacity .3s;max-width:90vw;text-align:center}' +
     '.rules ul{margin:6px 0 0;padding-left:18px;line-height:1.55;font-size:.9rem}.hk-opts{display:grid;gap:6px;margin:8px 0}.hk-opts label{display:flex;gap:10px;align-items:flex-start;line-height:1.35;font-size:.9rem;cursor:pointer}.hk-opts input{margin-top:3px}.hk-opts small{display:block;color:var(--muted)}';
 
   HK.init = function (cfg) {
