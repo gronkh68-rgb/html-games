@@ -1039,7 +1039,7 @@ function safeHtml(html){
 }
 
 // ---------- Wiederbeitritt (Client merkt sich Raum und Token) ----------
-function getRejoin(){try{const r=JSON.parse(localStorage.getItem('mdn-rejoin')||'null');if(r&&r.code&&r.tok&&Date.now()-r.t<6*3600e3)return r;}catch(e){}return null;}
+function getRejoin(){try{const r=JSON.parse(localStorage.getItem('mdn-rejoin')||'null');if(r&&r.code&&r.tok&&Date.now()-r.t<24*3600e3)return r;}catch(e){}return null;}
 function setRejoin(r){try{if(r)localStorage.setItem('mdn-rejoin',JSON.stringify(r));else localStorage.removeItem('mdn-rejoin');}catch(e){}renderRejoin();}
 function renderRejoin(){
   const r=netRole==='client'?null:getRejoin();
@@ -1273,7 +1273,7 @@ function saveGame(s,code,slot,toks){
   try{if(false)0;else localStorage.setItem('mdn-saved',JSON.stringify({t:now,code,slot,tok:myTok,name:myNameVal(),toks:toks||null,snap:s}));}catch(e){}
   renderSaved();
 }
-function getSaved(){try{const r=JSON.parse(localStorage.getItem('mdn-saved')||'null');if(r&&r.snap&&r.code&&Date.now()-r.t<12*3600e3)return r;}catch(e){}return null;}
+function getSaved(){try{const r=JSON.parse(localStorage.getItem('mdn-saved')||'null');if(r&&r.snap&&r.code&&Date.now()-r.t<24*3600e3)return r;}catch(e){}return null;}
 function clearSaved(){try{localStorage.removeItem('mdn-saved');}catch(e){}renderSaved();}
 function broadcastSnap(){
   if(netRole!=='host')return;
@@ -1475,8 +1475,8 @@ $('again').onclick=()=>{if(netRole==='client'){goMenu('');}else backToSetup();};
 // Start: Name und Raumlink aus der Adresse
 
 {
-  const q=new URLSearchParams(location.search).get('room');
-  if(q){$('joinCode').value=q.toUpperCase().slice(0,5);showMode('join');}
+  const qp=new URLSearchParams(location.search),q=qp.get('room');
+  if(q){$('joinCode').value=q.toUpperCase().slice(0,5);showMode('join');if(qp.get('spec'))setTimeout(()=>joinRoom(q.toUpperCase().slice(0,5),true),600);else if(qp.get('resume'))setTimeout(()=>joinRoom(q.toUpperCase().slice(0,5)),600);}      // Links von der Startseite
   else if(getRejoin())showMode('join');
   else showMode('local');
 }

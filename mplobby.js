@@ -71,7 +71,7 @@
     // Wiederbeitritt: eigene Kennung und letzten Raum merken
     var LASTK = 'mp-last-' + cfg.prefix;
     function myRid() { try { var r = localStorage.getItem('mp-rid'); if (!r) { r = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); localStorage.setItem('mp-rid', r); } return r; } catch (e) { return 'x' + Math.random().toString(36).slice(2, 10); } }
-    function getLast() { if (!cfg.rejoin) return null; try { var l = JSON.parse(localStorage.getItem(LASTK) || 'null'); return l && Date.now() - l.t < 6 * 3600e3 ? l : null; } catch (e) { return null; } }
+    function getLast() { if (!cfg.rejoin) return null; try { var l = JSON.parse(localStorage.getItem(LASTK) || 'null'); return l && Date.now() - l.t < 24 * 3600e3 ? l : null; } catch (e) { return null; } }
     function saveLast(code) { if (!cfg.rejoin || !code) return; try { localStorage.setItem(LASTK, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {} }
     function clearLast() { try { localStorage.removeItem(LASTK); } catch (e) {} updateRejoin(); }
     function updateRejoin() { var l = getLast(), show = !!l && L.role !== 'client'; $('mpRejoin').hidden = !show; if (show) $('mpRejoinCode').textContent = l.code; }
@@ -455,7 +455,8 @@
 
     // Raumlink (?room=CODE): Beitritts-Fenster direkt öffnen
     var q = new URLSearchParams(location.search).get('room');
-    if (q) { setTimeout(function () { ov.hidden = false; showMode('join'); $('mpJoinCode').value = q.toUpperCase().slice(0, 5); }, 300); }
+    var qp = new URLSearchParams(location.search);
+    if (q) { setTimeout(function () { ov.hidden = false; showMode('join'); $('mpJoinCode').value = q.toUpperCase().slice(0, 5); }, 300); if (qp.get('spec')) setTimeout(function () { joinRoom(q.toUpperCase().slice(0, 5), true); }, 900); else if (qp.get('resume')) setTimeout(function () { joinRoom(q.toUpperCase().slice(0, 5)); }, 900); }      // Links von der Startseite: direkt beitreten, zurück ins Spiel oder zuschauen
     return L;
   };
 })();

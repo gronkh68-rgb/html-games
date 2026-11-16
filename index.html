@@ -52,10 +52,26 @@ header p{margin:0;color:var(--muted);font-size:1.05rem}
 .menu button{font:inherit;font-size:.9rem;font-weight:600;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 12px;cursor:pointer}
 .menu button:hover{border-color:var(--accent)}.menu .lang{display:inline-flex;gap:6px}.menu .lang button.on{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2) inset}
 .menu .hello{color:var(--muted);font-weight:600}
+/* Favoriten, eigene offene Spiele und Browser für öffentliche Räume */
+.game{position:relative}
+.fav{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--muted);font-size:1.15rem;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;z-index:2}
+.fav:hover{border-color:#ffd23f;color:#ffd23f}.fav.on{color:#ffd23f;border-color:#ffd23f;background:rgba(255,210,63,.15)}
+.bar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:0 0 14px;flex-wrap:wrap}.bar .hint{color:var(--muted);font-size:.85rem}
+.bar button,.xp .btn{font:inherit;font-size:.9rem;font-weight:600;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;display:inline-block}
+.bar button:hover,.xp .btn:hover{border-color:var(--accent)}.bar button.on{border-color:#ffd23f;color:#ffd23f}
+.xp{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px;margin:0 0 14px}
+.xp h3,.xp summary{margin:0;font-size:1rem;font-weight:700;cursor:default}.xp summary{cursor:pointer}.xp .n{color:var(--muted);font-weight:600;font-size:.85rem;margin-left:6px}
+.xr{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;flex-wrap:wrap}.xr:first-child{margin-top:10px}
+.xr .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:1.2rem;background:linear-gradient(135deg,var(--accent),var(--accent2));flex:none}
+.xr .tx{flex:1;min-width:150px;line-height:1.3}.xr .tx small{color:var(--muted);display:block}
+.xr .btn.go{border-color:var(--accent2);color:var(--accent2)}.xr .btn.x{padding:7px 10px}
+.empty{color:var(--muted);font-size:.9rem;padding-top:8px}
 footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
 </style>
 <script>window.DARK_STYLE=1;</script>
 <script src="theme.js"></script>
+<script src="net-config.js"></script>
+<script src="net.js"></script>
 </head>
 <body>
 <main>
@@ -69,6 +85,9 @@ footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
       <span class="lang" data-noi18n><button data-l="de">🇩🇪 Deutsch</button><button data-l="en">🇬🇧 English</button></span>
     </div>
   </header>
+  <section class="xp" id="mine" hidden><h3 id="mineT"></h3><div id="mineList"></div></section>
+  <section class="xp"><details id="liveBox" open><summary id="liveT"></summary><div id="liveList" class="empty"></div></details></section>
+  <div class="bar"><button id="favOnly"></button><span class="hint" id="favHint"></span></div>
   <div class="grid">
     <a class="game" href="wortgitter/">
       <div class="icon">🔤</div>
@@ -251,6 +270,51 @@ document.getElementById('hello').setAttribute('data-noi18n','');
 document.getElementById('mName').onclick=()=>SITE.askName(true).then(paintMenu);
 document.querySelector('.menu .lang').onclick=e=>{const b=e.target.closest('[data-l]');if(b&&b.dataset.l!==SITE.lang)SITE.setLang(b.dataset.l);};
 document.addEventListener('site-name',paintMenu);paintMenu();
+// ---------- Favoriten: Stern auf jeder Karte, Favoriten stehen oben ----------
+const T=(d,e)=>SITE.T(d,e),esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const grid=document.querySelector('.grid'),cards=[...grid.querySelectorAll('.game')],pathOf=c=>c.getAttribute('href');
+let favs=[],favOnly=false;try{favs=JSON.parse(localStorage.getItem('html-games-favs')||'[]');favOnly=localStorage.getItem('html-games-favonly')==='1';}catch(e){}
+cards.forEach((c,i)=>{c._i=i;const b=document.createElement('button');b.type='button';b.className='fav';b.textContent='★';b.onclick=e=>{e.preventDefault();e.stopPropagation();const p=pathOf(c),k=favs.indexOf(p);if(k>=0)favs.splice(k,1);else favs.push(p);try{localStorage.setItem('html-games-favs',JSON.stringify(favs));}catch(x){}paintFavs();};c.appendChild(b);});
+function paintFavs(){
+  const n=cards.filter(c=>favs.includes(pathOf(c))).length;
+  cards.forEach(c=>{const f=favs.includes(pathOf(c));c.querySelector('.fav').classList.toggle('on',f);c.querySelector('.fav').title=f?T('Aus Favoriten entfernen','Remove from favourites'):T('Zu Favoriten','Add to favourites');c.style.display=favOnly&&!f?'none':'';});
+  [...cards].sort((a,b)=>(favs.includes(pathOf(b))-favs.includes(pathOf(a)))||(a._i-b._i)).forEach(c=>grid.appendChild(c));
+  const fb=document.getElementById('favOnly');fb.textContent=favOnly?T('★ Alle Spiele zeigen','★ Show all games'):T('☆ Nur Favoriten zeigen','☆ Show favourites only');fb.classList.toggle('on',favOnly);fb.disabled=!n&&!favOnly;
+  document.getElementById('favHint').textContent=n?T(`${n} Favorit(en) stehen oben`,`${n} favourite(s) on top`):T('Tippe den Stern auf einer Karte, um ein Spiel nach oben zu holen.','Tap the star on a card to move a game to the top.');
+}
+document.getElementById('favOnly').onclick=()=>{favOnly=!favOnly;try{localStorage.setItem('html-games-favonly',favOnly?'1':'0');}catch(e){}paintFavs();};
+paintFavs();
+// ---------- Offene Spiele: eigene (zum Wiederaufnehmen) und öffentliche Räume aller Spiele ----------
+const PF={'mensch-aergere-dich-nicht':'mdn-v1-','mensch-teams':'mtm-v1-','hoellen-tycoon':'htc-v1-','heldengilde':'hgl-v1-','auf-und-ab':'aua-v1-','wortgitter':'wgt-v1-','domino':'dom-v1-','billard':'bil-v1-','jenga':'jng-v1-','neun-welten':'nwl-v1-','farbchaos':'fch-v1-','hanafuda':'hnf-v1-','muehle':'mue-v1-','netrunner-aergere-dich-nicht':'ndn-v1-','poker':'pkr-v1-','blackjack':'bjk-v1-','schiffe-versenken':'sv-v1-','tron':'tron-v1-','vier-gewinnt':'c4-v1-'};
+const info=path=>{const c=cards.find(x=>pathOf(x)===path+'/');return c?{n:c.querySelector('h2').textContent,i:c.querySelector('.icon').textContent,path:path+'/'}:{n:path,i:'🎮',path:path+'/'};};
+const byPrefix={};Object.keys(PF).forEach(p=>byPrefix[PF[p]]=p);
+const ago=ms=>{const m=Math.max(1,Math.round(ms/60000));return m<60?T(`vor ${m} Min.`,`${m} min ago`):T(`vor ${Math.round(m/60)} Std.`,`${Math.round(m/60)} h ago`);};
+const DAY=24*3600e3;      // nicht wieder aufgenommene Spiele verfallen nach 24 Stunden
+function paintMine(){
+  const rows=[],now=Date.now();
+  const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+  Object.keys(PF).forEach(path=>{
+    const pf=PF[path],keys=pf==='mdn-v1-'?['mdn-saved','mdn-rejoin']:['mp-last-'+pf];
+    let best=null;keys.forEach(k=>{const v=rd(k);if(!v)return;if(!v.code||!v.t||now-v.t>DAY){try{localStorage.removeItem(k);}catch(e){}return;}if(!best||v.t>best.t)best={code:v.code,t:v.t};});
+    if(best)rows.push({path,code:best.code,t:best.t,keys});
+  });
+  rows.sort((a,b)=>b.t-a.t);
+  const box=document.getElementById('mine');box.hidden=!rows.length;if(!rows.length)return;
+  document.getElementById('mineT').innerHTML=T('🗂 Meine offenen Spiele','🗂 My open games')+'<span class="n">'+T('verfallen nach 24 Std.','expire after 24 h')+'</span>';
+  document.getElementById('mineList').innerHTML=rows.map(r=>{const g=info(r.path);return `<div class="xr"><span class="ic">${g.i}</span><div class="tx"><b>${esc(g.n)}</b><small>${T('Raum','Room')} ${esc(r.code)} · ${ago(now-r.t)}</small></div><a class="btn go" href="${g.path}?room=${encodeURIComponent(r.code)}&resume=1">${T('↩ Zurück ins Spiel','↩ Back into the game')}</a><button class="btn x" data-forget="${r.path}" title="${T('Vergessen','Forget')}">✕</button></div>`;}).join('');
+  document.getElementById('mineList').dataset.rows=JSON.stringify(rows.map(r=>[r.path,r.keys]));
+}
+document.getElementById('mineList').addEventListener('click',e=>{const b=e.target.closest('[data-forget]');if(!b)return;const rows=JSON.parse(document.getElementById('mineList').dataset.rows||'[]'),r=rows.find(x=>x[0]===b.dataset.forget);if(r)r[1].forEach(k=>{try{localStorage.removeItem(k);}catch(x){}});paintMine();});
+paintMine();setInterval(paintMine,30000);
+let liveList=[];
+function paintLive(){
+  const lst=liveList.map(g=>Object.assign({},g,{path:byPrefix[g.prefix]})).filter(g=>g.path).sort((a,b)=>(a.live-b.live)||(b.count-a.count));
+  document.getElementById('liveT').innerHTML=T('🌐 Offene Spiele online','🌐 Open games online')+'<span class="n">'+(lst.length?lst.length:'')+'</span>';
+  const el=document.getElementById('liveList');el.className=lst.length?'':'empty';
+  el.innerHTML=lst.length?lst.map(g=>{const i=info(g.path);return `<div class="xr"><span class="ic">${i.i}</span><div class="tx"><b>${esc(i.n)}</b><small>${esc(g.host||'?')} · ${g.live?T('Spiel läuft','game in progress'):g.count+'/'+g.max+' '+T('Spieler','players')}</small></div><a class="btn${g.live?'':' go'}" href="${i.path}?room=${encodeURIComponent(g.code)}${g.live?'&spec=1':''}">${g.live?T('👁 Zuschauen','👁 Watch'):T('Beitreten','Join')}</a></div>`;}).join(''):T('Gerade ist kein öffentliches Spiel offen. Erstelle in einem Spiel einen öffentlichen Raum, er erscheint hier für alle.','No public game is open right now. Create a public room in a game and it shows up here for everyone.');
+}
+paintLive();
+try{if(window.Net&&Net.watchAll)Net.watchAll(Object.values(PF),l=>{liveList=l;paintLive();});}catch(e){}
 </script>
 </body>
 </html>

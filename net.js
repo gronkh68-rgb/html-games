@@ -295,6 +295,31 @@
     return { stop: function () { closed = true; clearInterval(timer); if (mq) mq.close(); } };
   };
 
+  // Alle öffentlichen Räume mehrerer Spiele mit einer einzigen Verbindung (Startseite: Browser für offene Spiele)
+  Net.watchAll = function (prefixes, onList) {
+    var mq = null, closed = false, seen = {}, timer = null, byTopic = {};
+    prefixes.forEach(function (p) { byTopic[pubTopic(p)] = p; });
+    function emit() {
+      var now = Date.now(), list = [];
+      Object.keys(seen).forEach(function (k) { if (now - seen[k].t > PUB_STALE) delete seen[k]; else list.push(seen[k]); });
+      onList(list);
+    }
+    async function open() {
+      mq = new MiniMqtt();
+      mq.onmessage = function (t, s) {
+        var pf = byTopic[t]; if (!pf) return; var m; try { m = JSON.parse(s); } catch (e) { return; }
+        if (!m || typeof m.code !== 'string' || !/^[A-Z2-9]{4,8}$/.test(m.code)) return;
+        seen[pf + m.code] = { prefix: pf, code: m.code, host: String(m.host || '').slice(0, 14), count: +m.count || 0, max: +m.max || 4, live: !!m.live, t: Date.now() };
+        emit();
+      };
+      mq.onclose = function () { if (!closed) setTimeout(function () { open().catch(function () {}); }, 3000); };
+      await mq.connect(BROKERS); prefixes.forEach(function (p) { mq.subscribe(pubTopic(p)); });
+    }
+    open().catch(function () {});
+    timer = setInterval(emit, 3000);
+    return { stop: function () { closed = true; clearInterval(timer); if (mq) mq.close(); } };
+  };
+
   // Einem Raum beitreten: erst WebRTC, bei Problemen zusätzlich über den Relay.
   Net.join = function (prefix, code, cb) {
     var finished = false, peer = null, rc = null, relayStarted = false, timers = [];
