@@ -438,6 +438,7 @@ $('musicBtn').onclick=()=>{
 $('musicVol').oninput=e=>{bgm.volume=+e.target.value;try{localStorage.setItem('tetris-vol',e.target.value);}catch(err){}};
 updateMusicUi();
 
+if(window.SITE&&SITE.guard)SITE.guard(()=>(running||paused)&&!over);
 board=newBoard();queue=[];bag=[];fillQueue();score=0;lines=0;level=1;updateHud();
 requestAnimationFrame(t=>{lastT=t;loop(t);});
 </script>

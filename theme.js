@@ -111,7 +111,7 @@
 
 /* ===== Seitenweite Funktionen: Spielername, Sprache (DE/EN), Versionsnummer und Update-Hinweis ===== */
 (function () {
-  var VERSION = '3.29.2';
+  var VERSION = '3.30.0';
   var script = document.currentScript, base = script.src.replace(/theme\.js.*$/, ''), root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -119,8 +119,12 @@
   if (lang !== 'de' && lang !== 'en') lang = /^de/i.test(navigator.language || 'de') ? 'de' : 'en';
   root.lang = lang;
   var dict = {}, pats = [];
+  var guards = [];
   var SITE = window.SITE = {
     version: VERSION, lang: lang, base: base,
+    // Spiele melden, ob gerade eine Partie läuft: dann fragt der Browser beim Schließen, Neuladen und Zurück nach (die App ebenso).
+    guard: function (fn) { if (typeof fn === 'function') guards.push(fn); },
+    playing: function () { for (var i = 0; i < guards.length; i++) { try { if (guards[i]()) return true; } catch (e) {} } return false; },
     T: function (de, en) { return lang === 'en' && en != null ? en : de; },
     name: function () { return (get('mp-name') || '').trim(); },
     setName: function (n) { n = String(n || '').trim().slice(0, 14); if (n) set('mp-name', n); var i = document.getElementById('mpName'); if (i) i.value = n; return n; },
@@ -302,6 +306,14 @@
   var shownV = null, lastCheck = 0;
   function cmpV(a, b) { a = String(a).split('.').map(Number); b = String(b).split('.').map(Number); for (var i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) - (b[i] || 0); } return 0; }
   try { if (/[?&]_v=/.test(location.search) && history.replaceState) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])_v=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash); } catch (e) {}
+  // Warnung beim Verlassen: Fenster schließen, Seite neu laden, Browser-Zurück
+  addEventListener('beforeunload', function (e) { if (!SITE.playing() || window.__siteLeaving) return; e.preventDefault(); e.returnValue = ''; return ''; });
+  // Der Knopf „← Spiele“ und andere Links im Spiel fragen selbst nach (der Browser fragt nur bei Schließen und Neuladen)
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]'); if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || a.target === '_blank') return;
+    if (!SITE.playing() || /^(#|javascript:|mailto:)/.test(a.getAttribute('href'))) return;
+    if (!confirm(SITE.T('Das Spiel läuft noch. Wirklich verlassen?', 'The game is still running. Really leave?'))) e.preventDefault(); else window.__siteLeaving = true;
+  }, true);
   function checkUpdate() {
     if (Date.now() - lastCheck < 20000 || location.protocol === 'file:') return; lastCheck = Date.now();
     fetch(base + 'version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {

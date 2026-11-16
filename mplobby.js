@@ -73,6 +73,7 @@
     function myRid() { try { var r = localStorage.getItem('mp-rid'); if (!r) { r = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); localStorage.setItem('mp-rid', r); } return r; } catch (e) { return 'x' + Math.random().toString(36).slice(2, 10); } }
     function getLast() { if (!cfg.rejoin) return null; try { var l = JSON.parse(localStorage.getItem(LASTK) || 'null'); return l && Date.now() - l.t < 24 * 3600e3 ? l : null; } catch (e) { return null; } }
     // ---------- Unbeendete Spiele: Host und Ersatz-Host speichern den letzten Stand (24 Std.), damit nach einem Totalausfall einer das Spiel fortsetzen kann ----------
+    if (window.SITE && SITE.guard) SITE.guard(function () { return L.playing && L.role !== 'local'; });
     var SAVEK = 'mp-saved-' + cfg.prefix, savedT = 0;
     function getSaved() { if (!cfg.migrate) return null; try { var g = JSON.parse(localStorage.getItem(SAVEK) || 'null'); return g && g.snap && g.code && Date.now() - g.t < 24 * 3600e3 ? g : null; } catch (e) { return null; } }
     function clearSaved() { try { localStorage.removeItem(SAVEK); } catch (e) {} }

@@ -269,6 +269,7 @@ $('again').onclick = function () { $('win').hidden = true; startGame(true); };
 $('newp').onclick = function () { $('win').hidden = true; toSetup(); };
 $('bBack').onclick = toSetup;
 function syncFull() { var on = S.mode === '3d' && !$('game').hidden; document.body.classList.toggle('full3d', on); if (G && !$('game').hidden) setTimeout(resizeAll, 60); }
+if (window.SITE && SITE.guard) SITE.guard(function () { return !!G && !$('game').hidden && !won; });
 function toSetup() { $('game').hidden = true; $('setup').hidden = false; timer.on = false; syncFull(); }
 
 /* ===================== Verteilen ===================== */

@@ -70,6 +70,7 @@
       if (K.ROLE === 'host') K.G.seats.forEach(function (x, i) { if (x.type === 'remote') K.L.sendTo(x.seat, { k: 'v', v: cfg.view(K.G, i) }); });
       if (K.ROLE === 'host' && K.L.specs && K.L.specs.length) K.L.sendSpecs({ k: 'v', v: cfg.view(K.G, -1) });      // Zuschauer sehen die Sicht ohne eigenen Platz
     };
+    if (window.SITE && SITE.guard) SITE.guard(function () { return !!K.G && !K.G.over; });
     K.apply = function () { if (!K.V) return; cfg.render(K.V, K.prevV); K.prevV = K.V; };
     K.fxLocal = function (d) {
       if (d && d.k === 'dice3d') { if (!HK.noView && window.Dice3D) K.dview(d.p).play(d.track, { hold: 1300, color: d.col, mine: d.p === K.ME, mod: !!d.mod, rot: d.rot || 0 }); return; }

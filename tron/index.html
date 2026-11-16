@@ -141,6 +141,7 @@ $('sndBtn').onclick=()=>{sndOn=!sndOn;try{localStorage.setItem('tron-sound',sndO
 // ---------- Zustand ----------
 const cv=$('cv'),cv3=$('cv3'),ctx=cv.getContext('2d'),bgC=document.createElement('canvas'),trC=document.createElement('canvas'),tctx=trC.getContext('2d');
 let W=84,H=50,cs=10,grid=new Uint8Array(W*H),P=[],state='menu',paused=false;
+if(window.SITE&&SITE.guard)SITE.guard(()=>state==='count'||state==='play');
 let sub=35,acc=0,simT=0,tickN=0,last=0,lastSim=0,mul=1,parts=[],shake=0,flowTok=0;
 let vis=new Uint8Array(W*H),que=new Int32Array(W*H);
 // Online: Der Host rechnet das Spiel und schickt jeden Schritt; Mitspieler schicken nur ihre Lenkbefehle

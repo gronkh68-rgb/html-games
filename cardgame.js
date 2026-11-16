@@ -493,6 +493,7 @@
     $('cgOnline').onclick = function () { $('cgMenu').hidden = true; L.open(); };
     var mpClose = document.getElementById('mpClose');
     if (mpClose) mpClose.addEventListener('click', function () { if (S.role !== 'host' && S.role !== 'client') $('cgMenu').hidden = false; });
+    if (window.SITE && SITE.guard) SITE.guard(function () { return !!S.engine && !(S.lastView && S.lastView.over); });
     CG.state = S; CG.ctx = ctx;
   };
 })();

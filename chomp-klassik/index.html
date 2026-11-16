@@ -201,6 +201,7 @@ addEventListener('pointerup',()=>{sw=null;});
 setInterval(()=>{if(document.hidden&&(state==='play'))paused=true;},1000);
 function start(){$('ov').hidden=true;newGame();}
 $('ovB').onclick=start;
+if(window.SITE&&SITE.guard)SITE.guard(()=>state==='play'||state==='ready'||state==='dying'||state==='clear');
 resetDots();resetActors();state='title';updHud();requestAnimationFrame(t=>{lastT=t;loop(t);});
 </script>
 </body>

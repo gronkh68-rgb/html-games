@@ -1,6 +1,6 @@
 // Dünner Rahmen um das Spieleportal: öffnet immer die aktuelle Version von GitHub Pages.
 // Neue Spiele und Fehlerkorrekturen kommen so ohne neue .exe an (jeder Push auf main wird bei GitHub veröffentlicht).
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path = require('path');
 const URL_SITE = 'https://gronkh68-rgb.github.io/html-games/';
 
@@ -17,6 +17,11 @@ function create() {
   w.webContents.on('did-fail-load', (_e, code, _d, url, isMain) => {
     if (!isMain || code === -3) return;
     w.loadFile(path.join(__dirname, 'offline.html'), { query: { retry: '1' } });
+  });
+  // Läuft ein Spiel, meldet die Seite das über beforeunload: dann fragen wir vor dem Schließen des Fensters nach
+  w.webContents.on('will-prevent-unload', e => {
+    const c = dialog.showMessageBoxSync(w, { type: 'question', buttons: ['Weiterspielen', 'Verlassen'], defaultId: 0, cancelId: 0, title: 'Spiel läuft', message: 'Das Spiel läuft noch. Wirklich verlassen?' });
+    if (c === 1) e.preventDefault();      // preventDefault = Seite darf geschlossen werden
   });
   // Links auf fremde Seiten im normalen Browser öffnen
   w.webContents.setWindowOpenHandler(({ url }) => { if (!url.startsWith(URL_SITE)) shell.openExternal(url); return { action: url.startsWith(URL_SITE) ? 'allow' : 'deny' }; });

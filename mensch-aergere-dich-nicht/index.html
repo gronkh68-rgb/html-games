@@ -1481,6 +1481,7 @@ $('again').onclick=()=>{if(netRole==='client'){goMenu('');}else backToSetup();};
   else showMode('local');
 }
 renderSaved();
+if(window.SITE&&SITE.guard)SITE.guard(()=>!$('game').hidden&&$('winBox').hidden);
 addEventListener('beforeunload',()=>{try{if(netRole==='client'&&hostConn)hostConn.send({t:'bye'});}catch(e){}});
 </script>
 <script>
