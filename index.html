@@ -16,7 +16,7 @@
   --glow:0 0 18px rgba(0,207,255,.35);color-scheme:dark;
 }
 html:not([data-style]){--bg:#f3f5fb;--bg2:#fff;--card:#fff;--card2:#f4f1ff;--line:#e1e5f2;--line2:#c9d0e8;--text:#1b1e33;--muted:#5d6385;--dim:#8b91b0;--cy:#2563eb;--gr:#16a34a;--or:#d97706;--vi:#7c5cff;--pk:#db2777;--glow:0 6px 24px rgba(124,92,255,.22);color-scheme:light}
-html[data-style="dark"]{--bg:#0d1016;--bg2:#10141b;--card:#141821;--card2:#1a202b;--line:#232a36;--line2:#313b4b;--cy:#5b8def;--glow:0 6px 22px rgba(0,0,0,.4)}
+html[data-style="dark"]{--bg:#08090e;--bg2:rgba(255,255,255,.04);--card:rgba(255,255,255,.035);--card2:rgba(255,255,255,.07);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--text:#ebeef6;--muted:#9aa3b8;--dim:#6b7489;--cy:#8b92ff;--gr:#7ee0b5;--or:#f0b36a;--vi:#b79cff;--pk:#f08ab0;--gold:#e8c27a;--gold2:#f6e3b4;--glow:0 8px 30px rgba(99,102,241,.28)}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;min-height:100vh;color:var(--text);font-family:var(--ui);background:var(--bg);position:relative;overflow-x:hidden}
@@ -106,6 +106,53 @@ footer a{color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:900px){.dash{grid-template-columns:1fr}.search{order:3;flex-basis:100%;max-width:none}.top-in{flex-wrap:wrap}.menu{margin-left:auto}}
 @media (max-width:560px){.hero p,.hero .stats{display:none}.hero{margin-bottom:18px}main{padding:22px 14px 40px}.top-in{padding:9px 14px}.brand small{display:none}.menu .hello{display:none}.grid{grid-template-columns:1fr}.stat{padding:7px 11px}}
+
+/* ---------- Stil „Obsidian“ (Dunkel): kunstvoller ---------- */
+html[data-style="dark"] body::after{display:none}
+html[data-style="dark"] .top{background:rgba(8,9,14,.62);border-bottom:1px solid rgba(255,255,255,.07)}
+html[data-style="dark"] .top::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(232,194,122,.55),transparent);opacity:.7}
+html[data-style="dark"] .brand b{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:1.35rem;letter-spacing:.14em;color:var(--gold2)}
+html[data-style="dark"] .brand b i{color:#fff;text-shadow:none}
+html[data-style="dark"] .brand small{color:var(--gold);font-size:.6rem;letter-spacing:.34em;opacity:.85}
+html[data-style="dark"] .search input,html[data-style="dark"] .menu button,html[data-style="dark"] .chip,html[data-style="dark"] .btn,html[data-style="dark"] .stat,html[data-style="dark"] .tag{background:rgba(255,255,255,.04);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+html[data-style="dark"] .search input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,194,122,.16)}
+html[data-style="dark"] .menu button:hover,html[data-style="dark"] .btn:hover{border-color:var(--gold);color:var(--gold2);box-shadow:0 8px 24px rgba(232,194,122,.14)}
+html[data-style="dark"] .menu .lang button.on,html[data-style="dark"] .chip.on{color:var(--gold2);border-color:rgba(232,194,122,.6);background:rgba(232,194,122,.09);box-shadow:inset 0 0 0 1px rgba(232,194,122,.25),0 6px 20px rgba(232,194,122,.1)}
+html[data-style="dark"] .btn.go{color:var(--gold2);border-color:rgba(232,194,122,.55)}
+/* Titelbereich: Serifenschrift mit Goldverlauf und Zierlinie */
+html[data-style="dark"] .hero{align-items:flex-start;position:relative;padding-bottom:26px}
+html[data-style="dark"] .hero::after{content:"";position:absolute;left:0;bottom:0;width:min(520px,70%);height:14px;background:linear-gradient(90deg,var(--gold),transparent) center/100% 1px no-repeat;opacity:.55}
+html[data-style="dark"] .hero::before{content:"";position:absolute;left:0;bottom:-6px;width:13px;height:13px;border:1px solid var(--gold);transform:rotate(45deg);background:var(--bg);opacity:.9}
+html[data-style="dark"] .hero .eyebrow{color:var(--gold);font-size:.72rem;letter-spacing:.34em}
+html[data-style="dark"] .hero h1{font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;font-weight:500;text-transform:none;font-size:clamp(2.6rem,6.4vw,4.6rem);letter-spacing:-.01em;line-height:1.02}
+html[data-style="dark"] .hero h1 em{font-style:italic;font-weight:500;background:linear-gradient(95deg,#fff3d0 0%,var(--gold) 45%,#b98a3c 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+html[data-style="dark"] .stat b{font-family:'Cormorant Garamond',Georgia,serif;font-size:1.6rem;font-weight:600;color:var(--gold2)}
+/* Glas-Bereiche */
+html[data-style="dark"] .xp{background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.09);border-top:1px solid rgba(232,194,122,.45);box-shadow:0 20px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+html[data-style="dark"] .xp h3,html[data-style="dark"] .xp summary{font-family:'Share Tech Mono',monospace;letter-spacing:.22em;font-size:.78rem;color:var(--gold2)}
+html[data-style="dark"] .xr .ic{background:radial-gradient(circle at 30% 25%,rgba(232,194,122,.22),rgba(255,255,255,.04));border-color:rgba(232,194,122,.3)}
+/* Karten: Glas, Verlaufsrand, Lichtfleck unter dem Mauszeiger, Leuchtkugel hinter dem Symbol */
+html[data-style="dark"] .gc{--mx:50%;--my:0%;background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.012));border:1px solid rgba(255,255,255,.09);border-top:1px solid color-mix(in srgb,var(--c) 70%,#fff 10%);border-radius:18px;box-shadow:0 18px 44px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.06);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+html[data-style="dark"] .gc::before{background:radial-gradient(240px 180px at var(--mx) var(--my),color-mix(in srgb,var(--c) 24%,transparent),transparent 70%),radial-gradient(220px 100px at 0% 0%,color-mix(in srgb,var(--c) 14%,transparent),transparent 70%);opacity:.85}
+html[data-style="dark"] .gc::after{content:"";position:absolute;left:18px;right:18px;top:0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--c) 90%,#fff 20%),transparent);box-shadow:0 0 14px color-mix(in srgb,var(--c) 70%,transparent)}
+html[data-style="dark"] .gc:hover,html[data-style="dark"] .gc:focus-visible{background:linear-gradient(165deg,rgba(255,255,255,.085),rgba(255,255,255,.025));border-color:color-mix(in srgb,var(--c) 55%,rgba(255,255,255,.1));box-shadow:0 26px 60px rgba(0,0,0,.5),0 0 40px color-mix(in srgb,var(--c) 18%,transparent),inset 0 1px 0 rgba(255,255,255,.08)}
+html[data-style="dark"] .gc .icon{border-radius:50%;width:50px;height:50px;background:radial-gradient(circle at 32% 28%,color-mix(in srgb,var(--c) 38%,#fff 6%),color-mix(in srgb,var(--c) 8%,#0a0b10) 72%);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--c) 32%,transparent),inset 0 0 12px rgba(0,0,0,.3)}
+html[data-style="dark"] .gc h2{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:1.28rem;letter-spacing:.01em;text-transform:none;line-height:1.15}
+html[data-style="dark"] .gc p{color:var(--muted)}
+html[data-style="dark"] .gc .play{font-family:'Share Tech Mono',monospace;font-weight:400;letter-spacing:.24em;font-size:.76rem}
+html[data-style="dark"] .tag{border-radius:999px;border-color:rgba(255,255,255,.12);padding:2px 9px}
+html[data-style="dark"] .fav{border-radius:50%;background:rgba(10,11,16,.5);border-color:rgba(255,255,255,.14);backdrop-filter:blur(6px)}
+html[data-style="dark"] .fav.on{color:var(--gold);border-color:var(--gold);background:rgba(232,194,122,.12);box-shadow:0 0 16px rgba(232,194,122,.3)}
+html[data-style="dark"] footer{border-top-color:rgba(232,194,122,.2);color:var(--dim)}
+html[data-style="dark"] .xp .btn{background:rgba(255,255,255,.05);color:var(--text);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);letter-spacing:.02em}
+html[data-style="dark"] .xp .btn:hover:not(:disabled){background:rgba(232,194,122,.1);border-color:var(--gold);color:var(--gold2);transform:none;box-shadow:0 8px 24px rgba(232,194,122,.14)}
+html[data-style="dark"] .xp .btn.go{color:var(--gold2);border-color:rgba(232,194,122,.55);background:rgba(232,194,122,.08)}
+/* Einblenden beim Laden */
+@keyframes nwUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+html[data-style="dark"] .gc{animation:nwUp .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--n,0) * 40ms)}
+html[data-style="dark"] .hero>*{animation:nwUp .7s cubic-bezier(.2,.7,.2,1) both}.hero>:nth-child(2){animation-delay:.08s}.hero>:nth-child(3){animation-delay:.16s}.hero>:nth-child(4){animation-delay:.24s}
+@media (prefers-reduced-motion:reduce){html[data-style="dark"] .gc,html[data-style="dark"] .hero>*{animation:none}}
+html[data-fx="off"][data-style="dark"] .gc,html[data-fx="off"][data-style="dark"] .hero>*{animation:none}
 </style>
 <script>window.DARK_STYLE=1;</script>
 <script src="theme.js" data-legacy></script>
@@ -365,6 +412,8 @@ function paintHero(){
   document.getElementById('heroP').textContent=T('Brettspiele, Kartenspiele und Arcade direkt im Browser. Mit Computergegnern, Freunden online, Zuschauermodus und Wiederbeitritt.','Board games, card games and arcade right in your browser. With computer opponents, friends online, spectator mode and rejoin.');
   document.getElementById('stats').innerHTML=[[cards.length,T('Spiele','Games')],[cards.filter(c=>c._m[2]).length,T('mit Online-Modus','with online mode')],[cards.filter(c=>c._m[3]).length,T('in 3D','in 3D')]].map(s=>`<div class="stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join('');
 }
+document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.gc');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');}});
+cards.forEach((c,i)=>c.style.setProperty('--n',Math.min(i,14)));
 paintHero();paintGrid();
 // ---------- Offene Spiele: eigene (zum Wiederaufnehmen) und öffentliche Räume aller Spiele ----------
 const PF={'mensch-aergere-dich-nicht':'mdn-v1-','mensch-teams':'mtm-v1-','hoellen-tycoon':'htc-v1-','heldengilde':'hgl-v1-','auf-und-ab':'aua-v1-','wortgitter':'wgt-v1-','domino':'dom-v1-','billard':'bil-v1-','jenga':'jng-v1-','neun-welten':'nwl-v1-','farbchaos':'fch-v1-','hanafuda':'hnf-v1-','muehle':'mue-v1-','netrunner-aergere-dich-nicht':'ndn-v1-','poker':'pkr-v1-','blackjack':'bjk-v1-','schiffe-versenken':'sv-v1-','tron':'tron-v1-','vier-gewinnt':'c4-v1-'};
