@@ -294,7 +294,7 @@ function paintMine(){
   const rows=[],now=Date.now();
   const rd=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
   Object.keys(PF).forEach(path=>{
-    const pf=PF[path],keys=pf==='mdn-v1-'?['mdn-saved','mdn-rejoin']:['mp-last-'+pf];
+    const pf=PF[path],keys=pf==='mdn-v1-'?['mdn-saved','mdn-rejoin']:['mp-last-'+pf,'mp-saved-'+pf];
     let best=null;keys.forEach(k=>{const v=rd(k);if(!v)return;if(!v.code||!v.t||now-v.t>DAY){try{localStorage.removeItem(k);}catch(e){}return;}if(!best||v.t>best.t)best={code:v.code,t:v.t};});
     if(best)rows.push({path,code:best.code,t:best.t,keys});
   });

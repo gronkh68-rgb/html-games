@@ -72,6 +72,12 @@
     var LASTK = 'mp-last-' + cfg.prefix;
     function myRid() { try { var r = localStorage.getItem('mp-rid'); if (!r) { r = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); localStorage.setItem('mp-rid', r); } return r; } catch (e) { return 'x' + Math.random().toString(36).slice(2, 10); } }
     function getLast() { if (!cfg.rejoin) return null; try { var l = JSON.parse(localStorage.getItem(LASTK) || 'null'); return l && Date.now() - l.t < 24 * 3600e3 ? l : null; } catch (e) { return null; } }
+    // ---------- Unbeendete Spiele: Host und Ersatz-Host speichern den letzten Stand (24 Std.), damit nach einem Totalausfall einer das Spiel fortsetzen kann ----------
+    var SAVEK = 'mp-saved-' + cfg.prefix, savedT = 0;
+    function getSaved() { if (!cfg.migrate) return null; try { var g = JSON.parse(localStorage.getItem(SAVEK) || 'null'); return g && g.snap && g.code && Date.now() - g.t < 24 * 3600e3 ? g : null; } catch (e) { return null; } }
+    function clearSaved() { try { localStorage.removeItem(SAVEK); } catch (e) {} }
+    function persist(d) { if (!cfg.migrate) return; var now = Date.now(); if (now - savedT < 2000) return; savedT = now; d.t = now; try { localStorage.setItem(SAVEK, JSON.stringify(d)); } catch (e) {} }
+    L.hasSaved = function () { return !!getSaved(); };
     function saveLast(code) { if (!cfg.rejoin || !code) return; try { localStorage.setItem(LASTK, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {} }
     function clearLast() { try { localStorage.removeItem(LASTK); } catch (e) {} updateRejoin(); }
     function updateRejoin() { var l = getLast(), show = !!l && L.role !== 'client'; $('mpRejoin').hidden = !show; if (show) $('mpRejoinCode').textContent = l.code; }
@@ -143,6 +149,7 @@
     }
     L.snap = function (d) {                              // Spiel ruft das an jedem Zugbeginn auf
       L.lastSnap = d;
+      if (L.role === 'host' && L.room) persist({ code: L.room.code, you: hostSeat(), hostSeat: hostSeat(), seats: L.seats.map(function (s) { return { type: s.type, name: s.name || '', rid: s.rid || (s.type === 'host' ? myRid() : null) }; }), snap: d });
       if (!cfg.migrate || L.role !== 'host' || !L.backup) return;
       var s = L.seats[L.backup.seat]; if (s && s.conn && s.conn.open) try { s.conn.send({ t: 'snap', d: d }); } catch (e) {}
     };
@@ -321,12 +328,12 @@
       }
       else if (m.t === 'standby') { becomeStandby(m); }
       else if (m.t === 'backup') { L.backup = { seat: m.seat, code: m.code }; }
-      else if (m.t === 'snap') { L.snapData = m.d; }
+      else if (m.t === 'snap') { L.snapData = m.d; if (L.standbySeats && L.standbySeats.seats) persist({ code: L.joinCode, you: L.you, hostSeat: L.standbySeats.hostSeat, seats: L.standbySeats.seats, snap: m.d }); }
       else if (m.t === 'migrate') { startMigration(); }
       else if (m.t === 'start') { L.playing = true; L.you = m.you; ov.hidden = true; if (cfg.onStart) cfg.onStart({ role: 'client', you: m.you, seats: m.seats, spec: !!m.spec }); }
       else if (m.t === 'g') { if (cfg.onData) cfg.onData(-1, m.d); }
       else if (m.t === 'full') { var w = m.why || 'Der Raum ist voll'; L.leave(); clearLast(); err(w); showMode('join'); }
-      else if (m.t === 'kicked') { var why = m.why || 'Verbindung beendet'; if (/Host/.test(why)) clearLast(); L.leave(); ov.hidden = false; showMode('join'); err(why); if (cfg.onLeave) cfg.onLeave(why); }
+      else if (m.t === 'kicked') { var why = m.why || 'Verbindung beendet'; if (/Host/.test(why)) { clearLast(); clearSaved(); } L.leave(); ov.hidden = false; showMode('join'); err(why); if (cfg.onLeave) cfg.onLeave(why); }
     }
     function becomeStandby(m) {
       L.standbySeats = m;
@@ -367,19 +374,31 @@
     function becomeHost() {
       var sd = L.standbySeats;
       if (!L.standby || !sd || !L.snapData) { giveUp(); return; }
-      L.room = L.standby.room; L.role = 'host'; L.playing = true; L.migrating = false; L.hostConn = null; L.backup = null; L.lastSnap = L.snapData; toast('');
-      var me = L.you;
+      takeOver(L.standby.room, sd, L.snapData, L.you, L.standby.queue.splice(0));
+    }
+    function takeOver(room, sd, snap, me, queue) {      // gemeinsam für Host-Wechsel und Fortsetzen aus dem Speicher
+      L.room = room; L.role = 'host'; L.playing = true; L.migrating = false; L.hostConn = null; L.backup = null; L.snapData = snap; L.lastSnap = snap; L.you = me; toast(''); ov.hidden = true;
       L.seats = sd.seats.map(function (s, i) {
         if (i === me) return { type: 'host', name: myName(), rid: myRid() };
         if (i === sd.hostSeat) return { type: cfg.bots ? 'cpu' : 'left', name: '', rid: s.rid || undefined, away: !!cfg.rejoin, was: s.name };      // der alte Host darf wieder auf seinen Platz (Kennung, Name oder Raumcode)
         if (s.type === 'remote') return { type: cfg.bots ? 'cpu' : 'left', name: '', rid: s.rid, away: true };
         return { type: s.type === 'off' ? 'off' : (s.type === 'cpu' ? 'cpu' : 'left'), name: '' };
       });
-      if (cfg.onMigrate) cfg.onMigrate(L.snapData, { you: me, seats: lobbyInfo() });
-      var q = L.standby.queue.splice(0);
-      q.forEach(function (x) { onHostMsg(x[0], x[1]); });
+      if (cfg.onMigrate) cfg.onMigrate(snap, { you: me, seats: lobbyInfo() });
+      (queue || []).forEach(function (x) { onHostMsg(x[0], x[1]); });
       setTimeout(ensureBackup, 4000);
     }
+    L.resumeSaved = async function () {
+      var g = getSaved(); if (!g || L.role !== 'local' || L.opening) return false;
+      L.opening = true; toast('Starte Raum …');
+      var r = null, wait = function (ms) { return new Promise(function (res) { setTimeout(res, ms); }); };
+      for (var i = 0; i < 5 && !r; i++) { try { r = await Net.host(cfg.prefix, g.code, onConn); } catch (e) { r = null; if (i < 4) await wait(2500); } }      // alter Code: dann klappt "Zurück ins Spiel" bei allen unverändert
+      for (var j = 0; j < 3 && !r; j++) { try { r = await Net.host(cfg.prefix, Net.newCode(), onConn); } catch (e) { r = null; } }
+      L.opening = false; if (!r) { toast('Raum konnte nicht erstellt werden.'); return false; }
+      takeOver(r, { seats: g.seats, hostSeat: g.hostSeat }, g.snap, g.you, []);
+      if (r.code !== g.code) toast('Neuer Raumcode: ' + r.code + ' (der alte war noch belegt)');
+      return true;
+    };
     function onClientClose() {
       if (L.role !== 'client' || L.leaving) return;
       if (cfg.migrate && L.playing && L.backup && L.backup.code && !L.migrating) { startMigration(); return; }
@@ -399,13 +418,13 @@
     L.broadcast = function (d) { L.seats.forEach(function (s) { if (s.conn && s.conn.open) try { s.conn.send({ t: 'g', d: d }); } catch (e) {} }); L.sendSpecs(d); };
     L.backToLobby = function () {                                                    // Host: nach dem Spiel zurück in die Lobby
       if (L.role !== 'host') return;
-      L.playing = false; dropSpecs('Das Spiel ist zu Ende.');
+      L.playing = false; dropSpecs('Das Spiel ist zu Ende.'); clearSaved();
       L.seats = L.seats.map(function (s) { return s.away ? { type: 'open' } : (s.type === 'off' ? { type: 'open' } : (s.type === 'left' ? { type: 'open' } : s)); });
       broadcastLobby(true); ov.hidden = false; showMode('host'); renderHost();
     };
-    L.leave = function () {
+    L.leave = function (keepSaved) {
       var wasIn = L.role === 'client' && L.playing;
-      L.leaving = true;
+      L.leaving = true; if (!keepSaved && L.role === 'host') clearSaved();
       if (L.role === 'host') {
         L.seats.forEach(function (s) { if (s.conn) try { if (!L.handedOver) s.conn.send({ t: 'kicked', why: 'Der Host hat den Raum geschlossen' }); s.conn.close(); } catch (e) {} }); dropSpecs('Der Host hat den Raum geschlossen');
         try { L.room && L.room.close(); } catch (e) {}
@@ -443,14 +462,16 @@
     var rj = document.createElement('div'); rj.id = 'mpRj'; rj.setAttribute('data-noi18n', ''); document.body.appendChild(rj);
     var rjOff = false; try { rjOff = sessionStorage.getItem('mp-rj-off-' + cfg.prefix) === '1'; } catch (e) {}
     function showRejoin() {
-      var l = getLast(); if (!l || L.role !== 'local' || rjOff) { rj.style.display = 'none'; return; }
-      rj.innerHTML = '<span>↩ Du warst in Raum <b>' + esc(l.code) + '</b>.</span><button class="go">Zurück ins Spiel</button><button class="x" title="Ausblenden">✕</button>';
+      var l = getLast(), sv = getSaved(); if ((!l && !sv) || L.role !== 'local' || rjOff) { rj.style.display = 'none'; return; }
+      var code = l ? l.code : sv.code;
+      rj.innerHTML = '<span>↩ Du warst in Raum <b>' + esc(code) + '</b>.</span>' + (l ? '<button class="go">Zurück ins Spiel</button>' : '') + (sv ? '<button class="res" title="Wenn der Host weg ist: das Spiel aus deinem gespeicherten Stand weiterführen, die anderen treten wieder bei">▶ Fortsetzen (ich hoste)</button>' : '') + '<button class="x" title="Ausblenden">✕</button>';
       rj.style.display = 'flex';
-      rj.querySelector('.go').onclick = function () { rj.style.display = 'none'; L.rejoin(); };
+      if (l) rj.querySelector('.go').onclick = function () { rj.style.display = 'none'; L.rejoin(); };
+      if (sv) rj.querySelector('.res').onclick = function () { rj.style.display = 'none'; L.resumeSaved(); };
       rj.querySelector('.x').onclick = function () { rjOff = true; try { sessionStorage.setItem('mp-rj-off-' + cfg.prefix, '1'); } catch (e) {} rj.style.display = 'none'; };
     }
     L.showRejoin = function () { rjOff = false; try { sessionStorage.removeItem('mp-rj-off-' + cfg.prefix); } catch (e) {} setTimeout(showRejoin, 400); };
-    if (cfg.rejoin) { setTimeout(showRejoin, 1200); setInterval(function () { if (L.role !== 'local' || !getLast()) rj.style.display = 'none'; }, 2000); }
+    if (cfg.rejoin || cfg.migrate) { setTimeout(showRejoin, 1200); setInterval(function () { if (L.role !== 'local' || (!getLast() && !getSaved())) rj.style.display = 'none'; }, 2000); }
     addEventListener('beforeunload', function () { try { if (L.role === 'host') L.handover(); } catch (e) {} try { if (L.role === 'client' && L.hostConn) L.hostConn.send({ t: 'bye' }); } catch (e) {} });
 
     // Raumlink (?room=CODE): Beitritts-Fenster direkt öffnen
