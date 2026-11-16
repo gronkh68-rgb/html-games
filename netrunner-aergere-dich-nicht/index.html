@@ -984,7 +984,7 @@ function dropPlayer(i){            // Mitspieler weg: der Computer übernimmt
 }
 L=MP.init({
   prefix:'ndn-v1-',title:'Netrunner ärgere dich nicht',
-  seats:PLAYERS.map(c=>({name:c.n,color:hexCss(c.c)})),minPlayers:2,bots:true,
+  seats:PLAYERS.map(c=>({name:c.n,color:hexCss(c.c)})),minPlayers:2,bots:true,rejoin:true,
   onStart(info){
     netRole=info.role;mySlot=info.you;$('onlineEnd').hidden=false;
     if(info.role==='host'){
@@ -1006,6 +1006,12 @@ L=MP.init({
     else if(m.t==='snap')applySnap(m.s);
   },
   onSeatDrop(i){dropPlayer(i);},
+  onRejoin(i){      // wer weg war, übernimmt seinen Platz vom Computer zurück und bekommt Brett und Stand neu
+    if(netRole!=='host')return;
+    const s=L.seats[i];cfg[i]='remote';names[i]=s&&s.name?s.name:names[i];
+    say(`${chip(i)}<b>${PLAYERS[i].n}${names[i]?' ('+esc(names[i])+')':''}</b> ist wieder da.`);
+    L.sendTo(i,{t:'init',d:initObj()});L.sendTo(i,{t:'snap',s:snapObj()});showScores();netPush();
+  },
   onBackToLobby(){token++;cReady=false;clearInterval(rollAnim);cRolling=false;$('hud').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;document.title='Netrunner ärgere dich nicht';},
   onLeave(why){netRole='local';mySlot=-1;cReady=false;$('onlineEnd').hidden=true;token++;$('hud').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;}
 });

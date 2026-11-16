@@ -475,7 +475,7 @@
     L = MP.init({
       prefix: G.prefix, title: G.title,
       seats: Array.from({ length: G.maxSeats }, function (_, i) { return { name: 'Platz ' + (i + 1), color: SEAT_COL[i % SEAT_COL.length] }; }),
-      minPlayers: G.minPlayers || 2, bots: true,
+      minPlayers: G.minPlayers || 2, bots: true, rejoin: true,
       onStart: function (info) {
         if (info.role === 'host') launch('host', info.you, info.seats.map(function (s, i) { return { type: s.type, name: s.name }; }));
         else { stopEngine(); S.role = 'client'; S.you = info.you; $('cgMenu').hidden = true; $('cgOver').hidden = true; $('cgLeave').hidden = false; S.actSig = ''; $('cgMsg').textContent = 'Warte auf den Host …'; $('cgMsg').style.display = 'block'; }
@@ -485,6 +485,7 @@
         if (S.role === 'host') { if (m.t === 'act') act(from, m.a); }
         else if (m.t === 'v') render(m.v);
       },
+      onRejoin: function (i) { if (S.role !== 'host') return; S.seatTypes[i] = 'remote'; var nm = L.seats[i] && L.seats[i].name; if (nm) S.names[i] = nm; L.sendTo(i, { t: 'v', v: viewFor(i) }); ctx.push(); },      // wer weg war, bekommt seinen Platz vom Computer zurück
       onSeatDrop: function (i) { S.seatTypes[i] = 'cpu'; if (S.pending && S.pending.seat === i) S.pending.finish(S.pending.botFn()); ctx.push(); },
       onBackToLobby: function () { S.role = 'local'; S.lastView = null; $('cgOver').hidden = true; S.actSig = ''; $('cgActions').innerHTML = ''; },
       onLeave: function () { toMenu(); }
