@@ -6,237 +6,289 @@
 <title>Meine HTML-Spiele</title>
 <meta name="description" content="Brettspiele, Kartenspiele und Arcade im Browser, allein oder online mit Freunden.">
 <meta property="og:title" content="HTML Games"><meta property="og:description" content="Brettspiele, Kartenspiele und Arcade im Browser, allein oder online mit Freunden."><meta property="og:image" content="icons/og-image.png"><meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap">
 <style>
 :root{
-  --bg:#0f1220;--card:#1a1e33;--card-hover:#232845;--text:#eef0ff;--muted:#9aa0c3;
-  --accent:#7c5cff;--accent2:#27d3c3;--border:#2a2f4f;
+  --bg:#080c12;--bg2:#0c121b;--card:#0e151f;--card2:#121b28;--line:#1c2a3b;--line2:#27405a;--text:#e6f1fb;--muted:#8aa0b6;--dim:#5d7389;
+  --cy:#00cfff;--gr:#39ff14;--or:#ff9a3d;--vi:#a78bfa;--pk:#ff3d81;--warn:#ff9a3d;
+  --disp:Orbitron,"Segoe UI",system-ui,sans-serif;--mono:"Share Tech Mono",ui-monospace,Consolas,monospace;--ui:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --glow:0 0 18px rgba(0,207,255,.35);color-scheme:dark;
 }
-@media (prefers-color-scheme:light){
-  :root{--bg:#f4f5fb;--card:#fff;--card-hover:#f0eeff;--text:#1b1e33;--muted:#62678a;--border:#e1e3f0}
-}
+html:not([data-style]){--bg:#f3f5fb;--bg2:#fff;--card:#fff;--card2:#f4f1ff;--line:#e1e5f2;--line2:#c9d0e8;--text:#1b1e33;--muted:#5d6385;--dim:#8b91b0;--cy:#2563eb;--gr:#16a34a;--or:#d97706;--vi:#7c5cff;--pk:#db2777;--glow:0 6px 24px rgba(124,92,255,.22);color-scheme:light}
+html[data-style="dark"]{--bg:#0d1016;--bg2:#10141b;--card:#141821;--card2:#1a202b;--line:#232a36;--line2:#313b4b;--cy:#5b8def;--glow:0 6px 22px rgba(0,0,0,.4)}
 *{box-sizing:border-box}
-body{
-  margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
-  background:radial-gradient(900px 500px at 15% -10%,rgba(124,92,255,.25),transparent 60%),
-             radial-gradient(800px 500px at 100% 0%,rgba(39,211,195,.18),transparent 60%),var(--bg);
-  color:var(--text);
-}
-main{max-width:860px;margin:0 auto;padding:56px 16px 40px}
-header{text-align:center;margin-bottom:40px}
-h1{
-  margin:0 0 8px;font-size:clamp(2rem,6vw,3.2rem);letter-spacing:-.02em;
-  background:linear-gradient(90deg,var(--accent),var(--accent2));
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-}
-header .logo{display:block;margin:0 auto 6px;width:min(620px,92vw);height:auto}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;color:var(--text);font-family:var(--ui);background:var(--bg);position:relative;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:radial-gradient(900px 520px at 12% -8%,rgba(0,207,255,.13),transparent 62%),radial-gradient(760px 480px at 100% 0%,rgba(167,139,250,.10),transparent 60%),radial-gradient(700px 500px at 60% 110%,rgba(57,255,20,.05),transparent 60%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.55;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(ellipse at 50% 0%,#000 0,transparent 75%);mask-image:radial-gradient(ellipse at 50% 0%,#000 0,transparent 75%)}
+html:not([data-style]) body::after{opacity:.35}
+a{color:inherit}
+/* ---------- Kopfleiste ---------- */
+.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:16px}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;flex:none}
+.brand img{width:38px;height:38px;border-radius:10px;display:block}
+.brand b{font:900 1.05rem/1 var(--disp);letter-spacing:.1em;color:var(--text)}.brand b i{font-style:normal;color:var(--cy);text-shadow:0 0 12px rgba(0,207,255,.55)}
+html:not([data-style]) .brand b i{text-shadow:none}
+.brand small{display:block;font:400 .62rem/1 var(--mono);letter-spacing:.28em;color:var(--gr);margin-top:5px}
+html:not([data-style]) .brand small{color:var(--dim)}
+.search{flex:1;max-width:460px;margin:0 auto;position:relative}
+.search input{width:100%;font:400 .95rem var(--mono);color:var(--text);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 14px 10px 38px;outline:none;transition:border-color .15s,box-shadow .15s}
+.search input::placeholder{color:var(--dim)}.search input:focus{border-color:var(--cy);box-shadow:var(--glow)}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--dim);pointer-events:none}
+.search kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:400 .7rem var(--mono);color:var(--dim);border:1px solid var(--line2);border-radius:5px;padding:1px 6px}
+.menu{display:flex;align-items:center;gap:8px;flex:none}
+.menu .hello{color:var(--muted);font:400 .85rem var(--mono);white-space:nowrap}
+.menu button{font:600 .82rem var(--ui);color:var(--text);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:7px 11px;cursor:pointer;transition:border-color .15s,color .15s}
+.menu button:hover{border-color:var(--cy);color:var(--cy)}
+.menu .lang{display:inline-flex;gap:4px}.menu .lang button{padding:7px 9px;font-size:.78rem}.menu .lang button.on{border-color:var(--cy);color:var(--cy);box-shadow:inset 0 0 0 1px var(--cy)}
+/* ---------- Seite ---------- */
+main{max-width:1240px;margin:0 auto;padding:34px 20px 50px}
+.hero{display:flex;flex-direction:column;gap:14px;margin:0 0 28px}
+.hero .eyebrow{font:400 .78rem var(--mono);letter-spacing:.3em;color:var(--gr);text-transform:uppercase;display:flex;align-items:center;gap:10px}
+html:not([data-style]) .hero .eyebrow{color:var(--vi)}
+.hero .eyebrow::before{content:"";width:28px;height:2px;background:currentColor;box-shadow:0 0 10px currentColor}
+.hero h1{margin:0;font:900 clamp(1.9rem,4.6vw,3.1rem)/1.08 var(--disp);letter-spacing:.02em;text-transform:uppercase}
+.hero h1 em{font-style:normal;color:var(--cy);text-shadow:0 0 22px rgba(0,207,255,.5)}
+html:not([data-style]) .hero h1 em{text-shadow:none}
+.hero p{margin:0;color:var(--muted);font-size:1.05rem;max-width:640px;line-height:1.55}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.stat{display:flex;align-items:baseline;gap:8px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.stat b{font:900 1.25rem var(--disp);color:var(--cy)}.stat span{font:400 .78rem var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+/* ---------- Bereiche: Weiterspielen und Live ---------- */
+.dash{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 30px}
+.dash:has(#mine[hidden]){grid-template-columns:1fr}
+.xp{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--cy);border-radius:14px;padding:14px 16px;min-width:0}
+#mine.xp{border-top-color:var(--or)}
+.xp h3,.xp summary{margin:0;font:700 .86rem var(--disp);letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:8px;list-style:none}
+.xp summary{cursor:pointer}.xp summary::-webkit-details-marker{display:none}
+.xp .n{margin-left:auto;font:400 .74rem var(--mono);letter-spacing:.04em;color:var(--dim);text-transform:none}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gr);box-shadow:0 0 10px var(--gr);animation:pulse 1.8s ease-in-out infinite;flex:none}
+@keyframes pulse{50%{opacity:.35}}
+.xr{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--line);margin-top:9px}.xr:first-child{margin-top:11px}
+.xr .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:1.2rem;background:var(--card2);border:1px solid var(--line2);flex:none}
+.xr .tx{flex:1;min-width:0;line-height:1.25}.xr .tx b{display:block;font-size:.93rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.xr .tx small{color:var(--muted);font:400 .78rem var(--mono)}
+.btn{font:700 .8rem var(--ui);letter-spacing:.03em;color:var(--text);background:var(--card2);border:1px solid var(--line2);border-radius:9px;padding:8px 12px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:border-color .15s,color .15s,box-shadow .15s}
+.btn:hover{border-color:var(--cy);color:var(--cy);box-shadow:var(--glow)}.btn.go{color:var(--cy);border-color:var(--cy)}.btn.x{padding:8px 10px}
+.empty{color:var(--muted);font-size:.9rem;line-height:1.5;padding-top:10px}
+/* ---------- Filter ---------- */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 16px}
+.chip{font:600 .82rem var(--ui);color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s}
+.chip:hover{color:var(--text);border-color:var(--line2)}
+.chip.on{color:var(--cy);border-color:var(--cy);background:color-mix(in srgb,var(--cy) 10%,var(--card));box-shadow:var(--glow)}
+.chip .c{font:400 .72rem var(--mono);opacity:.7}
+.filters .sp{flex:1}.fh{font:400 .8rem var(--mono);color:var(--dim)}
+/* ---------- Spielekarten ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(256px,1fr));gap:14px}
+.gc{--c:var(--cy);position:relative;display:flex;flex-direction:column;gap:11px;padding:18px 18px 16px;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:14px;transition:transform .16s,border-color .16s,box-shadow .16s,background .16s;overflow:hidden}
+.gc::before{content:"";position:absolute;inset:0;background:radial-gradient(260px 120px at 0% 0%,color-mix(in srgb,var(--c) 14%,transparent),transparent 70%);opacity:.7;pointer-events:none}
+.gc:hover,.gc:focus-visible{transform:translateY(-4px);background:var(--card2);border-color:var(--c);box-shadow:0 14px 34px rgba(0,0,0,.32),0 0 0 1px color-mix(in srgb,var(--c) 35%,transparent),0 0 26px color-mix(in srgb,var(--c) 20%,transparent);outline:none}
+.gc[data-cat=brett]{--c:var(--cy)}.gc[data-cat=karten]{--c:var(--vi)}.gc[data-cat=wuerfel]{--c:var(--or)}.gc[data-cat=denken]{--c:var(--gr)}.gc[data-cat=arcade]{--c:var(--pk)}
+.gc .head{display:flex;align-items:center;gap:12px;position:relative}
+.gc .icon{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:1.55rem;flex:none;background:color-mix(in srgb,var(--c) 12%,var(--card2));border:1px solid color-mix(in srgb,var(--c) 40%,var(--line))}
+.gc h2{margin:0;font:700 1.02rem/1.2 var(--disp);letter-spacing:.04em;text-transform:uppercase;padding-right:30px}
+.gc p{margin:0;color:var(--muted);font-size:.9rem;line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;position:relative}
+.gc .tags{display:flex;gap:6px;flex-wrap:wrap;position:relative}
+.tag{font:400 .72rem var(--mono);letter-spacing:.04em;color:var(--muted);border:1px solid var(--line2);border-radius:6px;padding:2px 7px;background:var(--bg2);white-space:nowrap}
+.tag.on{color:var(--gr);border-color:color-mix(in srgb,var(--gr) 50%,var(--line2))}.tag.d3{color:var(--cy);border-color:color-mix(in srgb,var(--cy) 50%,var(--line2))}
+html:not([data-style]) .tag.on{color:#15803d}
+.gc .play{margin-top:auto;padding-top:2px;font:700 .8rem var(--disp);letter-spacing:.14em;text-transform:uppercase;color:var(--c);position:relative}
+.gc:hover .play{text-shadow:0 0 12px color-mix(in srgb,var(--c) 70%,transparent)}
+.fav{position:absolute;top:11px;right:11px;width:32px;height:32px;border-radius:9px;border:1px solid var(--line2);background:var(--bg2);color:var(--dim);font-size:1rem;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;z-index:2;transition:all .15s}
+.fav:hover{border-color:#ffd23f;color:#ffd23f}.fav.on{color:#ffd23f;border-color:#ffd23f;background:rgba(255,210,63,.12)}
+.nores{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 10px;font:400 .95rem var(--mono)}
+footer{text-align:center;margin-top:54px;color:var(--dim);font:400 .8rem var(--mono);letter-spacing:.08em;padding-top:22px;border-top:1px solid var(--line)}
+footer a{color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-header p{margin:0;color:var(--muted);font-size:1.05rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
-.game{
-  display:flex;flex-direction:column;gap:12px;padding:22px;text-decoration:none;color:inherit;
-  background:var(--card);border:1px solid var(--border);border-radius:18px;
-  transition:transform .15s,background .15s,border-color .15s,box-shadow .15s;
-}
-.game:hover,.game:focus-visible{
-  transform:translateY(-4px);background:var(--card-hover);border-color:var(--accent);
-  box-shadow:0 12px 30px rgba(124,92,255,.25);outline:none;
-}
-.icon{
-  width:54px;height:54px;border-radius:14px;display:grid;place-items:center;font-size:1.8rem;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-}
-.game h2{margin:0;font-size:1.25rem}
-.game p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.4}
-.play{margin-top:auto;font-weight:600;color:var(--accent2);font-size:.95rem}
-.menu{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:18px}
-.menu button{font:inherit;font-size:.9rem;font-weight:600;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 12px;cursor:pointer}
-.menu button:hover{border-color:var(--accent)}.menu .lang{display:inline-flex;gap:6px}.menu .lang button.on{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2) inset}
-.menu .hello{color:var(--muted);font-weight:600}
-/* Favoriten, eigene offene Spiele und Browser für öffentliche Räume */
-.game{position:relative}
-.fav{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--muted);font-size:1.15rem;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;z-index:2}
-.fav:hover{border-color:#ffd23f;color:#ffd23f}.fav.on{color:#ffd23f;border-color:#ffd23f;background:rgba(255,210,63,.15)}
-.bar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:0 0 14px;flex-wrap:wrap}.bar .hint{color:var(--muted);font-size:.85rem}
-.bar button,.xp .btn{font:inherit;font-size:.9rem;font-weight:600;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;display:inline-block}
-.bar button:hover,.xp .btn:hover{border-color:var(--accent)}.bar button.on{border-color:#ffd23f;color:#ffd23f}
-.xp{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px;margin:0 0 14px}
-.xp h3,.xp summary{margin:0;font-size:1rem;font-weight:700;cursor:default}.xp summary{cursor:pointer}.xp .n{color:var(--muted);font-weight:600;font-size:.85rem;margin-left:6px}
-.xr{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;flex-wrap:wrap}.xr:first-child{margin-top:10px}
-.xr .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:1.2rem;background:linear-gradient(135deg,var(--accent),var(--accent2));flex:none}
-.xr .tx{flex:1;min-width:150px;line-height:1.3}.xr .tx small{color:var(--muted);display:block}
-.xr .btn.go{border-color:var(--accent2);color:var(--accent2)}.xr .btn.x{padding:7px 10px}
-.empty{color:var(--muted);font-size:.9rem;padding-top:8px}
-footer{text-align:center;margin-top:48px;color:var(--muted);font-size:.85rem}
+@media (max-width:900px){.dash{grid-template-columns:1fr}.search{order:3;flex-basis:100%;max-width:none}.top-in{flex-wrap:wrap}.menu{margin-left:auto}}
+@media (max-width:560px){.hero p,.hero .stats{display:none}.hero{margin-bottom:18px}main{padding:22px 14px 40px}.top-in{padding:9px 14px}.brand small{display:none}.menu .hello{display:none}.grid{grid-template-columns:1fr}.stat{padding:7px 11px}}
 </style>
 <script>window.DARK_STYLE=1;</script>
-<script src="theme.js"></script>
+<script src="theme.js" data-legacy></script>
 <script src="net-config.js"></script>
 <script src="net.js"></script>
 </head>
 <body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="./" aria-label="HTML Games"><img src="icons/favicon.svg" alt="" width="38" height="38"><span><b>HTML <i>GAMES</i></b><small>BROWSER ARCADE</small></span></a>
+  <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" autocomplete="off" spellcheck="false" aria-label="Spiele suchen"><kbd>/</kbd></label>
+  <div class="menu" id="menu">
+    <span class="hello" id="hello"></span>
+    <button id="mName">👤 Profil</button>
+    <span class="lang" data-noi18n><button data-l="de">DE</button><button data-l="en">EN</button></span>
+  </div>
+</div></div>
 <main>
-  <header>
-    <img class="logo" src="icons/logo.svg" alt="HTML Games" width="460" height="150">
-    <h1 class="sr">Meine HTML-Spiele</h1>
-    <p>Direkt im Browser spielen. Keine Installation nötig.</p>
-    <div class="menu" id="menu">
-      <span class="hello" id="hello"></span>
-      <button id="mName">👤 Profil</button>
-      <span class="lang" data-noi18n><button data-l="de">🇩🇪 Deutsch</button><button data-l="en">🇬🇧 English</button></span>
-    </div>
-  </header>
-  <section class="xp" id="mine" hidden><h3 id="mineT"></h3><div id="mineList"></div></section>
-  <section class="xp"><details id="liveBox" open><summary id="liveT"></summary><div id="liveList" class="empty"></div></details></section>
-  <div class="bar"><button id="favOnly"></button><span class="hint" id="favHint"></span></div>
+  <section class="hero">
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1><span id="h1a"></span> <em id="h1b"></em></h1>
+    <p id="heroP"></p>
+    <div class="stats" id="stats"></div>
+  </section>
+  <div class="dash">
+    <section class="xp" id="mine" hidden><h3 id="mineT"></h3><div id="mineList"></div></section>
+    <section class="xp"><details id="liveBox" open><summary id="liveT"></summary><div id="liveList" class="empty"></div></details></section>
+  </div>
+  <div class="filters" id="filters"></div>
   <div class="grid">
-    <a class="game" href="wortgitter/">
+    <a class="gc" href="wortgitter/">
       <div class="icon">🔤</div>
       <h2>Wortgitter</h2>
       <p>Das Buchstaben-Legespiel nach Scrabble-Regeln: Wörter auf das 15×15-Brett legen, Prämienfelder nutzen, mit Wörterbuch auf Deutsch oder Englisch. 2 bis 4 Spieler, gegen Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="hoellen-tycoon/">
+    <a class="gc" href="hoellen-tycoon/">
       <div class="icon">😈</div>
       <h2>Helluva Tycoon</h2>
       <p>Das Immobilien-Brettspiel im Helluva-Boss-Stil: Spiele als Blitzø, Moxxie, Millie, Loona, Stolas oder Fizzarolli, kaufe Orte aus den Ringen der Hölle, baue, handle und treibe die anderen in den Ruin. 2 bis 6 Spieler, gegen Computer oder online. Inoffizielles Fan-Spiel.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="heldengilde/">
+    <a class="gc" href="heldengilde/">
       <div class="icon">⚔️</div>
       <h2>Heldengilde</h2>
       <p>Strategisches Kartenspiel: Stelle eine Gruppe aus Helden zusammen, würfle für ihre Fähigkeiten, besiege Monster und funke den anderen dazwischen. 2 bis 6 Spieler, gegen Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="auf-und-ab/">
+    <a class="gc" href="auf-und-ab/">
       <div class="icon">🔢</div>
       <h2>Auf &amp; Ab</h2>
       <p>Kooperatives Kartenspiel: Legt gemeinsam alle Zahlen von 2 bis 99 auf zwei aufsteigende und zwei absteigende Reihen, ohne Zahlen zu verraten. 1 bis 5 Spieler, mit Computer-Teamkollegen oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="rummikub/">
+    <a class="gc" href="rummikub/">
       <div class="icon">🎲</div>
       <h2>Rummikub</h2>
       <p>Der Brettspiel-Klassiker mit Zahlensteinen, auch im Mehrspielermodus.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="zollkreuzwort/">
+    <a class="gc" href="zollkreuzwort/">
       <div class="icon">🧩</div>
       <h2>Zollkreuzwort</h2>
       <p>Ein Kreuzworträtsel rund um den Zoll.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="mensch-teams/">
+    <a class="gc" href="mensch-teams/">
       <div class="icon">🎲</div>
       <h2>Mädn Teams</h2>
       <p>Mensch ärgere dich nicht im Team auf dem doppelt so großen Brett (80 Felder): Wer gegenüber sitzt, ist dein Partner, ein Team muss 8 Figuren ins Ziel bringen. 4 oder 8 Spieler, gegen Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="mensch-aergere-dich-nicht/">
+    <a class="gc" href="mensch-aergere-dich-nicht/">
       <div class="icon">😤</div>
       <h2>Mensch ärgere dich nicht</h2>
       <p>Der Klassiker für 2 bis 4 Spieler, mit oder ohne Computer-Gegner.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="farbchaos/">
+    <a class="gc" href="farbchaos/">
       <div class="icon">🃏</div>
       <h2>Farbchaos</h2>
       <p>Das beliebte Farbkarten-Spiel für 2 bis 4: Karten nach Farbe oder Zahl ablegen, Aussetzen, Richtungswechsel, Plus-Karten und UNO rufen. Gegen den Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="hanafuda/">
+    <a class="gc" href="hanafuda/">
       <div class="icon">🎴</div>
       <h2>Hanafuda Koi-Koi</h2>
       <p>Das japanische Blumenkarten-Spiel: Passende Monate sammeln, Kombinationen bilden und entscheiden, ob du weiterspielst (Koi-Koi) oder kassierst. Gegen den Computer oder online, mit 3D-Ansicht.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="puzzle/">
+    <a class="gc" href="puzzle/">
       <div class="icon">🧩</div>
       <h2>Puzzle</h2>
       <p>Eigenes Foto oder Bilder aus der Galerie, 6 bis 150 Teile, verschiedene Teileformen, Drag &amp; Drop mit Animationen. Wahlweise flach in 2D oder als 3D-Tisch mit Schatten.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="tetris/">
+    <a class="gc" href="tetris/">
       <div class="icon">🧱</div>
       <h2>Tetris</h2>
       <p>Der Klassiker mit Hold, Vorschau, Schatten-Stein, Wandtritten und Level. Mit Tastatur oder Touch.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="tron/">
+    <a class="gc" href="tron/">
       <div class="icon">🏍️</div>
       <h2>Tron</h2>
       <p>Lichtrenner-Duell in der Neon-Arena: Lenke dein Bike, schneide den Gegnern den Weg ab und fahre nie in eine Spur. Gegen 1 bis 3 Computer, zu zweit an einer Tastatur oder online mit bis zu 4 Spielern. Mit Turbo und 3D-Ansicht.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="poker/">
+    <a class="gc" href="poker/">
       <div class="icon">🃏</div>
       <h2>Poker</h2>
       <p>Texas Hold’em ohne Limit am 3D-Tisch. Bis zu 6 Spieler, gegen Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="blackjack/">
+    <a class="gc" href="blackjack/">
       <div class="icon">♠️</div>
       <h2>Blackjack</h2>
       <p>Schlage den Geber am 3D-Tisch. Bis zu 5 Spieler, gegen Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="vier-gewinnt/">
+    <a class="gc" href="vier-gewinnt/">
       <div class="icon">🔴</div>
       <h2>Vier gewinnt</h2>
       <p>Vier in einer Reihe. Gegen den Computer (3 Stufen) oder zu zweit.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="muehle/">
+    <a class="gc" href="muehle/">
       <div class="icon">⚪</div>
       <h2>Mühle</h2>
       <p>Setzen, ziehen, springen: bilde Mühlen und nimm dem Gegner die Steine.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="schiffe-versenken/">
+    <a class="gc" href="schiffe-versenken/">
       <div class="icon">🚢</div>
       <h2>Schiffe versenken</h2>
       <p>Finde und versenke die gegnerische Flotte, bevor er deine erwischt.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="chomp-arena/">
+    <a class="gc" href="chomp-arena/">
       <div class="icon">👾</div>
       <h2>Chomp Arena</h2>
       <p>Neon-Labyrinth für bis zu 4 Spieler: zusammen gegen die Geister (mit Kristall-Sync) oder gegeneinander mit eigenen Räumen und Arena-Kampf.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="neun-welten/">
+    <a class="gc" href="neun-welten/">
       <div class="icon">🌳</div>
       <h2>Neun Welten</h2>
       <p>Deckbau und Einsetzen in der Welt der nordischen Sagen: Gefolgsleute zu Asen, Riesen, Zwergen und Walküren schicken, Karten kaufen, Schlachten gewinnen. 2 bis 4 Spieler, gegen den Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="domino/">
+    <a class="gc" href="domino/">
       <div class="icon">🁫</div>
       <h2>Domino</h2>
       <p>Das klassische Legespiel für 2 bis 4 Spieler mit Vorrat, Blockade und Punktewertung. Gegen den Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="billard/">
+    <a class="gc" href="billard/">
       <div class="icon">🎱</div>
       <h2>Billard</h2>
       <p>8-Ball mit echter Kugelphysik: zielen, Stärke wählen, stoßen. Mit Fouls, freier Weißer und Zielhilfe. Gegen den Computer oder online zu zweit.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="jenga/">
+    <a class="gc" href="jenga/">
       <div class="icon">🧱</div>
       <h2>Wackelturm</h2>
       <p>Der Klötzchenturm in 3D für 2 bis 4 Spieler: Klotz wählen, mit ruhiger Hand herausziehen, oben auflegen. Wer den Turm umwirft, verliert.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="chomp-klassik/">
+    <a class="gc" href="chomp-klassik/">
       <div class="icon">🟡</div>
       <h2>Chomp Klassik</h2>
       <p>Das klassische Labyrinth für einen Spieler: alle Punkte fressen, vier Geister mit eigenem Verhalten, große Punkte, Früchte, Tunnel und steigende Level.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="game" href="fixer-fritz/">
+    <a class="gc" href="fixer-fritz/">
       <div class="icon">🔨</div>
       <h2>Fixer Fritz</h2>
       <p>Brecher Boris zertrümmert das Haus, Fritz repariert die Fenster. Klettere von Fenster zu Fenster, weiche den Ziegeln aus und schnapp dir Kuchen für kurze Unverwundbarkeit.</p>
+      <span class="play">Spielen →</span>
+    </a>
+      <a class="gc" href="netrunner-aergere-dich-nicht/">
+      <div class="icon">🛰️</div>
+      <h2>Netrunner ärgere dich nicht</h2>
+      <p>Das Würfel-Rennspiel auf einer 3D-Hexkarte in einer Neon-Stadt mit Portalen und Spezialfeldern. Bis zu 6 Runner, gegen Computer oder online.</p>
       <span class="play">Spielen →</span>
     </a>
   </div>
@@ -270,20 +322,50 @@ document.getElementById('hello').setAttribute('data-noi18n','');
 document.getElementById('mName').onclick=()=>SITE.askName(true).then(paintMenu);
 document.querySelector('.menu .lang').onclick=e=>{const b=e.target.closest('[data-l]');if(b&&b.dataset.l!==SITE.lang)SITE.setLang(b.dataset.l);};
 document.addEventListener('site-name',paintMenu);paintMenu();
-// ---------- Favoriten: Stern auf jeder Karte, Favoriten stehen oben ----------
+// ---------- Spiele: Kategorien, Suche, Favoriten ----------
 const T=(d,e)=>SITE.T(d,e),esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-const grid=document.querySelector('.grid'),cards=[...grid.querySelectorAll('.game')],pathOf=c=>c.getAttribute('href');
-let favs=[],favOnly=false;try{favs=JSON.parse(localStorage.getItem('html-games-favs')||'[]');favOnly=localStorage.getItem('html-games-favonly')==='1';}catch(e){}
-cards.forEach((c,i)=>{c._i=i;const b=document.createElement('button');b.type='button';b.className='fav';b.textContent='★';b.onclick=e=>{e.preventDefault();e.stopPropagation();const p=pathOf(c),k=favs.indexOf(p);if(k>=0)favs.splice(k,1);else favs.push(p);try{localStorage.setItem('html-games-favs',JSON.stringify(favs));}catch(x){}paintFavs();};c.appendChild(b);});
-function paintFavs(){
-  const n=cards.filter(c=>favs.includes(pathOf(c))).length;
-  cards.forEach(c=>{const f=favs.includes(pathOf(c));c.querySelector('.fav').classList.toggle('on',f);c.querySelector('.fav').title=f?T('Aus Favoriten entfernen','Remove from favourites'):T('Zu Favoriten','Add to favourites');c.style.display=favOnly&&!f?'none':'';});
-  [...cards].sort((a,b)=>(favs.includes(pathOf(b))-favs.includes(pathOf(a)))||(a._i-b._i)).forEach(c=>grid.appendChild(c));
-  const fb=document.getElementById('favOnly');fb.textContent=favOnly?T('★ Alle Spiele zeigen','★ Show all games'):T('☆ Nur Favoriten zeigen','☆ Show favourites only');fb.classList.toggle('on',favOnly);fb.disabled=!n&&!favOnly;
-  document.getElementById('favHint').textContent=n?T(`${n} Favorit(en) stehen oben`,`${n} favourite(s) on top`):T('Tippe den Stern auf einer Karte, um ein Spiel nach oben zu holen.','Tap the star on a card to move a game to the top.');
+const grid=document.querySelector('.grid'),cards=[...grid.querySelectorAll('.gc')],pathOf=c=>c.getAttribute('href');
+// Kategorie, Spielerzahl, Online, 3D je Spiel (Ordnername)
+const META={
+ 'wortgitter':['brett','2–4',1,0],'hoellen-tycoon':['brett','2–6',1,1],'heldengilde':['karten','2–6',1,0],'auf-und-ab':['karten','1–5',1,0],'rummikub':['brett','2–4',1,1],
+ 'zollkreuzwort':['denken','1',0,0],'mensch-aergere-dich-nicht':['wuerfel','2–4',1,1],'farbchaos':['karten','2–4',1,0],'hanafuda':['karten','2',1,1],'puzzle':['denken','1',0,1],
+ 'tron':['arcade','1–4',1,1],'tetris':['arcade','1',0,1],'poker':['karten','2–6',1,1],'blackjack':['karten','1–5',1,1],'vier-gewinnt':['brett','2',1,0],'muehle':['brett','2',1,0],
+ 'schiffe-versenken':['brett','2',1,0],'chomp-arena':['arcade','1–4',0,0],'mensch-teams':['wuerfel','2–4',1,1],'domino':['brett','2–4',1,0],'billard':['arcade','2',1,1],
+ 'jenga':['arcade','2–4',1,1],'neun-welten':['karten','2–4',1,0],'chomp-klassik':['arcade','1',0,0],'fixer-fritz':['arcade','1',0,0],'netrunner-aergere-dich-nicht':['wuerfel','2–6',1,1]};
+const CATS=[['brett','🧩 Brett','🧩 Board'],['karten','🃏 Karten','🃏 Cards'],['wuerfel','🎲 Würfel','🎲 Dice'],['denken','🧠 Denken','🧠 Puzzle'],['arcade','🕹 Arcade','🕹 Arcade']];
+let favs=[],cat='all',query='';try{favs=JSON.parse(localStorage.getItem('html-games-favs')||'[]');cat=localStorage.getItem('html-games-cat')||'all';}catch(e){}
+cards.forEach((c,i)=>{
+  c._i=i;const key=pathOf(c).replace('/',''),m=META[key]||['brett','',0,0];c.dataset.cat=m[0];c._m=m;c._k=key;
+  const head=document.createElement('div');head.className='head';head.appendChild(c.querySelector('.icon'));head.appendChild(c.querySelector('h2'));c.insertBefore(head,c.firstChild);
+  const tg=document.createElement('div');tg.className='tags';
+  tg.innerHTML=(m[1]?`<span class="tag">👥 ${m[1]}</span>`:'')+(m[2]?`<span class="tag on">🌐 Online</span>`:`<span class="tag">${T('Lokal','Local')}</span>`)+(m[3]?'<span class="tag d3">🧊 3D</span>':'');
+  c.insertBefore(tg,c.querySelector('.play'));
+  const b=document.createElement('button');b.type='button';b.className='fav';b.textContent='★';
+  b.onclick=e=>{e.preventDefault();e.stopPropagation();const p=pathOf(c),k=favs.indexOf(p);if(k>=0)favs.splice(k,1);else favs.push(p);try{localStorage.setItem('html-games-favs',JSON.stringify(favs));}catch(x){}paintGrid();};c.appendChild(b);
+});
+const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function paintGrid(){
+  const fav=c=>favs.includes(pathOf(c)),q=norm(query.trim());
+  const match=c=>(cat==='all'||(cat==='fav'?fav(c):cat==='online'?c._m[2]:cat==='3d'?c._m[3]:c._m[0]===cat))&&(!q||norm(c.querySelector('h2').textContent+' '+c.querySelector('p').textContent).includes(q));
+  const vis=cards.filter(match);
+  cards.forEach(c=>{const f=fav(c);c.querySelector('.fav').classList.toggle('on',f);c.querySelector('.fav').title=f?T('Aus Favoriten entfernen','Remove from favourites'):T('Zu Favoriten','Add to favourites');c.style.display=match(c)?'':'none';});
+  [...cards].sort((a,b)=>(fav(b)-fav(a))||(a._i-b._i)).forEach(c=>grid.appendChild(c));
+  let nr=document.getElementById('nores');if(!nr){nr=document.createElement('div');nr.id='nores';nr.className='nores';grid.appendChild(nr);}
+  nr.style.display=vis.length?'none':'';nr.textContent=T('Keine Spiele gefunden.','No games found.');grid.appendChild(nr);
+  const nf=cards.filter(fav).length;
+  const defs=[['all',T('Alle','All'),cards.length],['fav','★ '+T('Favoriten','Favourites'),nf]].concat(CATS.map(c=>[c[0],T(c[1],c[2]),cards.filter(x=>x._m[0]===c[0]).length]),[['online','🌐 Online',cards.filter(x=>x._m[2]).length],['3d','🧊 3D',cards.filter(x=>x._m[3]).length]]);
+  document.getElementById('filters').innerHTML=defs.map(d=>`<button class="chip${cat===d[0]?' on':''}" data-cat="${d[0]}">${d[1]} <span class="c">${d[2]}</span></button>`).join('')+'<span class="sp"></span><span class="fh">'+(nf?T('Favoriten stehen oben','Favourites on top'):T('Stern auf einer Karte = Favorit','Star on a card = favourite'))+'</span>';
 }
-document.getElementById('favOnly').onclick=()=>{favOnly=!favOnly;try{localStorage.setItem('html-games-favonly',favOnly?'1':'0');}catch(e){}paintFavs();};
-paintFavs();
+document.getElementById('filters').addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;cat=b.dataset.cat;try{localStorage.setItem('html-games-cat',cat);}catch(x){}paintGrid();});
+const qi=document.getElementById('q');qi.placeholder=T('Spiel suchen …','Search games …');qi.oninput=()=>{query=qi.value;paintGrid();};
+addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==qi&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();qi.focus();}else if(e.key==='Escape'&&document.activeElement===qi){qi.value='';query='';paintGrid();qi.blur();}});
+function paintHero(){
+  document.getElementById('eyebrow').textContent=T('Browser Arcade · kostenlos · ohne Installation','Browser arcade · free · no install');
+  document.getElementById('h1a').textContent=T('Spielen.','Play.');document.getElementById('h1b').textContent=T('Allein oder online.','Solo or online.');
+  document.getElementById('heroP').textContent=T('Brettspiele, Kartenspiele und Arcade direkt im Browser. Mit Computergegnern, Freunden online, Zuschauermodus und Wiederbeitritt.','Board games, card games and arcade right in your browser. With computer opponents, friends online, spectator mode and rejoin.');
+  document.getElementById('stats').innerHTML=[[cards.length,T('Spiele','Games')],[cards.filter(c=>c._m[2]).length,T('mit Online-Modus','with online mode')],[cards.filter(c=>c._m[3]).length,T('in 3D','in 3D')]].map(s=>`<div class="stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join('');
+}
+paintHero();paintGrid();
 // ---------- Offene Spiele: eigene (zum Wiederaufnehmen) und öffentliche Räume aller Spiele ----------
 const PF={'mensch-aergere-dich-nicht':'mdn-v1-','mensch-teams':'mtm-v1-','hoellen-tycoon':'htc-v1-','heldengilde':'hgl-v1-','auf-und-ab':'aua-v1-','wortgitter':'wgt-v1-','domino':'dom-v1-','billard':'bil-v1-','jenga':'jng-v1-','neun-welten':'nwl-v1-','farbchaos':'fch-v1-','hanafuda':'hnf-v1-','muehle':'mue-v1-','netrunner-aergere-dich-nicht':'ndn-v1-','poker':'pkr-v1-','blackjack':'bjk-v1-','schiffe-versenken':'sv-v1-','tron':'tron-v1-','vier-gewinnt':'c4-v1-'};
 const info=path=>{const c=cards.find(x=>pathOf(x)===path+'/');return c?{n:c.querySelector('h2').textContent,i:c.querySelector('.icon').textContent,path:path+'/'}:{n:path,i:'🎮',path:path+'/'};};
@@ -300,7 +382,7 @@ function paintMine(){
   });
   rows.sort((a,b)=>b.t-a.t);
   const box=document.getElementById('mine');box.hidden=!rows.length;if(!rows.length)return;
-  document.getElementById('mineT').innerHTML=T('🗂 Meine offenen Spiele','🗂 My open games')+'<span class="n">'+T('verfallen nach 24 Std.','expire after 24 h')+'</span>';
+  document.getElementById('mineT').innerHTML=T('Weiterspielen','Continue')+'<span class="n">'+T('verfallen nach 24 Std.','expire after 24 h')+'</span>';
   document.getElementById('mineList').innerHTML=rows.map(r=>{const g=info(r.path);return `<div class="xr"><span class="ic">${g.i}</span><div class="tx"><b>${esc(g.n)}</b><small>${T('Raum','Room')} ${esc(r.code)} · ${ago(now-r.t)}</small></div><a class="btn go" href="${g.path}?room=${encodeURIComponent(r.code)}&resume=1">${T('↩ Zurück ins Spiel','↩ Back into the game')}</a><button class="btn x" data-forget="${r.path}" title="${T('Vergessen','Forget')}">✕</button></div>`;}).join('');
   document.getElementById('mineList').dataset.rows=JSON.stringify(rows.map(r=>[r.path,r.keys]));
 }
@@ -309,7 +391,7 @@ paintMine();setInterval(paintMine,30000);
 let liveList=[];
 function paintLive(){
   const lst=liveList.map(g=>Object.assign({},g,{path:byPrefix[g.prefix]})).filter(g=>g.path).sort((a,b)=>(a.live-b.live)||(b.count-a.count));
-  document.getElementById('liveT').innerHTML=T('🌐 Offene Spiele online','🌐 Open games online')+'<span class="n">'+(lst.length?lst.length:'')+'</span>';
+  document.getElementById('liveT').innerHTML='<span class="dot"></span>'+T('Live: offene Spiele','Live: open games')+'<span class="n">'+(lst.length?lst.length+' '+T('Räume','rooms'):T('Suche …','searching …'))+'</span>';
   const el=document.getElementById('liveList');el.className=lst.length?'':'empty';
   el.innerHTML=lst.length?lst.map(g=>{const i=info(g.path);return `<div class="xr"><span class="ic">${i.i}</span><div class="tx"><b>${esc(i.n)}</b><small>${esc(g.host||'?')} · ${g.live?T('Spiel läuft','game in progress'):g.count+'/'+g.max+' '+T('Spieler','players')}</small></div><a class="btn${g.live?'':' go'}" href="${i.path}?room=${encodeURIComponent(g.code)}${g.live?'&spec=1':''}">${g.live?T('👁 Zuschauen','👁 Watch'):T('Beitreten','Join')}</a></div>`;}).join(''):T('Gerade ist kein öffentliches Spiel offen. Erstelle in einem Spiel einen öffentlichen Raum, er erscheint hier für alle.','No public game is open right now. Create a public room in a game and it shows up here for everyone.');
 }
