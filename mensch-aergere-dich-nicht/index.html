@@ -1077,7 +1077,8 @@ function leaveNet(){
   if(netRole==='client'){try{hostConn&&(hostConn.send({t:'bye'}),hostConn.close());}catch(e){}if(joiner)joiner.cancel();}
   stopAnnounce();
   room=null;lobby=[];held=[];hostConn=null;joiner=null;netRole='local';netPlaying=false;cReady=false;opening=false;mySlot=-1;canRollNet=false;isSpec=false;syncSpecBadge();backup=null;pendingSucc=-1;migrating=false;backupInfo=null;lastSnap=null;try{if(standby&&standby.room)standby.room.close();}catch(e){}standby=null;standbySeats=null;
-  clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';
+  clearInterval(rollAnim);cRolling=false;document.title='Mensch ärgere dich nicht';joinBusy=0;
+  setMine(false);disarmIdle();clearInterval(ctIv);ctId=-1;      // „Du bist dran“-Rahmen und Zähler nie im Menü stehen lassen
   $('joinForm').hidden=false;$('joinLobby').hidden=true;joinBtnReset();prevNames=null;
 }
 document.querySelectorAll('#modeTabs .btn').forEach(b=>b.onclick=()=>{
@@ -1114,6 +1115,12 @@ function onHostMsg(conn,m){
   if(m.t==='hello'){
     if(conn.slot!==undefined)return;
     const nm=String(m.name||'Spieler').slice(0,14);
+    if(m.tok&&!m.spec){      // dieselbe Person verbindet sich neu (zweite Verbindung, hängende alte): Platz übernehmen statt zweiten Platz zu vergeben oder abzuweisen
+      const ko=lobby.findIndex(s=>s&&s.type==='remote'&&s.tok===m.tok);
+      if(ko>=0){const oc=lobby[ko].conn;lobby[ko].conn=conn;lobby[ko].name=nm;conn.slot=ko;if(oc&&oc!==conn){oc.slot=undefined;try{oc.close();}catch(e){}}
+        try{conn.send({t:'welcome',slot:ko,tok:m.tok});}catch(e){}
+        if(netPlaying){names[ko]=nm;showScores();broadcastSnap();}else broadcastLobby();return;}
+    }
     if(netPlaying&&m.spec&&specOn()){addSpec(conn,nm);return;}
     if(netPlaying){
       // Wiederbeitritt: gleicher Token, sonst (ohne Token) gleicher Name; der Computer gibt den Platz zurück
@@ -1301,27 +1308,33 @@ function broadcastSnap(){
 // ---------- Mitspieler ----------
 function setJoinStatus(t){errMsg(t);}
 function syncSpecBadge(){let b=$('specBadge');if(!b){b=document.createElement('div');b.id='specBadge';b.textContent='👁 Du schaust zu';b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;background:rgba(10,14,28,.85);color:#fff;font-weight:800;padding:6px 14px;border-radius:999px;border:2px solid #00cfff;pointer-events:none';document.body.appendChild(b);}b.hidden=!isSpec||$('game').hidden;}
+let joinBusy=0;
 function joinRoom(codeArg,spec){
+  if(Date.now()-joinBusy<30000||(hostConn&&hostConn.open))return;      // Beitritt läuft schon: kein zweiter (sonst saß man zweimal im Raum)
+  joinBusy=Date.now();
   wantSpec=!!spec;
   const code=((typeof codeArg==='string'?codeArg:'')||$('joinCode').value||'').trim().toUpperCase();
   if(code.length<4){errMsg('Bitte den Raumcode eingeben.');return;}
   const name=myNameVal();errMsg('');joinedCode=code;prevNames=null;$('joinBtn').disabled=true;$('joinBtn').textContent='Verbinde …';$('joinBtn').classList.add('busy');stopWatch();
   joiner=Net.join(PREFIX,code,{
-    attach(c){hostConn=c;c.on('data',onClientMsg);c.on('close',onClientClose);},
-    open(c){netRole='client';errMsg('');const rj=getRejoin();try{c.send({t:'hello',name,spec:wantSpec||undefined,tok:!wantSpec&&rj&&rj.code===code?rj.tok:undefined});}catch(e){}},
-    fail(msg){joinBtnReset();hostConn=null;joiner=null;errMsg(msg||'Verbindung fehlgeschlagen.');}
+    attach(c){
+      if(hostConn&&hostConn!==c){try{hostConn.close();}catch(e){}}      // nur die neueste Verbindung zählt
+      hostConn=c;c.on('data',m=>{if(c===hostConn)onClientMsg(m);});c.on('close',()=>{if(c===hostConn)onClientClose();});
+    },
+    open(c){if(c!==hostConn)return;netRole='client';errMsg('');const rj=getRejoin();try{c.send({t:'hello',name,spec:wantSpec||undefined,tok:!wantSpec&&rj&&rj.code===code?rj.tok:undefined});}catch(e){}},
+    fail(msg){joinBusy=0;joinBtnReset();hostConn=null;joiner=null;errMsg(msg||'Verbindung fehlgeschlagen.');}
   });
 }
 sendHost=function(m){try{hostConn&&hostConn.open&&hostConn.send(m);}catch(e){}};
 function onClientMsg(m){
   if(!m||typeof m!=='object')return;
   if(m.t==='welcome'&&m.spec){isSpec=true;mySlot=-1;joinBtnReset();errMsg('Verbunden. Warte auf den Spielstand …');return;}
-  if(m.t==='welcome'){isSpec=false;if(m.tok){myTok=m.tok;setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});}mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();
+  if(m.t==='welcome'){joinBusy=0;isSpec=false;if(m.tok){myTok=m.tok;setRejoin({code:joinedCode,tok:m.tok,name:myNameVal(),t:Date.now()});}mySlot=m.slot;$('joinRoomCode').textContent=joinedCode;joinBtnReset();
     if(migrating){migrating=false;backupInfo=null;standby=null;setMsg('🔁 Neuer Host verbunden. Das Spiel läuft weiter.');return;}      // Host-Wechsel geschafft: im Spiel bleiben
     $('joinForm').hidden=true;$('joinLobby').hidden=false;}
   else if(m.t==='lobby'){
     mySlot=m.you;if(m.cols)m.cols.forEach((k,i)=>setSeatColor(i,k));
-    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;cancelDice();syncDock(false);$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
+    if(cReady||!$('game').hidden){cReady=false;token++;clearInterval(rollAnim);cRolling=false;cancelDice();syncDock(false);setMine(false);disarmIdle();clearInterval(ctIv);ctId=-1;$('game').hidden=true;$('winBox').hidden=true;$('setup').hidden=false;showMode('join');}
     $('joinForm').hidden=true;$('joinLobby').hidden=false;
     $('joinSlots').innerHTML=m.slots.map((s,i)=>{
       const me=i===m.you;

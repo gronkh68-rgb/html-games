@@ -208,6 +208,11 @@
           if (ri < 0) { full('Das Spiel läuft schon' + (cfg.rejoin ? ' und dein alter Platz ist nicht mehr frei' : '')); return; }
           seatBack(conn, ri, m); return;
         }
+        var dup = -1; if (m.rid) L.seats.forEach(function (s, k) { if (dup < 0 && s.type === 'remote' && s.rid === m.rid) dup = k; });
+        if (dup >= 0) {      // dieselbe Person nochmal (zweite Verbindung, Seite neu geladen): alten Platz weiterbenutzen statt zweimal in der Lobby zu stehen
+          var o2 = L.seats[dup].conn; L.seats[dup].conn = conn; L.seats[dup].name = String(m.name || 'Spieler').slice(0, 14); conn.slot = dup; if (o2 && o2 !== conn) { o2.slot = undefined; try { o2.close(); } catch (e) {} }
+          try { conn.send({ t: 'welcome', slot: dup, key: L.seats[dup].key }); } catch (e) {} broadcastLobby(); return;
+        }
         var i = -1; L.seats.forEach(function (s, k) { if (i < 0 && s.type === 'open') i = k; });
         if (i < 0) { full('Der Raum ist voll'); return; }
         L.seats[i] = { type: 'remote', name: String(m.name || 'Spieler').slice(0, 14), conn: conn, rid: m.rid, key: newKey() }; conn.slot = i;
@@ -327,21 +332,24 @@
     function stopWatch() { if (L.watch) { L.watch.stop(); L.watch = null; } }
 
     // ---------- Mitspieler ----------
+    var joinBusy = 0;
     function joinRoom(codeArg, spec) {
+      if (Date.now() - joinBusy < 30000 || (L.hostConn && L.hostConn.open)) return;      // Beitritt läuft schon: kein zweiter (sonst zweimal im Raum)
+      joinBusy = Date.now();
       L.wantSpec = !!spec;
       var code = ((typeof codeArg === 'string' ? codeArg : '') || $('mpJoinCode').value || '').trim().toUpperCase();
       if (code.length < 4) { err('Bitte den Raumcode eingeben.'); return; }
       L.joinCode = code; var name = myName(); err('Verbinde …'); $('mpJoinBtn').disabled = true; stopWatch();
       L.joiner = Net.join(cfg.prefix, code, {
-        attach: function (c) { L.hostConn = c; c.on('data', onClientMsg); c.on('close', onClientClose); },
-        open: function (c) { L.role = 'client'; err(''); try { c.send({ t: 'hello', name: name, rid: myRid(), key: L.wantSpec ? undefined : keyFor(code) || undefined, spec: L.wantSpec || undefined }); } catch (e) {} },
-        fail: function (msg) { clearLast(); $('mpJoinBtn').disabled = false; L.hostConn = null; L.joiner = null; err(msg || 'Verbindung fehlgeschlagen.'); showMode('join'); }
+        attach: function (c) { if (L.hostConn && L.hostConn !== c) { try { L.hostConn.close(); } catch (e) {} } L.hostConn = c; c.on('data', function (m) { if (c === L.hostConn) onClientMsg(m); }); c.on('close', function () { if (c === L.hostConn) onClientClose(); }); },
+        open: function (c) { if (c !== L.hostConn) return; L.role = 'client'; err(''); try { c.send({ t: 'hello', name: name, rid: myRid(), key: L.wantSpec ? undefined : keyFor(code) || undefined, spec: L.wantSpec || undefined }); } catch (e) {} },
+        fail: function (msg) { joinBusy = 0; clearLast(); $('mpJoinBtn').disabled = false; L.hostConn = null; L.joiner = null; err(msg || 'Verbindung fehlgeschlagen.'); showMode('join'); }
       });
     }
     function onClientMsg(m) {
       if (!m || typeof m !== 'object') return;
       if (m.t === 'welcome' && m.spec) { L.spec = true; L.you = -1; err('Verbunden. Warte auf den Spielstand …'); return; }
-      if (m.t === 'welcome') { L.spec = false; if (L.migrating) { L.migrating = false; toast(''); L.backup = null; } if (m.key) L.myKey = m.key; saveLast(L.joinCode, L.myKey); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
+      if (m.t === 'welcome') { joinBusy = 0; L.spec = false; if (L.migrating) { L.migrating = false; toast(''); L.backup = null; } if (m.key) L.myKey = m.key; saveLast(L.joinCode, L.myKey); L.you = m.slot; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
       else if (m.t === 'lobby') {
         L.you = m.you; $('mpJoinForm').hidden = true; $('mpLobby').hidden = false;
         if (L.playing || m.back) { L.playing = false; if (cfg.onBackToLobby) cfg.onBackToLobby(); ov.hidden = false; showMode('join'); $('mpJoinForm').hidden = true; $('mpLobby').hidden = false; }
