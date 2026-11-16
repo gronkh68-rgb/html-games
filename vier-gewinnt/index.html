@@ -226,6 +226,7 @@ let L=null;
 function bcast(){
   if(!(net.on&&net.role==='host'))return;
   L.broadcast({t:'state',board,turn,over,wins,last:lastMove,win:lastWin,draw:over&&!lastWin});
+  L.snap({phase:'turn',G:{board,turn,over,wins,starter,last:lastMove,win:lastWin,names:net.names}});      // Stand für den Ersatz-Host und zum Fortsetzen
 }
 function applyState(s){
   board=s.board;turn=s.turn;over=s.over;wins=s.wins;busy=false;
@@ -261,7 +262,7 @@ function leaveOnline(){
 }
 L=MP.init({
   prefix:'c4-v1-',title:'Vier gewinnt',
-  seats:[{name:'Rot',color:'#ef4444'},{name:'Gelb',color:'#facc15'}],minPlayers:2,bots:false,
+  seats:[{name:'Rot',color:'#ef4444'},{name:'Gelb',color:'#facc15'}],minPlayers:2,bots:false,rejoin:true,migrate:true,
   onStart(info){
     net.on=true;net.role=info.role;net.you=info.you;
     net.names={1:info.seats[0].name||'Rot',2:info.seats[1].name||'Gelb'};
@@ -276,7 +277,13 @@ L=MP.init({
       else if(m.t==='again'&&over){newGame();bcast();}
     }else if(m.t==='state')applyState(m);
   },
-  onSeatDrop(i){over=true;L.backToLobby();},
+  onSeatDrop(i){$('msg').textContent='⏳ Der Gegner ist weg. Das Spiel wartet auf seine Rückkehr (Raumcode im Chip unten).';},      // Platz bleibt frei: Wiederbeitritt, die Partie geht weiter
+  onRejoin(i){bcast();},
+  onMigrate(snap,info){      // der andere Spieler führt die Partie als Host weiter
+    const g=snap.G;token++;net.on=true;net.role='host';net.you=info.you;net.names=g.names||net.names;setOnlineUi(true);
+    wins=g.wins;starter=g.starter;lastMove=g.last||null;lastWin=g.win||null;
+    applyState({board:g.board,turn:g.turn,over:g.over,wins:g.wins,last:null,win:g.win,draw:g.over&&!g.win});bcast();
+  },
   onBackToLobby(){board=Array.from({length:ROWS},()=>Array(COLS).fill(0));buildBoard();$('msg').textContent='Warte in der Lobby …';},
   onLeave(why){net.on=false;net.role='local';setOnlineUi(false);wins={1:0,2:0};starter=1;newGame();}
 });

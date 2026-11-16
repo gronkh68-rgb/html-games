@@ -76,7 +76,10 @@
     var SAVEK = 'mp-saved-' + cfg.prefix, savedT = 0;
     function getSaved() { if (!cfg.migrate) return null; try { var g = JSON.parse(localStorage.getItem(SAVEK) || 'null'); return g && g.snap && g.code && Date.now() - g.t < 24 * 3600e3 ? g : null; } catch (e) { return null; } }
     function clearSaved() { try { localStorage.removeItem(SAVEK); } catch (e) {} }
-    function persist(d) { if (!cfg.migrate) return; var now = Date.now(); if (now - savedT < 2000) return; savedT = now; d.t = now; try { localStorage.setItem(SAVEK, JSON.stringify(d)); } catch (e) {} }
+    var savePend = null, saveTimer = 0;
+    function writeSaved() { saveTimer = 0; if (!savePend) return; var d = savePend; savePend = null; savedT = Date.now(); d.t = savedT; try { localStorage.setItem(SAVEK, JSON.stringify(d)); } catch (e) {} }
+    function persist(d) { if (!cfg.migrate) return; savePend = d; var wait = 2000 - (Date.now() - savedT); if (wait <= 0) writeSaved(); else if (!saveTimer) saveTimer = setTimeout(writeSaved, wait); }      // höchstens alle 2 s schreiben, der letzte Stand geht aber nie verloren
+    addEventListener('pagehide', function () { writeSaved(); });
     L.hasSaved = function () { return !!getSaved(); };
     function saveLast(code) { if (!cfg.rejoin || !code) return; try { localStorage.setItem(LASTK, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {} }
     function clearLast() { try { localStorage.removeItem(LASTK); } catch (e) {} updateRejoin(); }

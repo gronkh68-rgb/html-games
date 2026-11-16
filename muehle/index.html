@@ -274,6 +274,7 @@ let L=null,bq=false;
 function bcast(){
   if(!(net.on&&net.role==='host'))return;
   L.broadcast({t:'state',st,sel,removing,over});
+  L.snap({phase:'turn',G:{st,sel,removing,over,names:net.names}});      // Stand für den Ersatz-Host und zum Fortsetzen
 }
 const _draw=draw;
 draw=function(){_draw();if(net.on&&net.role==='host'&&!bq){bq=true;queueMicrotask(()=>{bq=false;bcast();});}};
@@ -292,7 +293,7 @@ function setOnlineUi(on){
 function leaveOnline(){if(L)L.leave();net.on=false;net.role='local';net.you=-1;setOnlineUi(false);start();}
 L=MP.init({
   prefix:'mue-v1-',title:'Mühle',
-  seats:[{name:'Weiß',color:'#f4f1ea'},{name:'Schwarz',color:'#2b2b33'}],minPlayers:2,bots:false,
+  seats:[{name:'Weiß',color:'#f4f1ea'},{name:'Schwarz',color:'#2b2b33'}],minPlayers:2,bots:false,rejoin:true,migrate:true,
   onStart(info){
     token++;net.on=true;net.role=info.role;net.you=info.you;mode='two';
     net.names={1:info.seats[0].name||'Weiß',2:info.seats[1].name||'Schwarz'};
@@ -307,7 +308,12 @@ L=MP.init({
       else if(m.t==='again'&&over)newOnline();
     }else if(m.t==='state')applyState(m);
   },
-  onSeatDrop(i){over=true;$('winBox').hidden=true;L.backToLobby();},
+  onSeatDrop(i){note='⏳ Der Gegner ist weg. Das Spiel wartet auf seine Rückkehr (Raumcode im Chip unten).';prompt_();},
+  onRejoin(i){note='';bcast();},
+  onMigrate(snap,info){      // der andere Spieler führt die Partie als Host weiter
+    const g=snap.G;token++;net.on=true;net.role='host';net.you=info.you;net.names=g.names||net.names;mode='two';setOnlineUi(true);
+    applyState({st:g.st,sel:g.sel,removing:g.removing,over:g.over});bcast();
+  },
   onBackToLobby(){st=newState();sel=null;removing=false;over=false;$('winBox').hidden=true;draw();$('msg').textContent='Warte in der Lobby …';},
   onLeave(why){net.on=false;net.role='local';setOnlineUi(false);start();}
 });
