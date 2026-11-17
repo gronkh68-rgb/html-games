@@ -66,6 +66,31 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 #ov.show{display:grid}
 #ov .box{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:22px 26px;text-align:center;max-width:360px}
 #ov h2{margin:0 0 6px}#ov p{margin:0 0 14px;color:var(--muted)}
+
+/* Kampagne */
+#camp{display:none}body.incamp #menu{display:none}body.incamp #camp{display:block}body.ingame #camp{display:none}
+.cmap{display:flex;flex-direction:column;gap:12px}
+.area{border-radius:14px;border:1px solid var(--border);border-top:3px solid var(--c);background:var(--card);padding:12px 14px}
+.area.lock{opacity:.45}
+.area h3{margin:0 0 8px;font-size:1.05rem}
+.nodes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nd{min-width:96px;padding:8px 10px;border-radius:10px;border:2px solid var(--border);text-align:center;font-size:.82rem;background:var(--card-hover);color:var(--text)}
+.nd b{display:block;font-size:1.3rem}
+.nd.done{opacity:.5;border-color:#39ff14}.nd.cur{border-color:var(--accent2);box-shadow:0 0 12px var(--accent2)}.nd.boss b{color:#ff8a00}
+.ar{color:var(--muted)}
+.cbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.mrow{display:flex;gap:10px;flex-wrap:wrap}
+#t3d{display:none;position:relative;height:min(58vh,540px);border-radius:16px;overflow:hidden;border:2px solid #5a3a1c;background:#0b0705}
+body.v3 #t3d{display:block}body.v3 #t2d{display:none}
+#bossInfo{display:none;margin:0 0 8px;padding:8px 12px;border-radius:10px;background:#3a1a10;border:1px solid #ff8a00;color:#ffd9b0;font-size:.85rem}
+#bossInfo b{color:#ff8a00}
+#pk{position:fixed;inset:0;display:none;place-items:center;background:rgba(5,5,10,.8);z-index:60;padding:12px;overflow:auto}
+#pk.show{display:grid}
+#pk .box{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:18px;text-align:center;max-width:min(96vw,640px);max-height:94vh;overflow:auto}
+#pk h2{margin:0 0 4px}#pk p{margin:0 0 12px;color:var(--muted);font-size:.9rem}
+#pk .cs{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+#pk .cs .card{cursor:pointer}#pk .cs .card:hover{transform:translateY(-6px);box-shadow:0 0 16px var(--accent2)}
+#pk .opts{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -74,6 +99,11 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 
   <div id="menu" class="menu">
     <div class="panel">
+      <h2 id="kT"></h2>
+      <p class="rules" id="kP"></p>
+      <div class="mrow" id="kBtns"></div>
+    </div>
+    <div class="panel">
       <h2 id="mT"></h2>
       <p class="rules" id="rules"></p>
       <div class="ogrid" id="ogrid"></div>
@@ -81,14 +111,26 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
     <div class="panel"><h2 id="cbT"></h2><p class="rules" id="cbP"></p><div class="cbook" id="cbook"></div></div>
   </div>
 
+  <div id="camp">
+    <div class="panel">
+      <h2 id="cT"></h2>
+      <div class="cbar"><span class="stat" id="cCan"></span><button class="btn alt" id="cDeck"></button><button class="btn alt" id="cExit"></button></div>
+      <div class="cmap" id="cmap"></div>
+      <div class="mrow" style="margin-top:12px"><button class="btn" id="cGo"></button></div>
+    </div>
+  </div>
+
   <div id="game">
     <div class="hdr">
       <div class="scale"><div class="track"><div class="zero"></div><div class="mk" id="mk"></div></div><div class="lb"><span id="lbO"></span><span id="lbY"></span></div></div>
       <span class="stat">🦴 <b id="bones">0</b></span>
       <span class="stat" id="turnS"></span>
+      <button class="btn alt" id="b3d" title="2D / 3D">🧊 3D</button>
       <button class="btn alt" id="bMenu">☰</button>
     </div>
-    <div class="table">
+    <div id="bossInfo"></div>
+    <div id="t3d"></div>
+    <div class="table" id="t2d">
       <div class="row q" id="oq"></div>
       <div class="row" id="ob"></div>
       <div class="mid"></div>
@@ -101,24 +143,73 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
     <div id="info"></div>
   </div>
 </div>
+<div id="pk"><div class="box"><h2 id="pkT"></h2><p id="pkP"></p><div class="cs" id="pkC"></div><div class="opts" id="pkO"></div></div></div>
 <div id="ov"><div class="box"><h2 id="ovT"></h2><p id="ovP"></p><button class="btn" id="ovB"></button> <button class="btn alt" id="ovM"></button></div></div>
 <script src="engine.js"></script>
 <script>
 (function () {
 'use strict';
 const T = (d, e) => (window.SITE && SITE.T) ? SITE.T(d, e) : d, $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
-// ---------- Gegner und Decks ----------
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+// ---------- Gegner und Gebiete ----------
 const OPP = [
   { id: 'koehler', n: 'Der Köhler', icon: '🪓', c: '#39ff14', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'wolf', 'adder', 'raven_egg', 'warren', 'otter', 'tadpole', 'opossum', 'skink', 'goat'], t: 'Einfach: kleine Waldtiere, wenig Druck.' },
   { id: 'hexe', n: 'Die Moorhexe', icon: '🧙', c: '#a06bff', diff: 2, d: ['adder', 'adder', 'bat', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'mantis', 'mantis_god', 'wolf', 'hound', 'ouro', 'packrat', 'cat', 'cockroach', 'ant', 'ant', 'ant_queen', 'kingfisher'], t: 'Mittel: Gift, Flieger und Knochen-Karten.' },
   { id: 'hirsch', n: 'Der Hirschkönig', icon: '🦌', c: '#ff8a00', diff: 3, d: ['elk', 'elk', 'elk_fawn', 'grizzly', 'grizzly', 'ox', 'vulture', 'hound', 'wolf', 'wolf', 'raven', 'mantis_god', 'bat', 'rattler', 'direwolf', 'shark', 'beaver', 'mole_man'], t: 'Schwer: große Tiere, schnelle Läufer.' }
 ];
+const T1 = ['stoat', 'wolf_cub', 'frog', 'adder', 'porcupine', 'mole', 'mantis', 'warren', 'goat', 'cat', 'otter', 'tadpole', 'raven_egg', 'ant', 'skink', 'opossum', 'elk_fawn'];
+const T2 = ['raven', 'bat', 'wolf', 'hound', 'packrat', 'coyote', 'beaver', 'kingfisher', 'ant_queen', 'cockroach', 'elk', 'mantis_god'];
+const T3 = ['grizzly', 'rattler', 'direwolf', 'shark', 'ouro', 'mole_man', 'vulture', 'ox'];
+const AREAS = [
+  { id: 'wald', n: 'Nebelwald', icon: '🌲', c: '#39ff14', pool: T1.concat(T1, T2), nodes: [
+    { t: 'fight', o: { n: 'Der Wilderer', icon: '🏹', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'warren', 'adder', 'opossum', 'skink', 'raven_egg'] } },
+    { t: 'fight', o: { n: 'Die Pilzsammlerin', icon: '🍄', diff: 1, d: ['stoat', 'wolf_cub', 'wolf_cub', 'tadpole', 'otter', 'mantis', 'goat', 'cat', 'ant', 'ant', 'elk_fawn', 'wolf'] } },
+    { t: 'camp' },
+    { t: 'boss', o: { n: 'Der Hirschkönig', icon: '🦌', diff: 2, boss: 'pack', win: 7, d: ['elk', 'elk', 'elk_fawn', 'elk_fawn', 'wolf', 'wolf', 'stoat', 'raven', 'hound', 'grizzly', 'porcupine', 'mole'] } }
+  ] },
+  { id: 'moor', n: 'Irrlichtmoor', icon: '🌫️', c: '#a06bff', pool: T2.concat(T2, T3, T1), nodes: [
+    { t: 'fight', o: { n: 'Der Torfstecher', icon: '⛏️', diff: 2, d: ['adder', 'adder', 'frog', 'tadpole', 'otter', 'kingfisher', 'raven', 'mole', 'beaver', 'wolf', 'bat', 'cockroach'] } },
+    { t: 'fight', o: { n: 'Das Irrlicht', icon: '🔥', diff: 2, d: ['bat', 'bat', 'raven', 'kingfisher', 'mantis', 'mantis_god', 'coyote', 'ant_queen', 'ant', 'ant', 'hound', 'packrat'] } },
+    { t: 'camp' },
+    { t: 'boss', o: { n: 'Die Moorhexe', icon: '🧙', diff: 2, boss: 'curse', win: 7, d: ['adder', 'adder', 'adder', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'cat', 'cat', 'ouro', 'mantis_god', 'wolf'] } }
+  ] },
+  { id: 'gruft', n: 'Knochengruft', icon: '💀', c: '#ff8a00', pool: T3.concat(T3, T2), nodes: [
+    { t: 'fight', o: { n: 'Der Totengräber', icon: '⚰️', diff: 3, d: ['adder', 'cockroach', 'cockroach', 'rattler', 'bat', 'bat', 'ouro', 'wolf', 'hound', 'direwolf', 'packrat', 'cat'] } },
+    { t: 'fight', o: { n: 'Die Grabwächterin', icon: '🗿', diff: 3, d: ['mole_man', 'mole_man', 'grizzly', 'ox', 'direwolf', 'vulture', 'shark', 'beaver', 'hound', 'raven', 'wolf', 'mantis_god'] } },
+    { t: 'camp' },
+    { t: 'boss', o: { n: 'Der Knochenfürst', icon: '👑', diff: 3, boss: 'necro', win: 7, d: ['rattler', 'rattler', 'cockroach', 'cockroach', 'bat', 'bat', 'adder', 'grizzly', 'ouro', 'direwolf', 'vulture', 'mantis_god', 'ox'] } }
+  ] }
+];
 const STARTER = ['stoat', 'wolf_cub', 'frog', 'adder', 'raven', 'elk_fawn', 'porcupine', 'mole', 'mantis', 'warren', 'wolf', 'hound', 'cat', 'goat', 'otter'];
-let G = null, opp = null, ui = { sel: null, sac: [] }, busy = false, done = false;
+const KEY = 'hd-camp-v1';
+let G = null, opp = null, ui = { sel: null, sac: [] }, busy = false, done = false, camp = null, fightNode = null, v3on = false;
+
+// ---------- Kartenelemente ----------
+function costHtml(c) { let s = ''; for (let i = 0; i < (c.cost.b || 0); i++) s += '🩸'; if (c.cost.o) s += (s ? '<br>' : '') + '🦴' + (c.cost.o > 1 ? '×' + c.cost.o : ''); return s; }
+function cardEl(c, cls) {
+  const d = document.createElement('div'); d.className = 'card ' + (cls || '') + (c.sub ? ' sub' : ''); d.dataset.uid = c.uid;
+  d.innerHTML = '<div class="nm">' + c.n + '</div><div class="cost">' + costHtml(c) + '</div><div class="art">' + c.art + '</div><div class="atk">' + c.atk + '</div><div class="hp' + (c.hp < c.max ? ' dmg' : '') + '">' + c.hp + '</div><div class="sg">' + c.sig.map(s => HD.SIG[s][1]).join('') + (c.lives > 1 ? '×' + c.lives : '') + '</div>';
+  return d;
+}
+const deckCard = x => HD.make(x);
+function chooser(title, text, cards, opts) {      // Auswahl-Fenster: cards = [{x, label}] -> Promise<Index|-1>
+  return new Promise(res => {
+    $('pkT').textContent = title; $('pkP').textContent = text; const C = $('pkC'), O = $('pkO'); C.innerHTML = ''; O.innerHTML = '';
+    cards.forEach((x, i) => { const c = deckCard(x), e = cardEl(c, 'ok'); e.onclick = () => { $('pk').classList.remove('show'); res(i); }; e.onmouseenter = () => info(c); C.appendChild(e); });
+    (opts || []).forEach(o => { const b = document.createElement('button'); b.className = 'btn' + (o.alt ? ' alt' : ''); b.textContent = o.t; b.onclick = () => { $('pk').classList.remove('show'); res(o.v); }; O.appendChild(b); });
+    $('pk').classList.add('show');
+  });
+}
 
 // ---------- Menü ----------
 function paintMenu() {
-  $('mT').textContent = T('Wähle deinen Gegner', 'Choose your opponent');
+  $('kT').textContent = T('Kampagne', 'Campaign');
+  $('kP').innerHTML = T('Zieh durch drei Gebiete mit je zwei Kämpfen, einem Lagerfeuer und einem <b>Boss</b>. Nach jedem Sieg wählst du eine neue Karte. Du hast <b>zwei Kerzen</b>: Jede Niederlage löscht eine. Bosse haben eigene Regeln und brauchen <b>7</b> Punkte Vorsprung. Dein Fortschritt wird im Browser gespeichert.', 'Travel through three regions with two fights, a campfire and a <b>boss</b> each. After every win you pick a new card. You have <b>two candles</b>: every defeat snuffs one. Bosses have special rules and need a <b>7</b> point lead. Your progress is saved in your browser.');
+  const sv = store.get(KEY), B = $('kBtns'); B.innerHTML = '';
+  const mk = (t, f, alt) => { const b = document.createElement('button'); b.className = 'btn' + (alt ? ' alt' : ''); b.textContent = t; b.onclick = f; B.appendChild(b); };
+  if (sv) mk('▶ ' + T('Kampagne fortsetzen', 'Continue') + ' (' + AREAS[sv.a].icon + ' ' + AREAS[sv.a].n + ')', () => { camp = sv; showCamp(); });
+  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = { a: 0, n: 0, c: 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; store.set(KEY, camp); showCamp(); }, !!sv);
+  $('mT').textContent = T('Freies Duell', 'Free duel');
   $('rules').innerHTML = T(
     '<b>So geht es:</b> Du und der Gegner habt je vier Bahnen. Karten kosten <b>Opfer 🩸</b> (eigene Karten vom Feld) oder <b>Knochen 🦴</b> (entstehen, wenn Karten sterben). Jede Runde ziehst du eine Karte aus dem <b>Wald</b> oder ein <b>Eichhörnchen</b>. Mit der <b>Klingel 🔔</b> greifen alle deine Karten an: Gegenüber trifft eine Karte, sonst geht der Schaden auf die <b>Waage</b>. Wer die Waage <b>5 Punkte</b> auf seine Seite bringt, gewinnt. Die Karten des Gegners warten erst in der Reihe dahinter.',
     '<b>How it works:</b> You and your opponent each have four lanes. Cards cost <b>sacrifices 🩸</b> (your own cards on the field) or <b>bones 🦴</b> (created when cards die). Each turn you draw one card from the <b>forest</b> or a <b>squirrel</b>. The <b>bell 🔔</b> makes all your cards attack: the card opposite is hit, otherwise the damage goes to the <b>scale</b>. Tip the scale <b>5 points</b> your way to win. Enemy cards wait in the row behind first.');
@@ -126,33 +217,77 @@ function paintMenu() {
 }
 function paintBook() {
   $('cbT').textContent = T('Kartenbuch', 'Card book');
-  $('cbP').innerHTML = T('Alle Karten und Fähigkeiten im Spiel. Fähigkeiten: ', 'All cards and abilities in the game. Abilities: ') + Object.keys(HD.SIG).map(k => HD.SIG[k][1] + ' <b>' + HD.SIG[k][0] + '</b> (' + HD.SIG[k][2] + ')').join(' · ');
+  $('cbP').innerHTML = T('Alle Karten und Fähigkeiten im Spiel. Fähigkeiten: ', 'All cards and abilities in the game. Abilities: ') + Object.keys(HD.SIG).map(k => HD.SIG[k][1] + ' <b>' + HD.SIG[k][0] + '</b> (' + HD.SIG[k][2] + ')').join(' · ') + '<br><br><b>' + T('Boss-Regeln', 'Boss rules') + ':</b> ' + Object.keys(HD.BOSS).map(k => '<b>' + HD.BOSS[k][0] + '</b> (' + HD.BOSS[k][1] + ')').join(' · ');
   $('cbook').innerHTML = '';
-  Object.keys(HD.CARDS).forEach(id => { if (id === 'squirrel' || HD.TOKENS[id]) { if (id !== 'squirrel') return; } const c = HD.make(id), cell = document.createElement('div'); cell.className = 'cell'; cell.appendChild(cardEl(c)); $('cbook').appendChild(cell); });
+  Object.keys(HD.CARDS).forEach(id => { if (HD.TOKENS[id] && id !== 'squirrel') return; const c = HD.make(id), cell = document.createElement('div'); cell.className = 'cell'; cell.appendChild(cardEl(c)); $('cbook').appendChild(cell); });
 }
-$('ogrid').addEventListener('click', e => { const b = e.target.closest('[data-o]'); if (b) startDuel(OPP.find(o => o.id === b.dataset.o)); });
+$('ogrid').addEventListener('click', e => { const b = e.target.closest('[data-o]'); if (b) { fightNode = null; startDuel(OPP.find(o => o.id === b.dataset.o), STARTER.map(id => ({ id, a: 0, h: 0 }))); } });
+
+// ---------- Kampagne ----------
+function save() { store.set(KEY, camp); }
+function showCamp() {
+  document.body.classList.add('incamp'); document.body.classList.remove('ingame'); $('back').onclick = e => { e.preventDefault(); leaveCamp(); };
+  const A = AREAS[camp.a], node = A.nodes[camp.n];
+  $('cT').textContent = '🗺️ ' + T('Kampagne', 'Campaign') + ' · ' + A.icon + ' ' + A.n;
+  $('cCan').textContent = '🕯️'.repeat(camp.c) + ' ' + T('Kerzen', 'Candles');
+  $('cDeck').textContent = '🃏 ' + T('Deck', 'Deck') + ' (' + camp.deck.length + ')'; $('cExit').textContent = '☰ ' + T('Menü', 'Menu');
+  $('cmap').innerHTML = AREAS.map((a, ai) => '<div class="area' + (ai > camp.a ? ' lock' : '') + '" style="--c:' + a.c + '"><h3>' + a.icon + ' ' + a.n + '</h3><div class="nodes">' + a.nodes.map((nd, ni) => {
+    const st = ai < camp.a || (ai === camp.a && ni < camp.n) ? 'done' : (ai === camp.a && ni === camp.n ? 'cur' : ''), ic = nd.t === 'camp' ? '🔥' : nd.o.icon, nm = nd.t === 'camp' ? T('Lagerfeuer', 'Campfire') : nd.o.n;
+    return '<div class="nd ' + st + (nd.t === 'boss' ? ' boss' : '') + '"><b>' + ic + '</b>' + nm + (nd.t === 'boss' ? '<br><small>' + HD.BOSS[nd.o.boss][0] + '</small>' : '') + '</div>';
+  }).join('<span class="ar">→</span>') + '</div></div>').join('');
+  $('cGo').textContent = node.t === 'camp' ? '🔥 ' + T('Zum Lagerfeuer', 'To the campfire') : '⚔️ ' + T('Kampf gegen ', 'Fight ') + node.o.n;
+}
+function leaveCamp() { document.body.classList.remove('incamp'); $('back').onclick = null; paintMenu(); }
+$('cExit').onclick = leaveCamp;
+$('cDeck').onclick = async () => { await chooser(T('Dein Deck', 'Your deck'), camp.deck.length + T(' Karten. Antippen schließt das Fenster.', ' cards. Tap a card to close.'), camp.deck, [{ t: T('Schließen', 'Close'), v: -1, alt: true }]); };
+$('cGo').onclick = async () => {
+  const A = AREAS[camp.a], node = A.nodes[camp.n];
+  if (node.t === 'camp') { await campfire(); advance(); showCamp(); return; }
+  fightNode = node; startDuel(node.o, camp.deck.slice());
+};
+function advance() {
+  camp.n++; const A = AREAS[camp.a];
+  if (camp.n >= A.nodes.length) { camp.a++; camp.n = 0; }
+  if (camp.a >= AREAS.length) { store.del(KEY); camp = null; return 'won'; }
+  save(); return null;
+}
+async function campfire() {
+  const o = await chooser('🔥 ' + T('Lagerfeuer', 'Campfire'), T('Wähle eine Hilfe. Du darfst nur eine nutzen.', 'Choose one help. You may use only one.'), [], [
+    { t: '🕯️ ' + T('Rasten: eine Kerze entzünden (höchstens 3)', 'Rest: light a candle (max 3)'), v: 'rest' }, { t: '❤️ ' + T('Stärken: eine Karte erhält +1 Leben', 'Strengthen: a card gets +1 health'), v: 'hp' },
+    { t: '⚔️ ' + T('Schärfen: eine Karte erhält +1 Angriff', 'Sharpen: a card gets +1 attack'), v: 'atk' }, { t: '🗑️ ' + T('Aussortieren: eine Karte aus dem Deck entfernen', 'Cull: remove a card from the deck'), v: 'cull' }]);
+  if (o === 'rest') { camp.c = Math.min(3, camp.c + 1); return; }
+  const i = await chooser(o === 'hp' ? T('Welche Karte stärken?', 'Which card?') : o === 'atk' ? T('Welche Karte schärfen?', 'Which card?') : T('Welche Karte entfernen?', 'Which card?'), '', camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]);
+  if (i < 0) return campfire();
+  if (o === 'hp') camp.deck[i].h++; else if (o === 'atk') camp.deck[i].a++; else if (camp.deck.length > 8) camp.deck.splice(i, 1); else { alert(T('Das Deck braucht mindestens 8 Karten.', 'The deck needs at least 8 cards.')); return campfire(); }
+}
+async function reward(boss) {
+  const pool = AREAS[camp.a].pool.slice(), pick = [];
+  while (pick.length < 3) { const id = pool[Math.floor(Math.random() * pool.length)]; if (pick.indexOf(id) < 0) pick.push(id); }
+  const i = await chooser(T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick.map(id => ({ id, a: 0, h: 0 })), [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
+  if (i >= 0) camp.deck.push({ id: pick[i], a: 0, h: 0 });
+}
 
 // ---------- Spielstart ----------
-function startDuel(o) {
+function startDuel(o, deck) {
   opp = o; done = false; busy = false; ui = { sel: null, sac: [] };
-  G = HD.newGame({ decks: [STARTER, o.d.slice()], npc: true });
+  G = HD.newGame({ decks: [deck, o.d.map(id => ({ id, a: 0, h: 0 }))], npc: true, boss: o.boss || null, win: o.win || 5 });
   HD.fillQueue(G, 1, o.diff);
-  document.body.classList.add('ingame'); $('back').onclick = e => { e.preventDefault(); toMenu(); };
+  if (o.boss === 'curse') HD.fillQueue(G, 1, o.diff);
+  document.body.classList.add('ingame'); $('back').onclick = e => { e.preventDefault(); $('bMenu').onclick(); };
+  const bi = $('bossInfo'); if (o.boss) { bi.style.display = 'block'; bi.innerHTML = '👑 <b>' + o.n + '</b> · ' + HD.BOSS[o.boss][0] + ': ' + HD.BOSS[o.boss][1] + ' ' + T('Sieg ab ', 'Win at ') + o.win + T(' Punkten Vorsprung.', ' points lead.'); } else bi.style.display = 'none';
   beginTurn(); render();
+  if (v3on && window.V3 && V3.ready) { V3.show(true); setTimeout(() => { V3.resize(); render(); }, 60); }
 }
-function toMenu() { document.body.classList.remove('ingame'); $('ov').classList.remove('show'); $('back').onclick = null; G = null; done = true; }
+function toMenu() {
+  document.body.classList.remove('ingame'); $('ov').classList.remove('show'); $('back').onclick = null; G = null; done = true;
+  if (camp) showCamp(); else paintMenu();
+}
 function beginTurn() { HD.startTurn(G, 0); ui = { sel: null, sac: [] }; say(T('Du bist dran: Ziehe eine Karte.', 'Your turn: draw a card.')); }
 function say(t) { $('msg').textContent = t; }
 
 // ---------- Darstellung ----------
-function costHtml(c) { let s = ''; for (let i = 0; i < (c.cost.b || 0); i++) s += '🩸'; if (c.cost.o) s += (s ? '<br>' : '') + '🦴' + (c.cost.o > 1 ? '×' + c.cost.o : ''); return s; }
-function cardEl(c, cls) {
-  const d = document.createElement('div'); d.className = 'card ' + (cls || '') + (c.sub ? ' sub' : ''); d.dataset.uid = c.uid;
-  d.innerHTML = '<div class="nm">' + c.n + '</div><div class="cost">' + costHtml(c) + '</div><div class="art">' + c.art + '</div><div class="atk">' + c.atk + '</div><div class="hp' + (c.hp < c.max ? ' dmg' : '') + '">' + c.hp + '</div><div class="sg">' + c.sig.map(s => HD.SIG[s][1]).join('') + (c.lives > 1 ? '×' + c.lives : '') + '</div>';
-  return d;
-}
 function slotEl(row, l, c, cls) { const s = document.createElement('div'); s.className = 'slot'; s.dataset.l = l; s.dataset.row = row; if (c) s.appendChild(cardEl(c, cls)); return s; }
-function targets() {   // gültige Zielbahnen für die gewählte Handkarte
+function targets() {
   const P = G.p[0], c = ui.sel != null ? P.hand[ui.sel] : null, r = [];
   if (!c || G.turn !== 0 || G.phase !== 'main' || busy) return r;
   const need = c.cost.b || 0; let got = 0; ui.sac.forEach(l => got += HD.has(P.board[l], 'worthy') ? 3 : 1);
@@ -161,14 +296,13 @@ function targets() {   // gültige Zielbahnen für die gewählte Handkarte
   return r;
 }
 function render() {
-  if (!G) return;
-  HD.refresh(G);
+  if (!G) return; HD.refresh(G);
   const P = G.p[0], O = G.p[1], tg = targets(), c = ui.sel != null ? P.hand[ui.sel] : null;
   const needSac = c && (c.cost.b || 0) > 0 && tg.length === 0;
   const fillRow = (id, row, arr, cls, mine) => { const el = $(id); el.innerHTML = ''; for (let l = 0; l < 4; l++) { const s = slotEl(row, l, arr[l], cls); if (mine) { if (tg.indexOf(l) >= 0) s.classList.add('tgt'); const cd = s.firstChild; if (cd) { if (ui.sac.indexOf(l) >= 0) cd.classList.add('sac'); if (needSac) cd.classList.add('ok'); } } el.appendChild(s); } };
   fillRow('oq', 'oq', O.queue, 'opp', false); fillRow('ob', 'ob', O.board, 'opp', false); fillRow('pb', 'pb', P.board, '', true);
   const h = $('hand'); h.innerHTML = ''; P.hand.forEach((cd, i) => { const e = cardEl(cd, 'ok' + (i === ui.sel ? ' sel' : '')); e.dataset.i = i; h.appendChild(e); });
-  const d = HD.diff(G); $('mk').style.left = (50 + d * 9) + '%';
+  const d = HD.diff(G); $('mk').style.left = (50 + d * (45 / G.win)) + '%';
   $('lbO').textContent = opp.n + ' · ' + O.dmg; $('lbY').textContent = T('Du', 'You') + ' · ' + P.dmg;
   $('bones').textContent = P.bones;
   const my = G.turn === 0 && G.over === null && !busy;
@@ -177,14 +311,31 @@ function render() {
   $('dDeck').classList.toggle('on', canDraw); $('dSide').classList.toggle('on', canDraw);
   $('bell').disabled = !(my && G.phase === 'main');
   $('turnS').textContent = T('Runde ', 'Round ') + G.n;
+  if (v3on && window.V3 && V3.ready) V3.sync({ G, tg, sac: ui.sac, opp });
 }
-function flash(s, l, cls) { const el = document.querySelector('.slot[data-row="' + (s === 0 ? 'pb' : 'ob') + '"][data-l="' + l + '"] .card'); if (el) { el.classList.add(cls); } }
+function flash(s, l, cls) { const el = document.querySelector('.slot[data-row="' + (s === 0 ? 'pb' : 'ob') + '"][data-l="' + l + '"] .card'); if (el) el.classList.add(cls); }
 async function hook(ev) {
   render();
-  if (ev.k === 'atk') flash(ev.s, ev.l, 'atk-a'); else if (ev.k === 'hit') flash(ev.s, ev.l, 'hit');
-  await sleep(ev.k === 'atk' ? 260 : ev.k === 'play' ? 120 : 340);
+  if (v3on && V3.ready) V3.fx(ev); else if (ev.k === 'atk') flash(ev.s, ev.l, 'atk-a'); else if (ev.k === 'hit') flash(ev.s, ev.l, 'hit');
+  await sleep(ev.k === 'atk' ? 300 : ev.k === 'play' ? 160 : 380);
   if (ev.k === 'die' || ev.k === 'scale') render();
 }
+
+// ---------- 3D ----------
+let libP = null;
+const loadJs = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error(src)); document.head.appendChild(s); });
+async function set3d(on) {
+  try { localStorage.setItem('hd-3d', on ? '1' : '0'); } catch (e) {}
+  if (!on) { v3on = false; document.body.classList.remove('v3'); if (window.V3 && V3.ready) V3.show(false); $('b3d').textContent = '🧊 3D'; render(); return; }
+  try {
+    if (!window.THREE) await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');
+    if (!window.V3) await loadJs('view3d.js?v=' + Date.now());
+    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); } });
+    v3on = true; document.body.classList.add('v3'); $('b3d').textContent = '▦ 2D'; V3.show(true); render();
+  } catch (e) { v3on = false; document.body.classList.remove('v3'); say(T('3D konnte nicht geladen werden (Internet?). Es bleibt bei 2D.', '3D could not be loaded. Staying in 2D.')); }
+}
+$('b3d').onclick = () => set3d(!v3on);
+addEventListener('resize', () => { if (v3on && window.V3) V3.resize(); });
 
 // ---------- Eingabe ----------
 function pileDraw(from) { if (busy || G.turn !== 0 || G.phase !== 'draw') return; const c = HD.draw(G, 0, from); if (c) { say(T('Spiele Karten aus und läute dann die Klingel.', 'Play cards, then ring the bell.')); render(); } }
@@ -193,14 +344,15 @@ $('hand').addEventListener('click', e => {
   const el = e.target.closest('.card'); if (!el || busy || G.phase !== 'main') return; const i = +el.dataset.i;
   info(G.p[0].hand[i]); ui = { sel: ui.sel === i ? null : i, sac: [] }; render();
   const c = ui.sel != null ? G.p[0].hand[ui.sel] : null;
-  if (c) { const r = HD.check(G, 0, ui.sel, 0, []); if ((c.cost.o || 0) > G.p[0].bones) say(T('Dafür fehlen Knochen 🦴.', 'Not enough bones 🦴.')); else if ((c.cost.b || 0) > 0) say(T('Wähle ', 'Choose ') + c.cost.b + T(' Karte(n) als Opfer 🩸.', ' card(s) to sacrifice 🩸.')); else say(T('Wähle eine freie Bahn.', 'Choose an empty lane.')); }
+  if (c) { if ((c.cost.o || 0) > G.p[0].bones) say(T('Dafür fehlen Knochen 🦴.', 'Not enough bones 🦴.')); else if ((c.cost.b || 0) > 0) say(T('Wähle ', 'Choose ') + c.cost.b + T(' Karte(n) als Opfer 🩸.', ' card(s) to sacrifice 🩸.')); else say(T('Wähle eine freie Bahn.', 'Choose an empty lane.')); }
 });
-$('pb').addEventListener('click', async e => {
-  if (busy || G.turn !== 0 || ui.sel == null) return;
-  const slot = e.target.closest('.slot'); if (!slot) return; const l = +slot.dataset.l, P = G.p[0], c = P.hand[ui.sel];
-  if (slot.classList.contains('tgt')) { busy = true; const idx = ui.sel, sac = ui.sac.slice(); ui = { sel: null, sac: [] }; await HD.play(G, 0, idx, l, sac, hook); busy = false; say(T('Weiter ausspielen oder die Klingel läuten.', 'Play more cards or ring the bell.')); render(); return; }
-  if (P.board[l] && (c.cost.b || 0) > 0) { const k = ui.sac.indexOf(l); if (k >= 0) ui.sac.splice(k, 1); else ui.sac.push(l); info(P.board[l]); render(); const t = targets(); if (t.length) say(T('Wähle die Bahn für die neue Karte.', 'Choose the lane for the new card.')); }
-});
+async function slotAction(l) {
+  if (busy || !G || G.turn !== 0 || ui.sel == null) return;
+  const P = G.p[0], c = P.hand[ui.sel], tg = targets();
+  if (tg.indexOf(l) >= 0) { busy = true; const idx = ui.sel, sac = ui.sac.slice(); ui = { sel: null, sac: [] }; await HD.play(G, 0, idx, l, sac, hook); busy = false; say(T('Weiter ausspielen oder die Klingel läuten.', 'Play more cards or ring the bell.')); render(); return; }
+  if (P.board[l] && (c.cost.b || 0) > 0) { const k = ui.sac.indexOf(l); if (k >= 0) ui.sac.splice(k, 1); else ui.sac.push(l); info(P.board[l]); render(); if (targets().length) say(T('Wähle die Bahn für die neue Karte.', 'Choose the lane for the new card.')); }
+}
+$('pb').addEventListener('click', e => { const slot = e.target.closest('.slot'); if (slot) slotAction(+slot.dataset.l); });
 function info(c) { $('info').innerHTML = c ? '<b>' + c.n + '</b> ' + c.atk + '/' + c.hp + (c.sig.length ? ' · ' + c.sig.map(s => HD.SIG[s][1] + ' <b>' + HD.SIG[s][0] + '</b>: ' + HD.SIG[s][2]).join(' · ') : '') : ''; }
 document.addEventListener('mouseover', e => { const el = e.target.closest('.card'); if (!el || !G) return; const u = +el.dataset.uid; let c = null; G.p.forEach(p => [].concat(p.hand, p.board, p.queue).forEach(x => { if (x && x.uid === u) c = x; })); if (c) info(c); });
 $('bell').onclick = async () => {
@@ -212,6 +364,7 @@ $('bell').onclick = async () => {
 };
 async function npcTurn() {
   say(opp.n + T(' ist am Zug …', ' is playing …')); HD.startTurn(G, 1); await sleep(450);
+  if (G.boss) { const n0 = G.p[0].board.filter(Boolean).length; HD.bossTurn(G); if (G.boss === 'curse') say('🧙 ' + HD.BOSS.curse[0] + '!'); render(); await sleep(600); }
   HD.advanceQueue(G, 1); render(); await sleep(450);
   await HD.attack(G, 1, hook); if (G.over !== null) return;
   HD.endTurn(G, 1); HD.fillQueue(G, 1, opp.diff); render();
@@ -220,13 +373,30 @@ function finish() {
   if (G.over === null) return false; busy = true; render(); done = true;
   const win = G.over === 0; $('ovT').textContent = win ? T('Gewonnen! 🎉', 'You win! 🎉') : T('Verloren …', 'You lost …');
   $('ovP').textContent = win ? T('Die Waage kippt auf deine Seite.', 'The scale tips to your side.') : T('Die Waage kippt zum Gegner.', 'The scale tips to your opponent.');
-  $('ovB').textContent = T('Nochmal', 'Again'); $('ovM').textContent = T('Menü', 'Menu'); $('ov').classList.add('show'); return true;
+  if (fightNode && camp) {
+    if (!win) { camp.c--; save(); $('ovP').textContent += ' ' + (camp.c > 0 ? T('Eine Kerze erlischt. Noch ', 'A candle goes out. ') + camp.c + T(' übrig.', ' left.') : T('Die letzte Kerze erlischt: Die Kampagne ist zu Ende.', 'The last candle goes out: the campaign is over.')); }
+    $('ovB').textContent = win ? T('Weiter', 'Continue') : (camp.c > 0 ? T('Nochmal versuchen', 'Try again') : T('Kampagne beenden', 'End campaign'));
+    $('ovM').style.display = win || camp.c <= 0 ? 'none' : '';
+  } else { $('ovB').textContent = T('Nochmal', 'Again'); $('ovM').style.display = ''; }
+  $('ovM').textContent = T('Zur Karte', 'To the map'); $('ov').classList.add('show'); return true;
 }
-$('ovB').onclick = () => { $('ov').classList.remove('show'); startDuel(opp); }; $('ovM').onclick = () => toMenu();
-$('bMenu').onclick = () => { if (!done && !confirm(T('Spiel abbrechen?', 'Abort game?'))) return; toMenu(); };
+$('ovB').onclick = async () => {
+  $('ov').classList.remove('show');
+  if (fightNode && camp) {
+    const win = G.over === 0, boss = fightNode.t === 'boss';
+    if (win) { await reward(boss); const r = advance(); if (r === 'won') { document.body.classList.remove('ingame'); alert(T('🏆 Du hast alle Bosse besiegt! Die Kampagne ist geschafft.', '🏆 You defeated all bosses! Campaign complete.')); G = null; paintMenu(); document.body.classList.remove('incamp'); return; } toMenu(); return; }
+    if (camp.c <= 0) { store.del(KEY); camp = null; fightNode = null; G = null; document.body.classList.remove('incamp'); toMenu(); return; }
+    startDuel(opp, camp.deck.slice()); return;
+  }
+  startDuel(opp, STARTER.map(id => ({ id, a: 0, h: 0 })));
+};
+$('ovM').onclick = () => toMenu();
+$('bMenu').onclick = () => { if (!done && !confirm(T('Kampf abbrechen? In der Kampagne geht dabei keine Kerze verloren.', 'Abort the fight? No candle is lost in the campaign.'))) return; fightNode = fightNode && camp ? fightNode : null; toMenu(); };
 if (window.SITE && SITE.guard) SITE.guard(() => !!G && !done);
 paintMenu(); paintBook();
-window.HDUI = { get G() { return G; } };
+let want3 = true; try { want3 = localStorage.getItem('hd-3d') !== '0'; } catch (e) {}
+if (want3) set3d(true);
+window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS };
 })();
 </script>
 </body>

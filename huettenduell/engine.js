@@ -65,14 +65,21 @@
     direwolf: ['Schreckenswolf', 2, 5, { b: 3 }, ['bi'], '🐺'],
     goat: ['Schwarze Ziege', 0, 1, { b: 1 }, ['worthy'], '🐐'],
     skink: ['Skink', 1, 2, { b: 1 }, ['tail'], '🦎'],
+    skeleton: ['Skelett', 1, 1, {}, [], '💀'],
     dam: ['Damm', 0, 2, {}, [], '🪵'],
     skink_tail: ['Schwanz', 0, 2, {}, [], '🦎']
   };
   // Opfer-Tier (Waldstapel)
   HD.CARDS = {}; Object.keys(C).forEach(function (id) { var c = C[id]; HD.CARDS[id] = { id: id, n: c[0], atk: c[1], hp: c[2], cost: c[3], sig: c[4], art: c[5], evo: c[6] || null }; });
+  // Bosse: besondere Regeln für den Gegner (Spieler 1)
+  HD.BOSS = {
+    pack: ['Rudelruf', 'Stirbt eine seiner Karten, schließt sich ein Elchkalb dem Rudel an (einmal pro Zug). Ab 3 Punkten Rückstand ruft er zwei Karten pro Zug.'],
+    curse: ['Moorfluch', 'Zu Beginn ihres Zuges verliert deine stärkste Karte 1 Leben. Ab 3 Punkten Rückstand legt sie zusätzlich eine Kreuzotter nach.'],
+    necro: ['Totenbeschwörung', 'Stirbt eine seiner Karten, steht an derselben Stelle ein Skelett auf (einmal pro Karte).']
+  };
   var uid = 1;
-  HD.make = function (id) { var d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false }; return c; };
-  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1 };
+  HD.make = function (x) { var up = typeof x === 'object' ? x : { id: x }, id = up.id, d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false, up: up.a || up.h ? { a: up.a || 0, h: up.h || 0 } : null }; if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } return c; };
+  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1 };
   function dies(c) { return !(HD.has(c, 'lives') && c.lives > 1); }
   // Ameisen: Angriff = Zahl der eigenen Ameisen
   HD.refresh = function (G) { for (var s = 0; s < 2; s++) { var b = G.p[s].board, n = 0, i; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) n++; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) b[i].atk = n; } };
@@ -81,7 +88,7 @@
   HD.shuffle = shuffle;
   // opts: { decks:[[id..],[id..]], npc: true|false, rnd }
   HD.newGame = function (opts) {
-    var G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd || Math.random, log: [] };
+    var G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd || Math.random, log: [], win: opts.win || WIN, boss: opts.boss || null, bossRisen: 0 };
     for (var s = 0; s < 2; s++) {
       var deck = shuffle(opts.decks[s].map(HD.make), G.rnd), side = []; for (var i = 0; i < 20; i++) side.push(HD.make('squirrel'));
       var P = { deck: deck, side: side, hand: [], board: [null, null, null, null], queue: [null, null, null, null], bones: 0, dmg: 0, drew: false };
@@ -92,7 +99,7 @@
     return G;
   };
   HD.diff = function (G) { return G.p[0].dmg - G.p[1].dmg; };
-  function check(G) { var d = HD.diff(G); if (d >= WIN) G.over = 0; else if (d <= -WIN) G.over = 1; return G.over !== null; }
+  function check(G) { var d = HD.diff(G); if (d >= G.win) G.over = 0; else if (d <= -G.win) G.over = 1; return G.over !== null; }
   // ---------- Aktionen ----------
   HD.draw = function (G, s, from) {
     var P = G.p[s]; if (P.drew || G.over !== null) return null;
@@ -127,9 +134,24 @@
   function kill(G, s, l, sacrificed) {
     var P = G.p[s], c = P.board[l]; if (!c) return;
     P.board[l] = null; P.bones++;
+    if (s === 1 && G.boss && !sacrificed) bossDeath(G, l, c);
     if (!sacrificed && HD.has(c, 'unkill')) P.hand.push(HD.make(c.id));
     if (!sacrificed && HD.has(c, 'lives') && c.lives > 1) { var n = HD.make(c.id); n.lives = c.lives - 1; P.hand.push(n); }
   }
+  function bossDeath(G, l, c) {
+    var B = G.p[1];
+    if (G.boss === 'pack' && c.id !== 'elk_fawn' && !G.rallied) { var f = -1; for (var i = 0; i < LANES; i++) if (!B.queue[i]) { f = i; break; } if (f >= 0) { B.queue[f] = HD.make('elk_fawn'); G.rallied = true; } }
+    if (G.boss === 'necro' && c.id !== 'skeleton' && !c.risen && !B.board[l]) { var sk = HD.make('skeleton'); sk.risen = true; B.board[l] = sk; }
+  }
+  // Zu Beginn des Zuges des Bosses
+  HD.bossTurn = function (G) {
+    G.rallied = false; var P = G.p[0], d = HD.diff(G), i;
+    if (G.boss === 'curse') {
+      var t = -1; for (i = 0; i < LANES; i++) if (P.board[i] && (t < 0 || P.board[i].atk > P.board[t].atk)) t = i;
+      if (t >= 0) { P.board[t].hp -= 1; if (P.board[t].hp <= 0) kill(G, 0, t); }
+      if (d >= 3) { for (i = 0; i < LANES; i++) if (!G.p[1].queue[i]) { G.p[1].queue[i] = HD.make('adder'); break; } }
+    }
+  };
   // Wächter der Gegenseite wechseln in leere Bahnen, wenn ein Gegner dort erscheint
   function onEnter(G, s, lane) {
     var o = 1 - s, O = G.p[o];
@@ -192,7 +214,7 @@
   };
   // Legt neue Karten in die Warteschlange; diff = Schwierigkeit 1..3
   HD.fillQueue = function (G, s, diff) {
-    var P = G.p[s], O = G.p[1 - s], rnd = G.rnd, n = 1 + (diff >= 2 && G.n > 5 ? 1 : 0) + (diff >= 3 && G.n > 3 ? 1 : 0);
+    var P = G.p[s], O = G.p[1 - s], rnd = G.rnd, n = 1 + (diff >= 2 && G.n > 5 ? 1 : 0) + (diff >= 3 && G.n > 3 ? 1 : 0) + (G.boss === 'pack' && HD.diff(G) >= 3 ? 1 : 0);
     for (var k = 0; k < n && P.deck.length; k++) {
       var free = []; for (var i = 0; i < LANES; i++) if (!P.queue[i]) free.push(i);
       if (!free.length) break;
