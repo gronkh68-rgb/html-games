@@ -76,38 +76,40 @@ const T = (d, e) => (window.SITE && SITE.T) ? SITE.T(d, e) : d, $ = id => docume
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
 // ---------- Gegner und Gebiete ----------
 const OPP = [
-  { id: 'koehler', n: 'Der Köhler', icon: '🪓', c: '#39ff14', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'wolf', 'adder', 'raven_egg', 'warren', 'otter', 'tadpole', 'opossum', 'skink', 'goat'], t: 'Einfach: kleine Waldtiere, wenig Druck.' },
+  { id: 'koehler', n: 'Der Köhler', icon: '🪓', c: '#39ff14', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'wolf', 'adder', 'raven_egg', 'warren', 'otter', 'otter', 'opossum', 'skink', 'goat'], t: 'Einfach: kleine Waldtiere, wenig Druck.' },
   { id: 'hexe', n: 'Die Moorhexe', icon: '🧙', c: '#a06bff', diff: 2, d: ['adder', 'adder', 'bat', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'mantis', 'mantis_god', 'wolf', 'hound', 'ouro', 'packrat', 'cat', 'cockroach', 'ant', 'ant', 'ant_queen', 'kingfisher'], t: 'Mittel: Gift, Flieger und Knochen-Karten.' },
-  { id: 'hirsch', n: 'Der Hirschkönig', icon: '🦌', c: '#ff8a00', diff: 3, d: ['elk', 'elk', 'elk_fawn', 'grizzly', 'grizzly', 'ox', 'vulture', 'hound', 'wolf', 'wolf', 'raven', 'mantis_god', 'bat', 'rattler', 'direwolf', 'shark', 'beaver', 'mole_man'], t: 'Schwer: große Tiere, schnelle Läufer.' }
+  { id: 'hirsch', n: 'Der Hirschkönig', icon: '🦌', c: '#ff8a00', diff: 3, d: ['elk', 'elk', 'elk_fawn', 'grizzly', 'grizzly', 'moose', 'vulture', 'hound', 'wolf', 'wolf', 'raven', 'mantis_god', 'bat', 'rattler', 'direwolf', 'shark', 'beaver', 'mole_man'], t: 'Schwer: große Tiere, schnelle Läufer.' }
 ];
-const T1 = ['stoat', 'wolf_cub', 'frog', 'adder', 'porcupine', 'mole', 'mantis', 'warren', 'goat', 'cat', 'otter', 'tadpole', 'raven_egg', 'ant', 'skink', 'opossum', 'elk_fawn', 'skunk', 'hare', 'hive', 'peddler'];
-const T2 = ['raven', 'bat', 'wolf', 'hound', 'packrat', 'coyote', 'beaver', 'kingfisher', 'ant_queen', 'cockroach', 'elk', 'mantis_god', 'snapper', 'packleader', 'ratking', 'anthill', 'juggler', 'mirrortoad'];
-const T3 = ['grizzly', 'rattler', 'direwolf', 'shark', 'ouro', 'mole_man', 'vulture', 'ox'];
+const T1 = ['stoat', 'wolf_cub', 'frog', 'porcupine', 'mole', 'mantis', 'warren', 'goat', 'cat', 'otter', 'raven_egg', 'ant', 'skink', 'opossum', 'elk_fawn', 'skunk', 'hive', 'stunted', 'sparrow', 'stinkbug'];
+const T2 = ['raven', 'bat', 'wolf', 'hound', 'coyote', 'beaver', 'kingfisher', 'ant_queen', 'cockroach', 'elk', 'snapper', 'ratking', 'mice', 'pronghorn', 'adder', 'magpie', 'alpha', 'direpup', 'handtent', 'mirrortent'];
+const T3 = ['grizzly', 'rattler', 'direwolf', 'shark', 'vulture', 'moose'];
+const RARES = ['mantis_god', 'long_elk', 'mole_man', 'ouro', 'packrat', 'amalgam', 'geck', 'urayuli'];      // Wiki: Nach jedem Boss darfst du 1 von 3 seltenen Karten wählen
+const CSTART = ['wolf', 'opossum', 'stoat', 'frog'];      // Startdeck der Kampagne nach dem Wiki: Wolf, Opossum, Hermelin, Ochsenfrosch
 const AREAS = [
   { id: 'wald', n: 'Nebelwald', icon: '🌲', c: '#39ff14', pool: T1.concat(T1, T2), foes: [
     { n: 'Der Wilderer', icon: '🏹', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'warren', 'adder', 'opossum', 'skink', 'raven_egg'] },
-    { n: 'Die Pilzsammlerin', icon: '🍄', diff: 1, d: ['stoat', 'wolf_cub', 'wolf_cub', 'tadpole', 'otter', 'mantis', 'goat', 'cat', 'ant', 'ant', 'elk_fawn', 'wolf'] },
+    { n: 'Die Pilzsammlerin', icon: '🍄', diff: 1, d: ['stoat', 'wolf_cub', 'wolf_cub', 'otter', 'otter', 'mantis', 'goat', 'cat', 'ant', 'ant', 'elk_fawn', 'wolf'] },
     { n: 'Der Holzfäller', icon: '🪓', diff: 1, d: ['stoat', 'beaver', 'wolf_cub', 'frog', 'porcupine', 'mole', 'wolf', 'adder', 'warren', 'goat', 'skink', 'opossum'] }
   ], elites: [
     { n: 'Der Eber', icon: '🐗', diff: 2, d: ['grizzly', 'wolf', 'wolf', 'stoat', 'porcupine', 'porcupine', 'hound', 'elk_fawn', 'mole', 'mantis', 'raven', 'warren'] },
     { n: 'Die Wolfsmutter', icon: '🐺', diff: 2, d: ['wolf', 'wolf', 'wolf_cub', 'wolf_cub', 'wolf_cub', 'direwolf', 'hound', 'stoat', 'frog', 'raven', 'goat', 'cat'] }
   ], boss: { n: 'Der Hirschkönig', icon: '🦌', diff: 2, boss: 'pack', win: 7, d: ['elk', 'elk', 'elk_fawn', 'elk_fawn', 'wolf', 'wolf', 'stoat', 'raven', 'hound', 'grizzly', 'porcupine', 'mole'] } },
   { id: 'moor', n: 'Irrlichtmoor', icon: '🌫️', c: '#a06bff', pool: T2.concat(T2, T3, T1), foes: [
-    { n: 'Der Torfstecher', icon: '⛏️', diff: 2, d: ['adder', 'adder', 'frog', 'tadpole', 'otter', 'kingfisher', 'raven', 'mole', 'beaver', 'wolf', 'bat', 'cockroach'] },
+    { n: 'Der Torfstecher', icon: '⛏️', diff: 2, d: ['adder', 'adder', 'frog', 'otter', 'otter', 'kingfisher', 'raven', 'mole', 'beaver', 'wolf', 'bat', 'cockroach'] },
     { n: 'Das Irrlicht', icon: '🔥', diff: 2, d: ['bat', 'bat', 'raven', 'kingfisher', 'mantis', 'mantis_god', 'coyote', 'ant_queen', 'ant', 'ant', 'hound', 'packrat'] },
-    { n: 'Der Fährmann', icon: '🛶', diff: 2, d: ['otter', 'otter', 'kingfisher', 'shark', 'tadpole', 'frog', 'beaver', 'wolf', 'raven', 'adder', 'cat', 'packrat'] }
+    { n: 'Der Fährmann', icon: '🛶', diff: 2, d: ['otter', 'otter', 'kingfisher', 'shark', 'otter', 'frog', 'beaver', 'wolf', 'raven', 'adder', 'cat', 'packrat'] }
   ], elites: [
     { n: 'Die Nebelmutter', icon: '🌫️', diff: 3, d: ['kingfisher', 'kingfisher', 'shark', 'otter', 'bat', 'bat', 'raven', 'ant_queen', 'ant', 'ant', 'mantis_god', 'cat'] },
     { n: 'Der Sumpfriese', icon: '🐊', diff: 3, d: ['shark', 'grizzly', 'adder', 'adder', 'rattler', 'beaver', 'mole_man', 'hound', 'wolf', 'cockroach', 'ouro', 'raven'] }
   ], boss: { n: 'Die Moorhexe', icon: '🧙', diff: 2, boss: 'curse', win: 7, d: ['adder', 'adder', 'adder', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'cat', 'cat', 'ouro', 'mantis_god', 'wolf'] } },
   { id: 'gruft', n: 'Knochengruft', icon: '💀', c: '#ff8a00', pool: T3.concat(T3, T2), foes: [
     { n: 'Der Totengräber', icon: '⚰️', diff: 3, d: ['adder', 'cockroach', 'cockroach', 'rattler', 'bat', 'bat', 'ouro', 'wolf', 'hound', 'direwolf', 'packrat', 'cat'] },
-    { n: 'Die Grabwächterin', icon: '🗿', diff: 3, d: ['mole_man', 'mole_man', 'grizzly', 'ox', 'direwolf', 'vulture', 'shark', 'beaver', 'hound', 'raven', 'wolf', 'mantis_god'] },
+    { n: 'Die Grabwächterin', icon: '🗿', diff: 3, d: ['mole_man', 'mole_man', 'grizzly', 'moose', 'direwolf', 'vulture', 'shark', 'beaver', 'hound', 'raven', 'wolf', 'mantis_god'] },
     { n: 'Der Leichenfledderer', icon: '🦇', diff: 3, d: ['bat', 'bat', 'vulture', 'raven', 'raven', 'coyote', 'cockroach', 'rattler', 'adder', 'wolf', 'packrat', 'mantis'] }
   ], elites: [
-    { n: 'Der Knochenriese', icon: '🦴', diff: 3, d: ['grizzly', 'grizzly', 'ox', 'ox', 'direwolf', 'rattler', 'rattler', 'cockroach', 'ouro', 'vulture', 'hound', 'wolf'] },
+    { n: 'Der Knochenriese', icon: '🦴', diff: 3, d: ['grizzly', 'grizzly', 'moose', 'moose', 'direwolf', 'rattler', 'rattler', 'cockroach', 'ouro', 'vulture', 'hound', 'wolf'] },
     { n: 'Die Schattenwölfin', icon: '🐺', diff: 3, d: ['direwolf', 'direwolf', 'wolf', 'wolf', 'bat', 'bat', 'mantis_god', 'mantis_god', 'raven', 'ouro', 'cockroach', 'hound'] }
-  ], boss: { n: 'Der Knochenfürst', icon: '👑', diff: 3, boss: 'necro', win: 7, d: ['rattler', 'rattler', 'cockroach', 'cockroach', 'bat', 'bat', 'adder', 'grizzly', 'ouro', 'direwolf', 'vulture', 'mantis_god', 'ox'] } }
+  ], boss: { n: 'Der Knochenfürst', icon: '👑', diff: 3, boss: 'necro', win: 7, d: ['rattler', 'rattler', 'cockroach', 'cockroach', 'bat', 'bat', 'adder', 'grizzly', 'ouro', 'direwolf', 'vulture', 'mantis_god', 'moose'] } }
 ];
 const STARTER = ['stoat', 'wolf_cub', 'frog', 'adder', 'raven', 'elk_fawn', 'porcupine', 'mole', 'mantis', 'warren', 'wolf', 'hound', 'cat', 'goat', 'otter'];
 const KEY = 'hd-camp-v2', DKEY = 'hd-death-v1';
@@ -158,14 +160,14 @@ $('ogrid').addEventListener('click', e => { const b = e.target.closest('[data-o]
 
 // ---------- Kampagne: verzweigte Karte ----------
 const NAME = { fight: 'Kampf', elite: 'Elitekampf', camp: 'Lagerfeuer', pick: 'Kartenfund', trade: 'Händler', boss: 'Boss' };
-function nodeName(n) { return n.t === 'event' ? T('Ereignis', 'Event') : n.t === 'camp' ? T('Lagerfeuer', 'Campfire') : n.t === 'pick' ? T('Kartenfund', 'Card find') : n.t === 'trade' ? T('Händler', 'Trader') : n.o.n; }
+function nodeName(n) { return n.t === 'event' ? T('Ereignis', 'Event') : n.t === 'camp' ? T('Lagerfeuer', 'Campfire') : n.t === 'pick' ? T('Kartenfund', 'Card find') : n.t === 'trade' ? T('Fellhändler', 'Pelt trader') : n.o.n; }
 function nodeDesc(n) {
   if (n.t === 'fight') return '⚔️ ' + T('Kampf gegen ', 'Fight vs ') + n.o.n + ' – ' + T('Belohnung: eine neue Karte', 'reward: a new card');
   if (n.t === 'elite') return '💀 ' + T('Elitegegner ', 'Elite ') + n.o.n + ' – ' + T('stärker, dafür bessere Belohnung', 'tougher, better reward');
   if (n.t === 'camp') return '🔥 ' + T('Lagerfeuer: rasten, stärken, schärfen oder aussortieren', 'Campfire: rest, strengthen, sharpen or cull');
   if (n.t === 'pick') return '🎴 ' + T('Kartenfund: wähle eine von drei Karten', 'Card find: choose one of three cards');
   if (n.t === 'event') return '👁️ ' + T('Ereignis: etwas Unheimliches am Weg. Du musst dich entscheiden.', 'Event: something uncanny on the road. You must decide.');
-  if (n.t === 'trade') return '🪙 ' + T('Händler: tausche eine Karte gegen eine zufällige stärkere', 'Trader: swap a card for a random stronger one');
+  if (n.t === 'trade') return '🪙 ' + T('Fellhändler: Kaufe Felle für Zähne (Zähne bekommst du für überschüssigen Schaden) und tausche sie gegen Karten.', 'Pelt trader: buy pelts with teeth (earned from excess damage) and trade them for cards.');
   return '👑 ' + T('Boss ', 'Boss ') + n.o.n + ' – ' + HD.BOSS[n.o.boss][0] + ': ' + HD.BOSS[n.o.boss][1];
 }
 const WW = 320, STEP = 72, PAD = 150;      // Karte: Breite in Pixeln, Abstand der Ebenen, Rand oben/unten
@@ -187,7 +189,7 @@ function genMap(ai) {
   layers.forEach((row, li) => row.forEach((n, j) => { n.x = Math.max(.15, Math.min(.85, .5 + (j - (row.length - 1) / 2) * .27 + (R() - .5) * .06)); n.wy = Math.round(H - PAD - li * STEP + (R() - .5) * 10); if (li === layers.length - 1) n.x = .5; }));
   return { layers, H };
 }
-function newCamp(hard) { const c = { a: 0, map: null, at: null, pend: null, hist: [], hard: !!hard, c: hard ? 1 : 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; c.map = genMap(0); return c; }
+function newCamp(hard) { const c = { a: 0, map: null, at: null, pend: null, hist: [], teeth: 0, gotPelt: false, hard: !!hard, c: hard ? 1 : 2, deck: CSTART.map(id => ({ id, a: 0, h: 0 })) }; c.map = genMap(0); return c; }
 const key = (l, i) => l + ':' + i, parse = k => k.split(':').map(Number), nodeAt = k => { const p = parse(k); return camp.map.layers[p[0]][p[1]]; };
 function reachable() {
   if (camp.pend) return [];
@@ -295,7 +297,7 @@ function showCamp() {
   document.body.classList.add('incamp'); document.body.classList.remove('ingame'); $('back').onclick = e => { e.preventDefault(); leaveCamp(); };
   const A = AREAS[camp.a];
   $('cT').textContent = '🗺️ ' + T('Kampagne', 'Campaign') + ' · ' + A.icon + ' ' + A.n;
-  $('cCan').textContent = '🕯️'.repeat(camp.c) + ' ' + T('Kerzen', 'Candles');
+  $('cCan').textContent = '🕯️'.repeat(camp.c) + ' ' + T('Kerzen', 'Candles') + ' · 🦷 ' + (camp.teeth || 0);
   $('cDeck').textContent = '🃏 ' + T('Deck', 'Deck') + ' (' + camp.deck.length + ')'; $('cExit').textContent = '☰ ' + T('Menü', 'Menu'); $('cm3').textContent = v3on ? '▦ 2D' : '🧊 3D';
   $('cGo').style.display = camp.pend ? '' : 'none'; if (camp.pend) $('cGo').textContent = '▶ ' + T('Weiter: ', 'Continue: ') + nodeName(nodeAt(camp.pend));
   setInfo(null); campView();
@@ -324,7 +326,7 @@ $('cGo').onclick = () => { if (!busyNode) runNode(); };
 async function runNode() {
   const n = nodeAt(camp.pend);
   if (n.t === 'fight' || n.t === 'elite' || n.t === 'boss') { fightNode = n; startDuel(n.o, camp.deck.slice()); return; }
-  if (n.t === 'camp') await campfire(); else if (n.t === 'pick') await reward(false); else if (n.t === 'trade') await trade(); else if (n.t === 'event') await event();
+  if (n.t === 'camp') await campfire(); else if (n.t === 'pick') await pickCard(); else if (n.t === 'trade') await trade(); else if (n.t === 'event') await event();
   await completeNode();
 }
 async function completeNode() {
@@ -338,19 +340,32 @@ async function completeNode() {
   save(); showCamp();
 }
 async function campfire() {
-  const o = await chooser('🔥 ' + T('Lagerfeuer', 'Campfire'), T('Wähle eine Hilfe. Du darfst nur eine nutzen.', 'Choose one help. You may use only one.'), [], [
-    { t: '🕯️ ' + T('Rasten: eine Kerze entzünden (höchstens 3)', 'Rest: light a candle (max 3)'), v: 'rest' }, { t: '❤️ ' + T('Stärken: eine Karte erhält +1 Leben', 'Strengthen: a card gets +1 health'), v: 'hp' },
-    { t: '⚔️ ' + T('Schärfen: eine Karte erhält +1 Angriff', 'Sharpen: a card gets +1 attack'), v: 'atk' }, { t: '🗑️ ' + T('Aussortieren: eine Karte aus dem Deck entfernen', 'Cull: remove a card from the deck'), v: 'cull' }]);
-  if (o === 'rest') { camp.c = Math.min(camp.hard ? 2 : 3, camp.c + 1); return; }
-  const i = await chooser(o === 'hp' ? T('Welche Karte stärken?', 'Which card?') : o === 'atk' ? T('Welche Karte schärfen?', 'Which card?') : T('Welche Karte entfernen?', 'Which card?'), '', camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]);
-  if (i < 0) return campfire();
-  if (o === 'hp') camp.deck[i].h++; else if (o === 'atk') camp.deck[i].a++; else if (camp.deck.length > 8) camp.deck.splice(i, 1); else { alert(T('Das Deck braucht mindestens 8 Karten.', 'The deck needs at least 8 cards.')); return campfire(); }
+  // Nach dem Wiki: Das Feuer gibt einer Karte +1 Angriff oder +2 Leben (zufällig pro Lagerfeuer). Mehrfaches Wärmen ist riskant: Die Karte wird mit 22,5 %, 45 % bzw. 67,5 % gefressen.
+  const stat = Math.random() < .5 ? 'a' : 'h', warm = {}, RISK = [0, .225, .45, .675]; let used = false;
+  for (;;) {
+    const opts = [{ t: '🔥 ' + T('Eine Karte wärmen: ', 'Warm a card: ') + (stat === 'a' ? '+1 ' + T('Angriff', 'power') : '+2 ' + T('Leben', 'health')), v: 'warm' }];
+    if (!used) { opts.push({ t: '🕯️ ' + T('Rasten: eine Kerze entzünden (höchstens ', 'Rest: light a candle (max ') + (camp.hard ? 2 : 3) + ')', v: 'rest' }, { t: '🗑️ ' + T('Aussortieren: eine Karte aus dem Deck entfernen', 'Cull: remove a card from the deck'), v: 'cull' }); }
+    opts.push({ t: T('Weiterziehen', 'Move on'), v: 'done', alt: true });
+    const o = await chooser('🔥 ' + T('Lagerfeuer', 'Campfire'), T('Hungrige Überlebende laden dich ans Feuer. Jede Karte darf höchstens viermal gewärmt werden, aber jedes weitere Mal steigt das Risiko, dass sie gefressen wird.', 'Starving survivors invite you to the fire. A card can be warmed up to four times, but each extra time raises the risk of it being eaten.'), [], opts);
+    if (o === 'done') return;
+    if (o === 'rest') { camp.c = Math.min(camp.hard ? 2 : 3, camp.c + 1); return; }
+    if (o === 'cull') {
+      const i = await chooser(T('Welche Karte entfernen?', 'Which card?'), '', camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (i < 0) continue;
+      if (camp.deck.length > 3) { camp.deck.splice(i, 1); return; } alert(T('Das Deck braucht mindestens 3 Karten.', 'The deck needs at least 3 cards.')); continue;
+    }
+    const i = await chooser(T('Welche Karte wärmst du?', 'Which card do you warm?'), (stat === 'a' ? '+1 ' + T('Angriff', 'power') : '+2 ' + T('Leben', 'health')) + T('. Risiko je nach bisherigen Malen: 0 %, 22,5 %, 45 %, 67,5 %.', '. Risk by times so far: 0%, 22.5%, 45%, 67.5%.'), camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]);
+    if (i < 0) continue;
+    const card = camp.deck[i], n = warm[i] || 0;
+    if (n >= 4) { alert(T('Diese Karte ist schon viermal gewärmt.', 'This card has been warmed four times already.')); continue; }
+    if (Math.random() < RISK[n]) { camp.deck.splice(i, 1); Object.keys(warm).forEach(k => { if (+k > i) { warm[k - 1] = warm[k]; delete warm[k]; } }); delete warm[i]; await chooser('🔥 ' + T('Gefressen!', 'Eaten!'), T('Die Überlebenden haben deine Karte verschlungen: ', 'The survivors devoured your card: ') + HD.CARDS[card.id].n, [], [{ t: 'OK', v: 1 }]); if (!camp.deck.length) camp.deck.push({ id: 'stoat', a: 0, h: 0 }); }
+    else { if (stat === 'a') card.a++; else card.h += 2; warm[i] = n + 1; used = true; }
+  }
 }
-async function reward(up) {
-  const pool = up ? T3.concat(T2, T3) : AREAS[camp.a].pool.slice(), pick = [];
+async function reward(up) {      // up: false = Gebietskarten, true = Beute (stärker), 'rare' = seltene Karte nach einem Boss
+  const pool = up === 'rare' ? RARES.slice() : up ? T3.concat(T2, T3) : AREAS[camp.a].pool.slice(), pick = [];
   while (pick.length < 3) { const id = pool[Math.floor(Math.random() * pool.length)]; if (!pick.some(p => p.id === id)) pick.push({ id, a: 0, h: 0 }); }
   const dl = deaths(); if (dl.length && Math.random() < .4) pick[2] = { id: 'death', dc: dl[Math.floor(Math.random() * dl.length)], a: 0, h: 0 };
-  const i = await chooser(up ? T('Beute des Elitegegners', 'Elite loot') : T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick, [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
+  const i = await chooser(up === 'rare' ? T('Seltene Belohnung', 'Rare reward') : up ? T('Beute des Elitegegners', 'Elite loot') : T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick, [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
   if (i >= 0) camp.deck.push(pick[i]);
 }
 // ---------- Todeskarte: Aus dem Scheitern entsteht eine Karte für spätere Kampagnen ----------
@@ -378,16 +393,18 @@ async function offerDeath() {
 }
 // Ereignisse: Entscheidungen mit Preis
 async function event() {
-  const ev = Math.floor(Math.random() * 3), deckN = () => camp.deck.length;
+  const ev = Math.floor(Math.random() * 5), deckN = () => camp.deck.length;
+  if (ev === 3) return mycologists();
+  if (ev === 4) return stones();
   if (ev === 0) {
     const o = await chooser('👁️ ' + T('Der Pakt am Wegesrand', 'The pact by the road'), T('Eine verhüllte Gestalt bietet dir eine mächtige Karte an. Der Preis: eine Kerze.', 'A hooded figure offers a powerful card. The price: a candle.'), [], [{ t: '🕯️ ' + T('Annehmen: starke Karte, aber eine Kerze erlischt', 'Accept: strong card, but a candle goes out'), v: 'yes' }, { t: T('Ablehnen und weitergehen', 'Decline and move on'), v: 'no', alt: true }]);
     if (o === 'yes') { if (camp.c <= 1) { await chooser('👁️', T('Die Gestalt lacht: „Deine letzte Kerze? Nein.“ Sie verschwindet.', 'The figure laughs: "Your last candle? No." It vanishes.'), [], [{ t: 'OK', v: 1 }]); return; } camp.c--; const id = T3[Math.floor(Math.random() * T3.length)]; camp.deck.push({ id, a: 0, h: 0 }); await chooser('👁️ ' + T('Der Pakt gilt', 'The pact holds'), T('Du erhältst: ', 'You receive: ') + HD.CARDS[id].n, [{ id, a: 0, h: 0 }], [{ t: 'OK', v: 1 }]); }
   } else if (ev === 1) {
     const o = await chooser('👁️ ' + T('Der Verwundete', 'The wounded wanderer'), T('Ein Wanderer liegt im Dreck. Hilfst du ihm, kostet es dich eine Karte, aber er stärkt deine Kerzen.', 'A wanderer lies in the dirt. Helping costs you a card, but he strengthens your candles.'), [], [{ t: '❤️ ' + T('Helfen: eine Karte abgeben, eine Kerze entzünden', 'Help: give a card, light a candle'), v: 'yes' }, { t: T('Weitergehen', 'Move on'), v: 'no', alt: true }]);
-    if (o === 'yes' && deckN() > 8) { const i = await chooser(T('Welche Karte gibst du ab?', 'Which card do you give?'), '', camp.deck, [{ t: T('Doch nicht', 'Never mind'), v: -1, alt: true }]); if (i >= 0) { camp.deck.splice(i, 1); camp.c = Math.min(camp.hard ? 2 : 3, camp.c + 1); } }
+    if (o === 'yes' && deckN() > 4) { const i = await chooser(T('Welche Karte gibst du ab?', 'Which card do you give?'), '', camp.deck, [{ t: T('Doch nicht', 'Never mind'), v: -1, alt: true }]); if (i >= 0) { camp.deck.splice(i, 1); camp.c = Math.min(camp.hard ? 2 : 3, camp.c + 1); } }
   } else {
     const o = await chooser('👁️ ' + T('Der Opferstein', 'The sacrificial stone'), T('Opfere zwei Karten deines Decks, und eine andere erhält +2 Angriff und +2 Leben.', 'Sacrifice two deck cards and another gets +2 attack and +2 health.'), [], [{ t: '🩸 ' + T('Opfern', 'Sacrifice'), v: 'yes' }, { t: T('Weitergehen', 'Move on'), v: 'no', alt: true }]);
-    if (o === 'yes' && deckN() > 10) {
+    if (o === 'yes' && deckN() > 5) {
       const a = await chooser(T('Erstes Opfer', 'First sacrifice'), '', camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (a < 0) return;
       const rest = camp.deck.filter((_, i) => i !== a), b = await chooser(T('Zweites Opfer', 'Second sacrifice'), '', rest, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (b < 0) return;
       const first = camp.deck[a], second = rest[b]; camp.deck = camp.deck.filter(x => x !== first && x !== second);
@@ -395,12 +412,53 @@ async function event() {
     }
   }
 }
+async function pickCard() {
+  if (Math.random() < .5) return reward(false);
+  // Wiki: Aus drei Kostenstufen wählen, du erhältst eine zufällige Karte dieser Kosten
+  const all = Object.keys(HD.CARDS).filter(id => !HD.TOKENS[id] && RARES.indexOf(id) < 0), key = c => (c.b ? '🩸×' + c.b : '🦴×' + c.o), kinds = {};
+  all.forEach(id => { const c = HD.CARDS[id].cost; if (c.b && c.o) return; const k = c.b ? 'b' + c.b : 'o' + c.o; (kinds[k] = kinds[k] || []).push(id); });
+  const ks = HD.shuffle(Object.keys(kinds).filter(k => kinds[k].length >= 2), Math.random).slice(0, 3);
+  const o = await chooser('🎴 ' + T('Kartenfund', 'Card find'), T('Wähle eine Kostenstufe: Du erhältst eine zufällige Karte dazu.', 'Choose a cost: you receive a random card of that cost.'), [], ks.map(k => ({ t: (k[0] === 'b' ? '🩸 ×' : '🦴 ×') + k.slice(1), v: k })));
+  const id = kinds[o][Math.floor(Math.random() * kinds[o].length)]; camp.deck.push({ id, a: 0, h: 0 });
+  await chooser('🎴 ' + T('Du erhältst', 'You receive'), HD.CARDS[id].n, [{ id, a: 0, h: 0 }], [{ t: 'OK', v: 1 }]);
+}
+async function mycologists() {      // Wiki: Zwei gleiche Karten verschmelzen; Werte und Fähigkeiten werden zusammengelegt
+  const cnt = {}; camp.deck.forEach(d => { cnt[d.id] = (cnt[d.id] || 0) + 1; }); let dup = Object.keys(cnt).filter(id => cnt[id] >= 2);
+  if (!dup.length) { const ids = HD.shuffle([...new Set(camp.deck.map(d => d.id))], Math.random).slice(0, 3); const i = await chooser('🍄 ' + T('Die Pilzforscher', 'The mycologists'), T('Du hast keine Dopplungen. Sie bieten dir eine Kopie an.', 'You have no duplicates. They offer you a copy.'), ids.map(id => ({ id, a: 0, h: 0 })), [{ t: T('Ablehnen', 'Decline'), v: -1, alt: true }]); if (i >= 0) camp.deck.push({ id: ids[i], a: 0, h: 0 }); return; }
+  const i = await chooser('🍄 ' + T('Die Pilzforscher', 'The mycologists'), T('Welche doppelte Karte soll verschmelzen? Angriff, Leben und Fähigkeiten werden zusammengelegt.', 'Which duplicate card should merge? Power, health and sigils combine.'), dup.map(id => ({ id, a: 0, h: 0 })), [{ t: T('Ablehnen', 'Decline'), v: -1, alt: true }]);
+  if (i < 0) return; const id = dup[i], idx = camp.deck.map((d, k) => d.id === id ? k : -1).filter(k => k >= 0), A = camp.deck[idx[0]], B = camp.deck[idx[1]], base = HD.CARDS[id];
+  const merged = { id, a: base.atk + A.a + B.a, h: base.hp + A.h + B.h }; if (A.dc) merged.dc = A.dc; camp.deck = camp.deck.filter((_, k) => k !== idx[0] && k !== idx[1]); camp.deck.push(merged);
+  await chooser('🍄 ' + T('Verschmolzen', 'Merged'), HD.CARDS[id].n + ' ' + (base.atk + merged.a) + '/' + (base.hp + merged.h), [merged], [{ t: 'OK', v: 1 }]);
+}
+const XSIGS = ['airborne', 'leap', 'worthy', 'quills', 'bi', 'unkill', 'burrow', 'sprint', 'guard', 'boneking', 'fecund', 'trinket', 'stinky', 'leader', 'rabbit', 'bees', 'antspawn', 'dam', 'submerge', 'reborn', 'death', 'tri'];
 async function trade() {
-  const i = await chooser('🪙 ' + T('Händler', 'Trader'), T('Gib eine Karte ab und erhalte eine zufällige stärkere.', 'Give a card and receive a random stronger one.'), camp.deck, [{ t: T('Nicht tauschen', 'No deal'), v: -1, alt: true }]);
-  if (i < 0) return;
-  const old = HD.CARDS[camp.deck[i].id], pw = old.atk + old.hp, pool = T2.concat(T3).filter(id => HD.CARDS[id].atk + HD.CARDS[id].hp >= pw && id !== old.id), id = (pool.length ? pool : T2)[Math.floor(Math.random() * (pool.length ? pool.length : T2.length))];
-  camp.deck[i] = { id, a: 0, h: 0 };
-  await chooser('🪙 ' + T('Der Händler grinst …', 'The trader grins …'), T('Du erhältst: ', 'You receive: ') + HD.CARDS[id].n, [{ id, a: 0, h: 0 }], [{ t: 'OK', v: 1 }]);
+  // Wiki: Der Fallensteller verkauft Felle für Zähne (Kaninchen 1–2, Wolf 2–6, Gold 3–11, Preise steigen je Gebiet). Der Händler tauscht Felle: Kaninchen = Karte, Wolf = Karte mit Zusatzfähigkeit, Gold = seltene Karte.
+  const ar = camp.a, price = { rabbit: [1, 2], wolf: [2, 6], gold: [3, 11] }, pr = k => Math.round(price[k][0] + (price[k][1] - price[k][0]) * ar / 2), PEL = { rabbit: 'pelt_rabbit', wolf: 'pelt_wolf', gold: 'pelt_gold' };
+  if (!camp.gotPelt) { camp.gotPelt = true; camp.deck.push({ id: 'pelt_rabbit', a: 0, h: 0 }); await chooser('🪤 ' + T('Der Fallensteller', 'The trapper'), T('Er schenkt dir ein Kaninchenfell.', 'He gives you a rabbit pelt.'), [{ id: 'pelt_rabbit', a: 0, h: 0 }], [{ t: 'OK', v: 1 }]); }
+  for (;;) {
+    const opts = ['rabbit', 'wolf', 'gold'].map(k => ({ t: { rabbit: '🐰 ' + T('Kaninchenfell', 'Rabbit pelt'), wolf: '🐺 ' + T('Wolfsfell', 'Wolf pelt'), gold: '🏅 ' + T('Goldenes Fell', 'Golden pelt') }[k] + ' – ' + pr(k) + ' 🦷', v: k, dis: (camp.teeth || 0) < pr(k) })).filter(o => !o.dis).map(o => ({ t: o.t, v: o.v }));
+    opts.push({ t: T('Weiter zum Händler', 'On to the trader'), v: 'done', alt: true });
+    const o = await chooser('🪤 ' + T('Der Fallensteller', 'The trapper'), T('Du hast ', 'You have ') + (camp.teeth || 0) + ' 🦷. ' + T('Kaufe Felle:', 'Buy pelts:'), [], opts);
+    if (o === 'done') break; camp.teeth -= pr(o); camp.deck.push({ id: PEL[o], a: 0, h: 0 });
+  }
+  const pelts = () => camp.deck.map((d, i) => /^pelt_/.test(d.id) ? i : -1).filter(i => i >= 0);
+  if (!pelts().length) { camp.teeth = (camp.teeth || 0) + 5; await chooser('🪙 ' + T('Die Händlerin', 'The trader'), T('Keine Felle? Sie schimpft und gibt dir 5 Zähne.', 'No pelts? She scolds you and gives you 5 teeth.'), [], [{ t: 'OK', v: 1 }]); return; }
+  for (;;) {
+    const pl = pelts(); if (!pl.length) return;
+    const i = await chooser('🪙 ' + T('Die Händlerin', 'The trader'), T('Tausche ein Fell gegen eine Karte (Kaninchen: Karte, Wolf: Karte mit Zusatzfähigkeit, Gold: seltene Karte).', 'Trade a pelt for a card (rabbit: card, wolf: card with extra sigil, gold: rare card).'), pl.map(k => camp.deck[k]), [{ t: T('Fertig', 'Done'), v: -1, alt: true }]);
+    if (i < 0) return; const idx = pl[i], kind = camp.deck[idx].id, pool = kind === 'pelt_gold' ? RARES : T1.concat(T2, T3), pick = [];
+    while (pick.length < 3) { const id = pool[Math.floor(Math.random() * pool.length)]; if (!pick.some(p => p.id === id)) pick.push({ id, a: 0, h: 0 }); }
+    if (kind === 'pelt_wolf') pick.forEach(p => { const have = HD.CARDS[p.id].sig; const cand = XSIGS.filter(k => have.indexOf(k) < 0); p.xs = [cand[Math.floor(Math.random() * cand.length)]]; });
+    const c = await chooser('🪙 ' + T('Wähle deine Karte', 'Choose your card'), '', pick, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (c < 0) continue;
+    camp.deck.splice(idx, 1); camp.deck.push(pick[c]);
+  }
+}
+async function stones() {      // Wiki: Mysteriöse Steine übertragen die Fähigkeiten einer Karte auf eine andere
+  const src = camp.deck.map((d, i) => HD.CARDS[d.id].sig.filter(k => k !== 'fledge').length ? i : -1).filter(i => i >= 0);
+  if (!src.length || camp.deck.length < 5) { await chooser('🗿 ' + T('Mysteriöse Steine', 'Mysterious stones'), T('Die Steine bleiben stumm.', 'The stones stay silent.'), [], [{ t: 'OK', v: 1 }]); return; }
+  const a = await chooser('🗿 ' + T('Mysteriöse Steine', 'Mysterious stones'), T('Wähle die Karte, deren Fähigkeiten übertragen werden. Sie geht dabei verloren.', 'Choose the card whose sigils are transferred. It is lost.'), src.map(i => camp.deck[i]), [{ t: T('Weitergehen', 'Move on'), v: -1, alt: true }]); if (a < 0) return;
+  const srcCard = camp.deck[src[a]], rest = camp.deck.filter(d => d !== srcCard), b = await chooser('🗿 ' + T('Ziel wählen', 'Choose the target'), '', rest, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (b < 0) return;
+  const tgt = rest[b], add = HD.CARDS[srcCard.id].sig.filter(k => k !== 'fledge').concat(srcCard.xs || []); tgt.xs = [...new Set((tgt.xs || []).concat(add))].slice(0, 3); camp.deck = camp.deck.filter(d => d !== srcCard);
 }
 
 // ---------- Spielstart ----------
@@ -547,7 +605,7 @@ $('ovB').onclick = async () => {
   $('ov').classList.remove('show');
   if (fightNode && camp) {
     const win = G.over === 0;
-    if (win) { await reward(fightNode.t !== 'fight'); await completeNode(); return; }
+    if (win) { const ex = Math.max(0, HD.diff(G) - G.win); if (ex > 0) { camp.teeth = (camp.teeth || 0) + ex; save(); } await reward(fightNode.t === 'boss' ? 'rare' : fightNode.t === 'elite'); await completeNode(); return; }
     if (camp.c <= 0) { await makeDeathCard(); store.del(KEY); camp = null; fightNode = null; G = null; document.body.classList.remove('incamp'); toMenu(); return; }
     startDuel(opp, camp.deck.slice()); return;
   }
@@ -560,7 +618,7 @@ paintMenu(); paintBook();
 let want3 = true; try { want3 = localStorage.getItem('hd-3d') !== '0'; } catch (e) {}
 if (want3) set3d(true);
 window.__hdReady = true;
-window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS, chooseNode: k => chooseNode(k), event: () => event(), newCamp };
+window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS, chooseNode: k => chooseNode(k), event: () => event(), trade: () => trade(), campfire: () => campfire(), newCamp };
 })();
 </script>
 </body>

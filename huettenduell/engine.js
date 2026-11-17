@@ -23,6 +23,12 @@
     dam: ['Dammbauer', '🪵', 'Beim Ausspielen entsteht in jeder freien Nachbarbahn ein Damm (0/2).'],
     submerge: ['Abtauchen', '🌊', 'Taucht während des Gegnerzugs ab: Angriffe gehen an ihr vorbei auf die Waage.'],
     ant: ['Ameise', '🐜', 'Der Angriff entspricht der Zahl deiner Ameisen auf dem Feld.'],
+    hefty: ['Wuchtig', '🦬', 'Am Zugende bewegt sie sich samt den Nachbarkarten in ihre Richtung und schiebt andere Karten mit.'],
+    double: ['Doppelhieb', '🗡️', 'Greift in jedem Angriff zweimal an.'],
+    digger: ['Knochengräber', '⛏️', 'Am Zugende erzeugt sie 1 Knochen.'],
+    reborn: ['Wiedergeburt', '♻️', 'Beim Tod kehrt sie mit +1 Angriff und +1 Leben auf die Hand zurück.'],
+    nosac: ['Nicht opferbar', '🚫', 'Diese Karte kann nicht geopfert werden.'],
+    frozen: ['Eingefroren', '🧊', 'Beim Tod erscheint an ihrer Stelle ein Opossum.'],
     leader: ['Anführer', '📣', 'Karten auf den Nachbarbahnen erhalten +1 Angriff.'],
     stinky: ['Gestank', '🦨', 'Die gegenüberliegende Karte verliert 1 Angriff.'],
     boneking: ['Knochenkönig', '🦴', 'Beim Tod gibt sie 4 Knochen statt 1.'],
@@ -35,59 +41,75 @@
     tail: ['Abgeworfener Schwanz', '🦎', 'Wird sie angegriffen, bleibt ein Schwanz (0/2) zurück und sie weicht in eine freie Nachbarbahn aus (einmal).']
   };
   // Karten: Name, Angriff, Leben, Kosten {b: Opfer, o: Knochen}, Fähigkeiten, Symbol, Entwicklung
+  // Kartenwerte nach dem Inscryption-Wiki (Akt I): Name, Angriff, Leben, Kosten {b: Blut, o: Knochen}, Fähigkeiten, Symbol, Entwicklung
   var C = {
     squirrel: ['Eichhörnchen', 0, 1, {}, [], '🐿️'],
     stoat: ['Hermelin', 1, 3, { b: 1 }, [], '🦡'],
     wolf_cub: ['Wolfswelpe', 1, 1, { b: 1 }, ['fledge'], '🐺', 'wolf'],
     wolf: ['Wolf', 3, 2, { b: 2 }, [], '🐺'],
-    frog: ['Ochsenfrosch', 1, 2, { b: 1 }, ['leap'], '🐸'],
-    adder: ['Kreuzotter', 1, 1, { o: 2 }, ['death'], '🐍'],
+    stunted: ['Verkümmerter Wolf', 2, 2, { b: 1 }, [], '🐺'],
+    coyote: ['Kojote', 2, 1, { o: 4 }, [], '🦊'],
+    hound: ['Bluthund', 2, 3, { b: 2 }, ['guard'], '🐕'],
+    alpha: ['Alphawolf', 1, 2, { o: 4 }, ['leader'], '🐺'],
+    direwolf: ['Schreckenswolf', 2, 5, { b: 3 }, ['double'], '🐺'],
+    direpup: ['Schreckenswolf-Welpe', 1, 1, { b: 2 }, ['digger', 'fledge'], '🐺', 'direwolf'],
+    raven_egg: ['Rabenei', 0, 2, { b: 1 }, ['fledge'], '🥚', 'raven'],
     raven: ['Rabe', 2, 3, { b: 2 }, ['airborne'], '🐦‍⬛'],
-    bat: ['Fledermaus', 2, 1, { o: 4 }, ['airborne'], '🦇'],
+    sparrow: ['Spatz', 1, 2, { b: 1 }, ['airborne'], '🐦'],
+    magpie: ['Elster', 1, 1, { b: 2 }, ['airborne', 'hoard'], '🐦‍⬛'],
+    kingfisher: ['Eisvogel', 1, 1, { b: 1 }, ['airborne', 'submerge'], '🐦'],
+    vulture: ['Truthahngeier', 3, 3, { o: 8 }, ['airborne'], '🦅'],
     elk_fawn: ['Elchkalb', 1, 1, { b: 1 }, ['sprint', 'fledge'], '🦌', 'elk'],
     elk: ['Elch', 2, 4, { b: 2 }, ['sprint'], '🫎'],
-    grizzly: ['Grizzly', 4, 6, { b: 3 }, [], '🐻'],
-    hound: ['Bluthund', 2, 3, { b: 2 }, ['guard'], '🐕'],
-    rattler: ['Klapperschlange', 3, 1, { o: 6 }, [], '🐍'],
-    mole: ['Maulwurf', 0, 4, { b: 1 }, ['burrow'], '🐀'],
-    porcupine: ['Stachelschwein', 1, 2, { b: 1 }, ['quills'], '🦔'],
+    pronghorn: ['Gabelbock', 1, 3, { b: 2 }, ['sprint', 'bi'], '🦌'],
+    moose: ['Elchbulle', 3, 7, { b: 3 }, ['hefty'], '🫎'],
+    goat: ['Schwarze Ziege', 0, 1, { b: 1 }, ['worthy'], '🐐'],
     mantis: ['Fangschrecke', 1, 1, { b: 1 }, ['bi'], '🦗'],
     mantis_god: ['Mantisgott', 1, 1, { b: 1 }, ['tri'], '🦗'],
-    coyote: ['Kojote', 2, 1, { o: 4 }, ['fecund'], '🦊'],
-    warren: ['Kaninchenbau', 0, 2, { b: 1 }, ['fecund'], '🐇'],
-    packrat: ['Packratte', 2, 2, { b: 2 }, ['hoard'], '🐀'],
-    ouro: ['Ouroboros', 1, 1, { b: 2 }, ['unkill'], '🐍'],
-    ox: ['Ur', 3, 4, { b: 2, o: 2 }, ['worthy'], '🐂'],
-    vulture: ['Geier', 3, 3, { b: 2, o: 2 }, ['airborne'], '🦅'],
-    cat: ['Katze', 0, 1, { b: 1 }, ['lives'], '🐈'],
-    opossum: ['Opossum', 1, 1, { o: 2 }, [], '🐁'],
-    beaver: ['Biber', 1, 3, { b: 2 }, ['dam'], '🦫'],
-    otter: ['Fischotter', 1, 1, { b: 1 }, ['submerge'], '🦦'],
-    kingfisher: ['Eisvogel', 1, 1, { b: 1 }, ['airborne', 'submerge'], '🐦'],
-    shark: ['Weißer Hai', 4, 7, { b: 3 }, ['submerge'], '🦈'],
-    tadpole: ['Kaulquappe', 0, 1, { b: 1 }, ['submerge', 'fledge'], '🐟', 'frog'],
-    raven_egg: ['Rabenei', 0, 2, { b: 1 }, ['fledge'], '🥚', 'raven'],
+    hive: ['Bienenstock', 0, 2, { b: 1 }, ['bees'], '🐝'],
     ant: ['Arbeiterameise', 0, 2, { b: 1 }, ['ant'], '🐜'],
-    ant_queen: ['Ameisenkönigin', 0, 3, { b: 2 }, ['ant', 'fecund'], '🐜'],
-    mole_man: ['Maulwurfsmann', 0, 6, { b: 1 }, ['leap', 'burrow'], '🐹'],
+    ant_queen: ['Ameisenkönigin', 0, 3, { b: 2 }, ['ant', 'antspawn'], '🐜'],
+    stinkbug: ['Stinkwanze', 1, 2, { o: 2 }, ['stinky'], '🪲'],
     cockroach: ['Kakerlake', 1, 1, { o: 4 }, ['unkill'], '🪳'],
-    direwolf: ['Schreckenswolf', 2, 5, { b: 3 }, ['bi'], '🐺'],
-    goat: ['Schwarze Ziege', 0, 1, { b: 1 }, ['worthy'], '🐐'],
+    ringworm: ['Ringwurm', 0, 1, { b: 1 }, [], '🪱'],
+    frog: ['Ochsenfrosch', 1, 2, { b: 1 }, ['leap'], '🐸'],
     skink: ['Skink', 1, 2, { b: 1 }, ['tail'], '🦎'],
+    adder: ['Kreuzotter', 1, 1, { b: 2 }, ['death'], '🐍'],
+    snapper: ['Schnappschildkröte', 1, 6, { b: 2 }, [], '🐢'],
+    rattler: ['Klapperschlange', 3, 1, { o: 6 }, [], '🐍'],
+    ouro: ['Ouroboros', 1, 1, { b: 2 }, ['reborn'], '🐍'],
+    mole: ['Maulwurf', 0, 4, { b: 1 }, ['burrow'], '🐀'],
+    mole_man: ['Maulwurfsmann', 0, 6, { b: 1 }, ['leap', 'burrow'], '🐹'],
+    packrat: ['Packratte', 2, 2, { b: 2 }, ['trinket'], '🐀'],
+    porcupine: ['Stachelschwein', 1, 2, { b: 1 }, ['quills'], '🦔'],
+    mice: ['Feldmäuse', 2, 2, { b: 2 }, ['fecund'], '🐁'],
+    cat: ['Katze', 0, 1, { b: 1 }, ['lives'], '🐈'],
+    beaver: ['Biber', 1, 4, { b: 2 }, ['dam'], '🦫'],
+    otter: ['Fischotter', 1, 1, { b: 1 }, ['submerge'], '🦦'],
+    shark: ['Weißer Hai', 4, 2, { b: 3 }, ['submerge'], '🦈'],
+    grizzly: ['Grizzly', 4, 6, { b: 3 }, [], '🐻'],
+    opossum: ['Opossum', 1, 1, { o: 2 }, [], '🐁'],
+    ratking: ['Rattenkönig', 2, 1, { b: 2 }, ['boneking'], '🐀'],
+    skunk: ['Stinktier', 0, 3, { b: 1 }, ['stinky'], '🦨'],
+    warren: ['Kaninchenbau', 0, 2, { b: 1 }, ['rabbit'], '🐇'],
+    bat: ['Fledermaus', 2, 1, { o: 4 }, ['airborne'], '🦇'],
+    handtent: ['Handtentakel', 0, 1, { b: 1 }, ['handy'], '🐙'],
+    mirrortent: ['Spiegeltentakel', 0, 3, { b: 1 }, ['mirror'], '🐙'],
+    long_elk: ['Langer Elch', 1, 2, { o: 4 }, ['sprint', 'death'], '🦌'],
+    amalgam: ['Amalgam', 3, 3, { b: 2 }, [], '🧬'],
+    geck: ['Gecko', 1, 1, {}, [], '🦎'],
+    urayuli: ['Urayuli', 7, 7, { b: 4 }, [], '🦣'],
+    // Marken und Sonderkarten
+    pelt_rabbit: ['Kaninchenfell', 0, 1, {}, [], '🐰'],
+    pelt_wolf: ['Wolfsfell', 0, 2, {}, [], '🐺'],
+    pelt_gold: ['Goldenes Fell', 0, 3, {}, [], '🏅'],
+    boulder: ['Felsbrocken', 0, 5, {}, ['nosac'], '🪨'],
+    frozen_opossum: ['Eis-Opossum', 0, 5, {}, ['nosac', 'frozen'], '🧊'],
     skeleton: ['Skelett', 1, 1, {}, [], '💀'],
     rabbit: ['Kaninchen', 0, 1, {}, [], '🐇'],
     bee: ['Biene', 1, 1, {}, ['airborne'], '🐝'],
-    smoke: ['Großer Rauch', 1, 3, {}, ['leap'], '🌫️'],
-    snapper: ['Schnappschildkröte', 1, 6, { b: 2 }, [], '🐢'],
-    packleader: ['Rudelführer', 1, 3, { b: 2 }, ['leader'], '🐺'],
-    skunk: ['Stinktier', 1, 2, { b: 1 }, ['stinky'], '🦨'],
-    ratking: ['Rattenkönig', 2, 2, { b: 2 }, ['boneking'], '🐀'],
-    hare: ['Hase', 0, 2, { b: 1 }, ['rabbit'], '🐇'],
-    anthill: ['Ameisenhügel', 0, 3, { b: 2 }, ['antspawn'], '🏺'],
-    hive: ['Bienenstock', 0, 2, { b: 1 }, ['bees'], '🐝'],
-    peddler: ['Hausierer', 1, 2, { b: 1 }, ['trinket'], '🧳'],
-    juggler: ['Gaukler', 0, 3, { b: 1 }, ['handy'], '🤹'],
-    mirrortoad: ['Spiegelkröte', 0, 3, { b: 1 }, ['mirror'], '🪞'],
+    smoke: ['Großer Rauch', 1, 3, {}, ['boneking'], '🌫️'],
+    starvation: ['Hunger', 1, 1, {}, [], '🍖'],
     death: ['Todeskarte', 1, 1, { b: 1 }, [], '💀'],
     dam: ['Damm', 0, 2, {}, [], '🪵'],
     skink_tail: ['Schwanz', 0, 2, {}, [], '🦎']
@@ -104,8 +126,8 @@
   // Nach dem Laden eines Spielstands (Host-Wechsel): Kartennummern fortsetzen
   HD.sync = function (G) { var m = 0; G.p.forEach(function (P) { [].concat(P.deck, P.side, P.hand, P.board, P.queue).forEach(function (c) { if (c && c.uid > m) m = c.uid; }); }); if (m >= uid) uid = m + 1; };
   HD.make = function (x) { var up = typeof x === 'object' ? x : { id: x }, id = up.id, d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false, up: up.a || up.h ? { a: up.a || 0, h: up.h || 0 } : null }; if (up.dc) { var dc = up.dc; c.n = dc.n; c.atk = dc.atk; c.hp = dc.hp; c.sig = dc.sig.slice(); c.art = dc.art; c.cost = dc.cost; c.max = c.hp; c.dead = true; }
-    if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } c.base = c.atk; return c; };
-  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1, death: 1, rabbit: 1, bee: 1, smoke: 1 };
+    if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } if (up.xs) up.xs.forEach(function (k) { if (c.sig.indexOf(k) < 0) c.sig.push(k); }); if (up.xs && up.xs.length) c.xs = up.xs.slice(); c.base = c.atk; return c; };
+  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1, death: 1, rabbit: 1, bee: 1, smoke: 1, starvation: 1, pelt_rabbit: 1, pelt_wolf: 1, pelt_gold: 1, boulder: 1, frozen_opossum: 1 };
   function dies(c) { return !(HD.has(c, 'lives') && c.lives > 1); }
   // Angriffswerte neu berechnen: Ameisen, Handvoll, Spiegelbild, Anführer (Nachbarn +1) und Gestank (-1)
   HD.refresh = function (G) {
@@ -128,13 +150,14 @@
     hourglass: ['Sanduhr', '⏳', 'Der Gegner überspringt seinen nächsten Zug.', 0],
     fan: ['Harpyienfächer', '🪶', 'Alle deine Karten greifen in diesem Zug mit Flug an.', 0],
     hook: ['Angelhaken', '🪝', 'Nimm eine gegnerische Karte auf eine freie Bahn deiner Seite.', 'h'],
-    lens: ['Elsternlupe', '🔍', 'Ziehe eine Karte aus dem Wald auf die Hand.', 0],
     sbottle: ['Flasche mit Eichhörnchen', '🍶', 'Ein Eichhörnchen kommt auf deine Hand.', 0],
     gbottle: ['Flasche mit Ziege', '🍶', 'Eine Schwarze Ziege kommt auf deine Hand.', 0],
+    bbottle: ['Flasche mit Felsbrocken', '🍶', 'Ein Felsbrocken (0/5) kommt auf deine Hand.', 0],
+    obottle: ['Flasche mit Eis-Opossum', '🍶', 'Ein Eis-Opossum (0/5) kommt auf deine Hand.', 0],
     bank: ['Sparschwein', '🐷', 'Du erhältst sofort 4 Knochen.', 0]
   };
   function giveItem(G, p) {
-    if (G.npc && p === 1) return; if (!G.itemPile || !G.itemPile.length) return;
+    if (G.npc && p === 1) return; if (!G.itemPile || !G.itemPile.length || G.p[p].items.length >= 3) return;      // Wiki: höchstens drei Gegenstände
     var id = G.itemPile.pop(); G.p[p].items.push(id);
   }
   HD.giveItem = giveItem;
@@ -151,7 +174,8 @@
     else if (id === 'pliers') { P.dmg++; }
     else if (id === 'hourglass') O.skip = true;
     else if (id === 'fan') P.fan = true;
-    else if (id === 'lens') { if (!P.deck.length) return 'Wald leer'; P.hand.push(P.deck.pop()); }
+    else if (id === 'bbottle') P.hand.push(HD.make('boulder'));
+    else if (id === 'obottle') P.hand.push(HD.make('frozen_opossum'));
     else if (id === 'sbottle') P.hand.push(HD.make('squirrel'));
     else if (id === 'gbottle') P.hand.push(HD.make('goat'));
     else if (id === 'bank') P.bones += 4;
@@ -202,7 +226,7 @@
   HD.check = function (G, s, idx, lane, sac) {
     var P = G.p[s], c = P.hand[idx]; sac = sac || [];
     if (!c) return 'Keine Karte'; if (G.over !== null) return 'Spiel vorbei'; if (G.turn !== s || G.phase !== 'main') return 'Nicht am Zug';
-    var need = c.cost.b || 0, got = 0; for (var i = 0; i < sac.length; i++) { var o = P.board[sac[i]]; if (!o) return 'Kein Opfer'; got += worth(o); }
+    var need = c.cost.b || 0, got = 0; for (var i = 0; i < sac.length; i++) { var o = P.board[sac[i]]; if (!o) return 'Kein Opfer'; if (HD.has(o, 'nosac')) return 'Nicht opferbar'; got += worth(o); }
     if (got < need) return 'Zu wenig Opfer (' + got + '/' + need + ')';
     if (sac.length > 1 && got - worth(P.board[sac[sac.length - 1]]) >= need) { /* überzählige Opfer sind erlaubt, aber unnötig */ }
     if ((c.cost.o || 0) > P.bones) return 'Zu wenig Knochen';
@@ -228,8 +252,10 @@
   function kill(G, s, l, sacrificed) {
     var P = G.p[s], c = P.board[l]; if (!c) return;
     P.board[l] = null; P.bones += (!sacrificed && HD.has(c, 'boneking')) ? 4 : 1; P.dead.push(c);
+    if (HD.has(c, 'frozen') && !P.board[l]) { P.board[l] = HD.make('opossum'); }
     if (s === 1 && G.boss && !sacrificed) bossDeath(G, l, c);
     if (!sacrificed && HD.has(c, 'unkill')) P.hand.push(HD.make(c.id));
+    if (!sacrificed && HD.has(c, 'reborn')) P.hand.push(HD.make({ id: c.id, a: (c.up ? c.up.a : 0) + 1, h: (c.up ? c.up.h : 0) + 1 }));
     if (!sacrificed && HD.has(c, 'lives') && c.lives > 1) { var n = HD.make(c.id); n.lives = c.lives - 1; P.hand.push(n); }
   }
   function bossDeath(G, l, c) {
@@ -259,6 +285,7 @@
       var c = P.board[l]; if (!c || c.atk <= 0) continue;
       var tg = HD.has(c, 'tri') ? [l - 1, l, l + 1] : HD.has(c, 'bi') ? [l - 1, l + 1] : [l];
       if (hook) await hook({ k: 'atk', s: s, l: l });
+      var reps = HD.has(c, 'double') ? 2 : 1, tgAll = []; for (var rp = 0; rp < reps; rp++) tgAll = tgAll.concat(tg); tg = tgAll;
       for (var t = 0; t < tg.length && G.over === null; t++) {
         var tl = tg[t]; if (tl < 0 || tl >= LANES || P.board[l] !== c) continue;
         HD.refresh(G); if (c.atk <= 0) break;
@@ -294,6 +321,15 @@
         if (j >= 0 && j < LANES && !P.board[j]) { P.board[j] = c; P.board[i] = null; onEnter(G, s, j); i = j; }
       }
     }
+    for (var h = 0; h < LANES; h++) {      // Wuchtig: die Karte und ihre Nachbarn rücken vor und schieben angrenzende Karten mit
+      var hc = P.board[h]; if (!hc || !HD.has(hc, 'hefty') || hc.moved) continue;
+      var d = hc.dir, a = h - 1 >= 0 && P.board[h - 1] ? h - 1 : h, b = h + 1 < LANES && P.board[h + 1] ? h + 1 : h;
+      var lo = d > 0 ? a : a, hi = b; if (d > 0) { while (hi + 1 < LANES && P.board[hi + 1]) hi++; if (hi + 1 >= LANES) { hc.dir = -d; continue; } for (var q = hi; q >= lo; q--) { P.board[q + 1] = P.board[q]; } P.board[lo] = null; }
+      else { while (lo - 1 >= 0 && P.board[lo - 1]) lo--; if (lo - 1 < 0) { hc.dir = -d; continue; } for (var q2 = lo; q2 <= hi; q2++) { P.board[q2 - 1] = P.board[q2]; } P.board[hi] = null; }
+      for (var u = 0; u < LANES; u++) if (P.board[u]) onEnter(G, s, u);
+      break;
+    }
+    for (var dg = 0; dg < LANES; dg++) if (HD.has(P.board[dg], 'digger')) P.bones++;
     for (var z = 0; z < LANES; z++) if (P.board[z] && HD.has(P.board[z], 'submerge')) P.board[z].sub = true;
     for (var k = 0; k < LANES; k++) {
       var f = P.board[k];
@@ -301,7 +337,13 @@
     }
     HD.refresh(G);
   };
-  HD.startTurn = function (G, s) { G.p[s].board.forEach(function (c) { if (c) c.sub = false; }); HD.refresh(G); G.turn = s; G.phase = 'draw'; G.p[s].drew = false; if (s === 0) G.n++; };
+  // Hunger (Wiki): Hat der Spieler zu Zugbeginn keine Karte mehr zu ziehen, erscheint beim Gegner eine Hunger-Karte (1/1, jede weitere +1/+1, ab der fünften mit Flug, ab der neunten zusätzlich ein Punkt auf der Waage)
+  function starve(G) {
+    var P = G.p[0], O = G.p[1]; if (!G.npc || P.deck.length || P.side.length) return; G.starved = (G.starved || 0) + 1; var n = G.starved;
+    var c = HD.make({ id: 'starvation', dc: { n: 'Hunger', atk: n, hp: n, sig: n >= 5 ? ['airborne'] : [], art: '🍖', cost: {} } }), l = O.board.indexOf(null); if (l < 0) l = 0; O.board[l] = c;
+    if (n >= 9) { O.dmg++; check(G); }
+  }
+  HD.startTurn = function (G, s) { G.p[s].board.forEach(function (c) { if (c) c.sub = false; }); HD.refresh(G); G.turn = s; G.phase = 'draw'; G.p[s].drew = false; if (s === 0) { G.n++; starve(G); } };
   // ---------- Computergegner ----------
   // Rückt die Warteschlange vor (Gegner-NPC)
   HD.advanceQueue = function (G, s) {
