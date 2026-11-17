@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Hüttenduell</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+html,body{overscroll-behavior:none}
+body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.wrap{max-width:1000px;padding:10px 12px 16px}
+:root{--cw:min(92px,19vw);--ch:calc(var(--cw)*1.45);--par:#d8c7a0;--par2:#b9a577;--ink:#2a2014;--blood:#c2342d}
+/* Menü */
+.menu .opp{display:flex;flex-direction:column;gap:6px;text-align:left;padding:12px 14px;border-radius:14px;background:var(--card);border:1px solid var(--border);border-top:3px solid var(--c,var(--accent));color:var(--text);cursor:pointer;font:inherit}
+.menu .opp:hover{border-color:var(--c,var(--accent));transform:translateY(-2px)}
+.menu .opp b{font-size:1.05rem}.menu .opp small{color:var(--muted)}
+.ogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:10px 0 16px}
+.rules{font-size:.88rem;color:var(--muted);line-height:1.55}.rules b{color:var(--text)}
+/* Spielfeld */
+#game{display:none}body.ingame #menu{display:none}body.ingame #game{display:block}
+.hdr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.hdr .sp{flex:1}
+.scale{flex:1;min-width:200px;max-width:420px}
+.scale .track{position:relative;height:16px;border-radius:9px;background:linear-gradient(90deg,#c2342d55,#222 45%,#222 55%,#39ff1455);border:1px solid var(--border)}
+.scale .zero{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--muted)}
+.scale .mk{position:absolute;top:-4px;width:20px;height:22px;margin-left:-10px;border-radius:6px;background:var(--accent2);box-shadow:0 0 10px var(--accent2);transition:left .35s}
+.scale .lb{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-top:3px}
+.stat{padding:5px 10px;border-radius:10px;background:var(--card);border:1px solid var(--border);font-size:.9rem;white-space:nowrap}
+.stat b{font-variant-numeric:tabular-nums}
+.table{background:radial-gradient(ellipse at 50% 40%,#3a2616,#1a0f08 70%);border:2px solid #5a3a1c;border-radius:16px;padding:10px;box-shadow:inset 0 0 60px rgba(0,0,0,.6)}
+.row{display:grid;grid-template-columns:repeat(4,var(--cw));gap:8px;justify-content:center;margin:5px 0}
+.row.q{opacity:.75}
+.row.q .slot{height:calc(var(--ch)*.62)}
+.row.q .card{transform:scale(.62);transform-origin:top center}
+.slot{width:var(--cw);height:var(--ch);border-radius:8px;border:2px dashed rgba(216,199,160,.25);position:relative;display:grid;place-items:center}
+.slot.tgt{border-color:var(--accent2);box-shadow:0 0 12px var(--accent2);cursor:pointer;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.mid{height:2px;background:linear-gradient(90deg,transparent,#8a6a3a,transparent);margin:6px 0}
+.card{width:var(--cw);height:var(--ch);border-radius:8px;background:linear-gradient(160deg,var(--par),var(--par2));border:2px solid #4a3820;position:relative;color:var(--ink);font-family:Georgia,serif;box-shadow:0 3px 8px rgba(0,0,0,.5);transition:transform .2s,box-shadow .2s}
+.card .nm{position:absolute;left:4px;right:4px;top:3px;font-size:calc(var(--cw)*.115);font-weight:700;text-align:center;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .art{position:absolute;left:6px;right:6px;top:calc(var(--cw)*.24);height:calc(var(--ch)*.45);background:radial-gradient(circle,#efe3c4,#c9b68a);border:1px solid #6a5636;border-radius:4px;display:grid;place-items:center;font-size:calc(var(--cw)*.5);filter:sepia(.7) contrast(1.1) saturate(.8)}
+.card .cost{position:absolute;right:3px;top:calc(var(--cw)*.22);font-size:calc(var(--cw)*.14);line-height:1;text-align:right;z-index:2;text-shadow:0 0 2px #fff}
+.card .atk,.card .hp{position:absolute;bottom:3px;font:900 calc(var(--cw)*.27)/1 Georgia,serif;text-shadow:0 0 2px #efe3c4}
+.card .atk{left:6px}.card .hp{right:6px}.card .hp.dmg{color:#b5261f}
+.card .sg{position:absolute;left:0;right:0;bottom:calc(var(--cw)*.05);text-align:center;font-size:calc(var(--cw)*.2);letter-spacing:1px}
+.card.opp{background:linear-gradient(160deg,#cdbb92,#a8946a)}
+.card.sel{transform:translateY(-14px);box-shadow:0 0 16px var(--accent2),0 3px 8px rgba(0,0,0,.5)}
+.card.sac{outline:3px solid var(--blood);box-shadow:0 0 14px var(--blood)}
+.card.ok{cursor:pointer}
+.card.hit{animation:hit .3s}.card.atk-a{animation:lunge .35s}
+@keyframes hit{25%{transform:translateX(-5px) rotate(-3deg);filter:brightness(1.6)}75%{transform:translateX(5px) rotate(3deg)}}
+@keyframes lunge{40%{transform:translateY(-16px) scale(1.06)}}
+.hand{display:flex;gap:8px;justify-content:center;padding:14px 4px 4px;overflow-x:auto;min-height:calc(var(--ch) + 22px)}
+.hand .card{flex:none;cursor:pointer}
+.piles{display:flex;gap:10px;justify-content:center;margin:6px 0}
+.pile{padding:8px 12px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text);cursor:pointer;font:inherit;font-size:.85rem}
+.pile:disabled{opacity:.4;cursor:default}.pile.on{border-color:var(--accent2);box-shadow:0 0 10px var(--accent2)}
+.bar{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.bell{font-size:1rem;padding:10px 22px}
+.msg{min-height:1.5em;text-align:center;color:var(--text);margin:6px 0;font-size:.95rem}
+#info{min-height:2.6em;text-align:center;font-size:.82rem;color:var(--muted);margin-top:4px}
+#ov{position:fixed;inset:0;display:none;place-items:center;background:rgba(5,5,10,.72);z-index:50;padding:16px}
+#ov.show{display:grid}
+#ov .box{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:22px 26px;text-align:center;max-width:360px}
+#ov h2{margin:0 0 6px}#ov p{margin:0 0 14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" id="back" href="../">← Spiele</a><h1>Hüttenduell</h1></div>
+
+  <div id="menu" class="menu">
+    <div class="panel">
+      <h2 id="mT"></h2>
+      <p class="rules" id="rules"></p>
+      <div class="ogrid" id="ogrid"></div>
+    </div>
+  </div>
+
+  <div id="game">
+    <div class="hdr">
+      <div class="scale"><div class="track"><div class="zero"></div><div class="mk" id="mk"></div></div><div class="lb"><span id="lbO"></span><span id="lbY"></span></div></div>
+      <span class="stat">🦴 <b id="bones">0</b></span>
+      <span class="stat" id="turnS"></span>
+      <button class="btn alt" id="bMenu">☰</button>
+    </div>
+    <div class="table">
+      <div class="row q" id="oq"></div>
+      <div class="row" id="ob"></div>
+      <div class="mid"></div>
+      <div class="row" id="pb"></div>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="piles"><button class="pile" id="dDeck"></button><button class="pile" id="dSide"></button></div>
+    <div class="hand" id="hand"></div>
+    <div class="bar"><button class="btn bell" id="bell">🔔 Angriff</button></div>
+    <div id="info"></div>
+  </div>
+</div>
+<div id="ov"><div class="box"><h2 id="ovT"></h2><p id="ovP"></p><button class="btn" id="ovB"></button> <button class="btn alt" id="ovM"></button></div></div>
+<script src="engine.js"></script>
+<script>
+(function () {
+'use strict';
+const T = (d, e) => (window.SITE && SITE.T) ? SITE.T(d, e) : d, $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
+// ---------- Gegner und Decks ----------
+const OPP = [
+  { id: 'koehler', n: 'Der Köhler', icon: '🪓', c: '#39ff14', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'wolf', 'adder', 'raven', 'warren'], t: 'Einfach: kleine Waldtiere, wenig Druck.' },
+  { id: 'hexe', n: 'Die Moorhexe', icon: '🧙', c: '#a06bff', diff: 2, d: ['adder', 'adder', 'bat', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'mantis', 'mantis_god', 'wolf', 'hound', 'ouro', 'packrat'], t: 'Mittel: Gift, Flieger und Knochen-Karten.' },
+  { id: 'hirsch', n: 'Der Hirschkönig', icon: '🦌', c: '#ff8a00', diff: 3, d: ['elk', 'elk', 'elk_fawn', 'grizzly', 'grizzly', 'ox', 'vulture', 'hound', 'wolf', 'wolf', 'raven', 'mantis_god', 'bat', 'rattler'], t: 'Schwer: große Tiere, schnelle Läufer.' }
+];
+const STARTER = ['stoat', 'wolf_cub', 'frog', 'adder', 'raven', 'elk_fawn', 'porcupine', 'mole', 'mantis', 'warren', 'wolf', 'hound'];
+let G = null, opp = null, ui = { sel: null, sac: [] }, busy = false, done = false;
+
+// ---------- Menü ----------
+function paintMenu() {
+  $('mT').textContent = T('Wähle deinen Gegner', 'Choose your opponent');
+  $('rules').innerHTML = T(
+    '<b>So geht es:</b> Du und der Gegner habt je vier Bahnen. Karten kosten <b>Opfer 🩸</b> (eigene Karten vom Feld) oder <b>Knochen 🦴</b> (entstehen, wenn Karten sterben). Jede Runde ziehst du eine Karte aus dem <b>Wald</b> oder ein <b>Eichhörnchen</b>. Mit der <b>Klingel 🔔</b> greifen alle deine Karten an: Gegenüber trifft eine Karte, sonst geht der Schaden auf die <b>Waage</b>. Wer die Waage <b>5 Punkte</b> auf seine Seite bringt, gewinnt. Die Karten des Gegners warten erst in der Reihe dahinter.',
+    '<b>How it works:</b> You and your opponent each have four lanes. Cards cost <b>sacrifices 🩸</b> (your own cards on the field) or <b>bones 🦴</b> (created when cards die). Each turn you draw one card from the <b>forest</b> or a <b>squirrel</b>. The <b>bell 🔔</b> makes all your cards attack: the card opposite is hit, otherwise the damage goes to the <b>scale</b>. Tip the scale <b>5 points</b> your way to win. Enemy cards wait in the row behind first.');
+  $('ogrid').innerHTML = OPP.map(o => '<button class="opp" style="--c:' + o.c + '" data-o="' + o.id + '"><b>' + o.icon + ' ' + o.n + '</b><small>' + o.t + '</small></button>').join('');
+}
+$('ogrid').addEventListener('click', e => { const b = e.target.closest('[data-o]'); if (b) startDuel(OPP.find(o => o.id === b.dataset.o)); });
+
+// ---------- Spielstart ----------
+function startDuel(o) {
+  opp = o; done = false; busy = false; ui = { sel: null, sac: [] };
+  G = HD.newGame({ decks: [STARTER, o.d.slice()], npc: true });
+  HD.fillQueue(G, 1, o.diff);
+  document.body.classList.add('ingame'); $('back').onclick = e => { e.preventDefault(); toMenu(); };
+  beginTurn(); render();
+}
+function toMenu() { document.body.classList.remove('ingame'); $('ov').classList.remove('show'); $('back').onclick = null; G = null; done = true; }
+function beginTurn() { HD.startTurn(G, 0); ui = { sel: null, sac: [] }; say(T('Du bist dran: Ziehe eine Karte.', 'Your turn: draw a card.')); }
+function say(t) { $('msg').textContent = t; }
+
+// ---------- Darstellung ----------
+function costHtml(c) { let s = ''; for (let i = 0; i < (c.cost.b || 0); i++) s += '🩸'; if (c.cost.o) s += (s ? '<br>' : '') + '🦴' + (c.cost.o > 1 ? '×' + c.cost.o : ''); return s; }
+function cardEl(c, cls) {
+  const d = document.createElement('div'); d.className = 'card ' + (cls || ''); d.dataset.uid = c.uid;
+  d.innerHTML = '<div class="nm">' + c.n + '</div><div class="cost">' + costHtml(c) + '</div><div class="art">' + c.art + '</div><div class="atk">' + c.atk + '</div><div class="hp' + (c.hp < c.max ? ' dmg' : '') + '">' + c.hp + '</div><div class="sg">' + c.sig.map(s => HD.SIG[s][1]).join('') + '</div>';
+  return d;
+}
+function slotEl(row, l, c, cls) { const s = document.createElement('div'); s.className = 'slot'; s.dataset.l = l; s.dataset.row = row; if (c) s.appendChild(cardEl(c, cls)); return s; }
+function targets() {   // gültige Zielbahnen für die gewählte Handkarte
+  const P = G.p[0], c = ui.sel != null ? P.hand[ui.sel] : null, r = [];
+  if (!c || G.turn !== 0 || G.phase !== 'main' || busy) return r;
+  const need = c.cost.b || 0; let got = 0; ui.sac.forEach(l => got += HD.has(P.board[l], 'worthy') ? 3 : 1);
+  if (got < need) return r;
+  for (let l = 0; l < 4; l++) if (!HD.check(G, 0, ui.sel, l, ui.sac)) r.push(l);
+  return r;
+}
+function render() {
+  if (!G) return;
+  const P = G.p[0], O = G.p[1], tg = targets(), c = ui.sel != null ? P.hand[ui.sel] : null;
+  const needSac = c && (c.cost.b || 0) > 0 && tg.length === 0;
+  const fillRow = (id, row, arr, cls, mine) => { const el = $(id); el.innerHTML = ''; for (let l = 0; l < 4; l++) { const s = slotEl(row, l, arr[l], cls); if (mine) { if (tg.indexOf(l) >= 0) s.classList.add('tgt'); const cd = s.firstChild; if (cd) { if (ui.sac.indexOf(l) >= 0) cd.classList.add('sac'); if (needSac) cd.classList.add('ok'); } } el.appendChild(s); } };
+  fillRow('oq', 'oq', O.queue, 'opp', false); fillRow('ob', 'ob', O.board, 'opp', false); fillRow('pb', 'pb', P.board, '', true);
+  const h = $('hand'); h.innerHTML = ''; P.hand.forEach((cd, i) => { const e = cardEl(cd, 'ok' + (i === ui.sel ? ' sel' : '')); e.dataset.i = i; h.appendChild(e); });
+  const d = HD.diff(G); $('mk').style.left = (50 + d * 9) + '%';
+  $('lbO').textContent = opp.n + ' · ' + O.dmg; $('lbY').textContent = T('Du', 'You') + ' · ' + P.dmg;
+  $('bones').textContent = P.bones;
+  const my = G.turn === 0 && G.over === null && !busy;
+  $('dDeck').textContent = '🌲 ' + T('Wald', 'Forest') + ' (' + P.deck.length + ')'; $('dSide').textContent = '🐿️ ' + T('Eichhörnchen', 'Squirrel') + ' (' + P.side.length + ')';
+  const canDraw = my && G.phase === 'draw' && !P.drew; $('dDeck').disabled = !(canDraw && P.deck.length); $('dSide').disabled = !(canDraw && P.side.length);
+  $('dDeck').classList.toggle('on', canDraw); $('dSide').classList.toggle('on', canDraw);
+  $('bell').disabled = !(my && G.phase === 'main');
+  $('turnS').textContent = T('Runde ', 'Round ') + G.n;
+}
+function flash(s, l, cls) { const el = document.querySelector('.slot[data-row="' + (s === 0 ? 'pb' : 'ob') + '"][data-l="' + l + '"] .card'); if (el) { el.classList.add(cls); } }
+async function hook(ev) {
+  render();
+  if (ev.k === 'atk') flash(ev.s, ev.l, 'atk-a'); else if (ev.k === 'hit') flash(ev.s, ev.l, 'hit');
+  await sleep(ev.k === 'atk' ? 260 : ev.k === 'play' ? 120 : 340);
+  if (ev.k === 'die' || ev.k === 'scale') render();
+}
+
+// ---------- Eingabe ----------
+function pileDraw(from) { if (busy || G.turn !== 0 || G.phase !== 'draw') return; const c = HD.draw(G, 0, from); if (c) { say(T('Spiele Karten aus und läute dann die Klingel.', 'Play cards, then ring the bell.')); render(); } }
+$('dDeck').onclick = () => pileDraw('deck'); $('dSide').onclick = () => pileDraw('side');
+$('hand').addEventListener('click', e => {
+  const el = e.target.closest('.card'); if (!el || busy || G.phase !== 'main') return; const i = +el.dataset.i;
+  info(G.p[0].hand[i]); ui = { sel: ui.sel === i ? null : i, sac: [] }; render();
+  const c = ui.sel != null ? G.p[0].hand[ui.sel] : null;
+  if (c) { const r = HD.check(G, 0, ui.sel, 0, []); if ((c.cost.o || 0) > G.p[0].bones) say(T('Dafür fehlen Knochen 🦴.', 'Not enough bones 🦴.')); else if ((c.cost.b || 0) > 0) say(T('Wähle ', 'Choose ') + c.cost.b + T(' Karte(n) als Opfer 🩸.', ' card(s) to sacrifice 🩸.')); else say(T('Wähle eine freie Bahn.', 'Choose an empty lane.')); }
+});
+$('pb').addEventListener('click', async e => {
+  if (busy || G.turn !== 0 || ui.sel == null) return;
+  const slot = e.target.closest('.slot'); if (!slot) return; const l = +slot.dataset.l, P = G.p[0], c = P.hand[ui.sel];
+  if (slot.classList.contains('tgt')) { busy = true; const idx = ui.sel, sac = ui.sac.slice(); ui = { sel: null, sac: [] }; await HD.play(G, 0, idx, l, sac, hook); busy = false; say(T('Weiter ausspielen oder die Klingel läuten.', 'Play more cards or ring the bell.')); render(); return; }
+  if (P.board[l] && (c.cost.b || 0) > 0) { const k = ui.sac.indexOf(l); if (k >= 0) ui.sac.splice(k, 1); else ui.sac.push(l); info(P.board[l]); render(); const t = targets(); if (t.length) say(T('Wähle die Bahn für die neue Karte.', 'Choose the lane for the new card.')); }
+});
+function info(c) { $('info').innerHTML = c ? '<b>' + c.n + '</b> ' + c.atk + '/' + c.hp + (c.sig.length ? ' · ' + c.sig.map(s => HD.SIG[s][1] + ' <b>' + HD.SIG[s][0] + '</b>: ' + HD.SIG[s][2]).join(' · ') : '') : ''; }
+document.addEventListener('mouseover', e => { const el = e.target.closest('.card'); if (!el || !G) return; const u = +el.dataset.uid; let c = null; G.p.forEach(p => [].concat(p.hand, p.board, p.queue).forEach(x => { if (x && x.uid === u) c = x; })); if (c) info(c); });
+$('bell').onclick = async () => {
+  if (busy || G.turn !== 0 || G.phase !== 'main') return; busy = true; ui = { sel: null, sac: [] }; render(); say(T('Angriff!', 'Attack!'));
+  await HD.attack(G, 0, hook); if (finish()) return;
+  HD.endTurn(G, 0); render(); await sleep(300);
+  await npcTurn(); if (finish()) return;
+  busy = false; beginTurn(); render();
+};
+async function npcTurn() {
+  say(opp.n + T(' ist am Zug …', ' is playing …')); HD.startTurn(G, 1); await sleep(450);
+  HD.advanceQueue(G, 1); render(); await sleep(450);
+  await HD.attack(G, 1, hook); if (G.over !== null) return;
+  HD.endTurn(G, 1); HD.fillQueue(G, 1, opp.diff); render();
+}
+function finish() {
+  if (G.over === null) return false; busy = true; render(); done = true;
+  const win = G.over === 0; $('ovT').textContent = win ? T('Gewonnen! 🎉', 'You win! 🎉') : T('Verloren …', 'You lost …');
+  $('ovP').textContent = win ? T('Die Waage kippt auf deine Seite.', 'The scale tips to your side.') : T('Die Waage kippt zum Gegner.', 'The scale tips to your opponent.');
+  $('ovB').textContent = T('Nochmal', 'Again'); $('ovM').textContent = T('Menü', 'Menu'); $('ov').classList.add('show'); return true;
+}
+$('ovB').onclick = () => { $('ov').classList.remove('show'); startDuel(opp); }; $('ovM').onclick = () => toMenu();
+$('bMenu').onclick = () => { if (!done && !confirm(T('Spiel abbrechen?', 'Abort game?'))) return; toMenu(); };
+if (window.SITE && SITE.guard) SITE.guard(() => !!G && !done);
+paintMenu();
+window.HDUI = { get G() { return G; } };
+})();
+</script>
+</body>
+</html>
