@@ -34,7 +34,11 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .row.q{opacity:.75}
 .row.q .slot{height:calc(var(--ch)*.62)}
 .row.q .card{transform:scale(.62);transform-origin:top center}
-.slot{width:var(--cw);height:var(--ch);border-radius:8px;border:2px dashed rgba(216,199,160,.25);position:relative;display:grid;place-items:center}
+.slot{width:var(--cw);height:var(--ch);border-radius:10px;border:2px solid rgba(201,162,78,.6);position:relative;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,rgba(62,40,22,.9),rgba(14,8,4,.96));box-shadow:inset 0 0 16px rgba(0,0,0,.85),0 0 0 1px rgba(0,0,0,.6)}
+#ob .slot{border-color:rgba(181,82,58,.7)}#oq .slot{border-color:rgba(138,132,120,.55)}
+.slot::before{content:"";position:absolute;inset:5px;border:1px solid rgba(201,162,78,.28);border-radius:6px;pointer-events:none}
+.slot::after{content:"🐾";position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--cw)*.4);opacity:.07;pointer-events:none}
+.slot .card{z-index:1}
 .slot.tgt{border-color:var(--accent2);box-shadow:0 0 12px var(--accent2);cursor:pointer;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.6}}
 .mid{height:2px;background:linear-gradient(90deg,transparent,#8a6a3a,transparent);margin:6px 0}
@@ -80,6 +84,10 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .ar{color:var(--muted)}
 .cbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
 .mrow{display:flex;gap:10px;flex-wrap:wrap}
+#mapc{display:block;width:100%;image-rendering:pixelated;border:3px solid #5a3a1c;border-radius:10px;background:#000;cursor:default}
+#cm3d{display:none;height:min(62vh,540px);border-radius:14px;overflow:hidden;border:3px solid #5a3a1c;background:#0b0705;position:relative}
+body.v3 #cm3d{display:block}body.v3 #mapc{display:none}
+#mapinfo{min-height:2.6em;margin-top:8px;color:var(--muted);text-align:center;font-size:.9rem}
 #t3d{display:none;position:relative;height:min(58vh,540px);border-radius:16px;overflow:hidden;border:2px solid #5a3a1c;background:#0b0705}
 body.v3 #t3d{display:block}body.v3 #t2d{display:none}
 #bossInfo{display:none;margin:0 0 8px;padding:8px 12px;border-radius:10px;background:#3a1a10;border:1px solid #ff8a00;color:#ffd9b0;font-size:.85rem}
@@ -114,9 +122,10 @@ body.v3 #t3d{display:block}body.v3 #t2d{display:none}
   <div id="camp">
     <div class="panel">
       <h2 id="cT"></h2>
-      <div class="cbar"><span class="stat" id="cCan"></span><button class="btn alt" id="cDeck"></button><button class="btn alt" id="cExit"></button></div>
-      <div class="cmap" id="cmap"></div>
-      <div class="mrow" style="margin-top:12px"><button class="btn" id="cGo"></button></div>
+      <div class="cbar"><span class="stat" id="cCan"></span><button class="btn alt" id="cDeck"></button><button class="btn alt" id="cm3">🧊 3D</button><button class="btn alt" id="cExit"></button></div>
+      <div id="mapwrap"><canvas id="mapc" width="384" height="240"></canvas><div id="cm3d"></div></div>
+      <div id="mapinfo"></div>
+      <div class="mrow" style="margin-top:10px"><button class="btn" id="cGo"></button></div>
     </div>
   </div>
 
@@ -161,27 +170,33 @@ const T1 = ['stoat', 'wolf_cub', 'frog', 'adder', 'porcupine', 'mole', 'mantis',
 const T2 = ['raven', 'bat', 'wolf', 'hound', 'packrat', 'coyote', 'beaver', 'kingfisher', 'ant_queen', 'cockroach', 'elk', 'mantis_god'];
 const T3 = ['grizzly', 'rattler', 'direwolf', 'shark', 'ouro', 'mole_man', 'vulture', 'ox'];
 const AREAS = [
-  { id: 'wald', n: 'Nebelwald', icon: '🌲', c: '#39ff14', pool: T1.concat(T1, T2), nodes: [
-    { t: 'fight', o: { n: 'Der Wilderer', icon: '🏹', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'warren', 'adder', 'opossum', 'skink', 'raven_egg'] } },
-    { t: 'fight', o: { n: 'Die Pilzsammlerin', icon: '🍄', diff: 1, d: ['stoat', 'wolf_cub', 'wolf_cub', 'tadpole', 'otter', 'mantis', 'goat', 'cat', 'ant', 'ant', 'elk_fawn', 'wolf'] } },
-    { t: 'camp' },
-    { t: 'boss', o: { n: 'Der Hirschkönig', icon: '🦌', diff: 2, boss: 'pack', win: 7, d: ['elk', 'elk', 'elk_fawn', 'elk_fawn', 'wolf', 'wolf', 'stoat', 'raven', 'hound', 'grizzly', 'porcupine', 'mole'] } }
-  ] },
-  { id: 'moor', n: 'Irrlichtmoor', icon: '🌫️', c: '#a06bff', pool: T2.concat(T2, T3, T1), nodes: [
-    { t: 'fight', o: { n: 'Der Torfstecher', icon: '⛏️', diff: 2, d: ['adder', 'adder', 'frog', 'tadpole', 'otter', 'kingfisher', 'raven', 'mole', 'beaver', 'wolf', 'bat', 'cockroach'] } },
-    { t: 'fight', o: { n: 'Das Irrlicht', icon: '🔥', diff: 2, d: ['bat', 'bat', 'raven', 'kingfisher', 'mantis', 'mantis_god', 'coyote', 'ant_queen', 'ant', 'ant', 'hound', 'packrat'] } },
-    { t: 'camp' },
-    { t: 'boss', o: { n: 'Die Moorhexe', icon: '🧙', diff: 2, boss: 'curse', win: 7, d: ['adder', 'adder', 'adder', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'cat', 'cat', 'ouro', 'mantis_god', 'wolf'] } }
-  ] },
-  { id: 'gruft', n: 'Knochengruft', icon: '💀', c: '#ff8a00', pool: T3.concat(T3, T2), nodes: [
-    { t: 'fight', o: { n: 'Der Totengräber', icon: '⚰️', diff: 3, d: ['adder', 'cockroach', 'cockroach', 'rattler', 'bat', 'bat', 'ouro', 'wolf', 'hound', 'direwolf', 'packrat', 'cat'] } },
-    { t: 'fight', o: { n: 'Die Grabwächterin', icon: '🗿', diff: 3, d: ['mole_man', 'mole_man', 'grizzly', 'ox', 'direwolf', 'vulture', 'shark', 'beaver', 'hound', 'raven', 'wolf', 'mantis_god'] } },
-    { t: 'camp' },
-    { t: 'boss', o: { n: 'Der Knochenfürst', icon: '👑', diff: 3, boss: 'necro', win: 7, d: ['rattler', 'rattler', 'cockroach', 'cockroach', 'bat', 'bat', 'adder', 'grizzly', 'ouro', 'direwolf', 'vulture', 'mantis_god', 'ox'] } }
-  ] }
+  { id: 'wald', n: 'Nebelwald', icon: '🌲', c: '#39ff14', pool: T1.concat(T1, T2), foes: [
+    { n: 'Der Wilderer', icon: '🏹', diff: 1, d: ['stoat', 'stoat', 'wolf_cub', 'frog', 'frog', 'porcupine', 'mole', 'warren', 'adder', 'opossum', 'skink', 'raven_egg'] },
+    { n: 'Die Pilzsammlerin', icon: '🍄', diff: 1, d: ['stoat', 'wolf_cub', 'wolf_cub', 'tadpole', 'otter', 'mantis', 'goat', 'cat', 'ant', 'ant', 'elk_fawn', 'wolf'] },
+    { n: 'Der Holzfäller', icon: '🪓', diff: 1, d: ['stoat', 'beaver', 'wolf_cub', 'frog', 'porcupine', 'mole', 'wolf', 'adder', 'warren', 'goat', 'skink', 'opossum'] }
+  ], elites: [
+    { n: 'Der Eber', icon: '🐗', diff: 2, d: ['grizzly', 'wolf', 'wolf', 'stoat', 'porcupine', 'porcupine', 'hound', 'elk_fawn', 'mole', 'mantis', 'raven', 'warren'] },
+    { n: 'Die Wolfsmutter', icon: '🐺', diff: 2, d: ['wolf', 'wolf', 'wolf_cub', 'wolf_cub', 'wolf_cub', 'direwolf', 'hound', 'stoat', 'frog', 'raven', 'goat', 'cat'] }
+  ], boss: { n: 'Der Hirschkönig', icon: '🦌', diff: 2, boss: 'pack', win: 7, d: ['elk', 'elk', 'elk_fawn', 'elk_fawn', 'wolf', 'wolf', 'stoat', 'raven', 'hound', 'grizzly', 'porcupine', 'mole'] } },
+  { id: 'moor', n: 'Irrlichtmoor', icon: '🌫️', c: '#a06bff', pool: T2.concat(T2, T3, T1), foes: [
+    { n: 'Der Torfstecher', icon: '⛏️', diff: 2, d: ['adder', 'adder', 'frog', 'tadpole', 'otter', 'kingfisher', 'raven', 'mole', 'beaver', 'wolf', 'bat', 'cockroach'] },
+    { n: 'Das Irrlicht', icon: '🔥', diff: 2, d: ['bat', 'bat', 'raven', 'kingfisher', 'mantis', 'mantis_god', 'coyote', 'ant_queen', 'ant', 'ant', 'hound', 'packrat'] },
+    { n: 'Der Fährmann', icon: '🛶', diff: 2, d: ['otter', 'otter', 'kingfisher', 'shark', 'tadpole', 'frog', 'beaver', 'wolf', 'raven', 'adder', 'cat', 'packrat'] }
+  ], elites: [
+    { n: 'Die Nebelmutter', icon: '🌫️', diff: 3, d: ['kingfisher', 'kingfisher', 'shark', 'otter', 'bat', 'bat', 'raven', 'ant_queen', 'ant', 'ant', 'mantis_god', 'cat'] },
+    { n: 'Der Sumpfriese', icon: '🐊', diff: 3, d: ['shark', 'grizzly', 'adder', 'adder', 'rattler', 'beaver', 'mole_man', 'hound', 'wolf', 'cockroach', 'ouro', 'raven'] }
+  ], boss: { n: 'Die Moorhexe', icon: '🧙', diff: 2, boss: 'curse', win: 7, d: ['adder', 'adder', 'adder', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'cat', 'cat', 'ouro', 'mantis_god', 'wolf'] } },
+  { id: 'gruft', n: 'Knochengruft', icon: '💀', c: '#ff8a00', pool: T3.concat(T3, T2), foes: [
+    { n: 'Der Totengräber', icon: '⚰️', diff: 3, d: ['adder', 'cockroach', 'cockroach', 'rattler', 'bat', 'bat', 'ouro', 'wolf', 'hound', 'direwolf', 'packrat', 'cat'] },
+    { n: 'Die Grabwächterin', icon: '🗿', diff: 3, d: ['mole_man', 'mole_man', 'grizzly', 'ox', 'direwolf', 'vulture', 'shark', 'beaver', 'hound', 'raven', 'wolf', 'mantis_god'] },
+    { n: 'Der Leichenfledderer', icon: '🦇', diff: 3, d: ['bat', 'bat', 'vulture', 'raven', 'raven', 'coyote', 'cockroach', 'rattler', 'adder', 'wolf', 'packrat', 'mantis'] }
+  ], elites: [
+    { n: 'Der Knochenriese', icon: '🦴', diff: 3, d: ['grizzly', 'grizzly', 'ox', 'ox', 'direwolf', 'rattler', 'rattler', 'cockroach', 'ouro', 'vulture', 'hound', 'wolf'] },
+    { n: 'Die Schattenwölfin', icon: '🐺', diff: 3, d: ['direwolf', 'direwolf', 'wolf', 'wolf', 'bat', 'bat', 'mantis_god', 'mantis_god', 'raven', 'ouro', 'cockroach', 'hound'] }
+  ], boss: { n: 'Der Knochenfürst', icon: '👑', diff: 3, boss: 'necro', win: 7, d: ['rattler', 'rattler', 'cockroach', 'cockroach', 'bat', 'bat', 'adder', 'grizzly', 'ouro', 'direwolf', 'vulture', 'mantis_god', 'ox'] } }
 ];
 const STARTER = ['stoat', 'wolf_cub', 'frog', 'adder', 'raven', 'elk_fawn', 'porcupine', 'mole', 'mantis', 'warren', 'wolf', 'hound', 'cat', 'goat', 'otter'];
-const KEY = 'hd-camp-v1';
+const KEY = 'hd-camp-v2';
 let G = null, opp = null, ui = { sel: null, sac: [] }, busy = false, done = false, camp = null, fightNode = null, v3on = false;
 
 // ---------- Kartenelemente ----------
@@ -208,7 +223,7 @@ function paintMenu() {
   const sv = store.get(KEY), B = $('kBtns'); B.innerHTML = '';
   const mk = (t, f, alt) => { const b = document.createElement('button'); b.className = 'btn' + (alt ? ' alt' : ''); b.textContent = t; b.onclick = f; B.appendChild(b); };
   if (sv) mk('▶ ' + T('Kampagne fortsetzen', 'Continue') + ' (' + AREAS[sv.a].icon + ' ' + AREAS[sv.a].n + ')', () => { camp = sv; showCamp(); });
-  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = { a: 0, n: 0, c: 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; store.set(KEY, camp); showCamp(); }, !!sv);
+  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = newCamp(); store.set(KEY, camp); showCamp(); }, !!sv);
   $('mT').textContent = T('Freies Duell', 'Free duel');
   $('rules').innerHTML = T(
     '<b>So geht es:</b> Du und der Gegner habt je vier Bahnen. Karten kosten <b>Opfer 🩸</b> (eigene Karten vom Feld) oder <b>Knochen 🦴</b> (entstehen, wenn Karten sterben). Jede Runde ziehst du eine Karte aus dem <b>Wald</b> oder ein <b>Eichhörnchen</b>. Mit der <b>Klingel 🔔</b> greifen alle deine Karten an: Gegenüber trifft eine Karte, sonst geht der Schaden auf die <b>Waage</b>. Wer die Waage <b>5 Punkte</b> auf seine Seite bringt, gewinnt. Die Karten des Gegners warten erst in der Reihe dahinter.',
@@ -223,33 +238,173 @@ function paintBook() {
 }
 $('ogrid').addEventListener('click', e => { const b = e.target.closest('[data-o]'); if (b) { fightNode = null; startDuel(OPP.find(o => o.id === b.dataset.o), STARTER.map(id => ({ id, a: 0, h: 0 }))); } });
 
-// ---------- Kampagne ----------
+// ---------- Kampagne: verzweigte Karte ----------
+const NAME = { fight: 'Kampf', elite: 'Elitekampf', camp: 'Lagerfeuer', pick: 'Kartenfund', trade: 'Händler', boss: 'Boss' };
+function nodeName(n) { return n.t === 'camp' ? T('Lagerfeuer', 'Campfire') : n.t === 'pick' ? T('Kartenfund', 'Card find') : n.t === 'trade' ? T('Händler', 'Trader') : n.o.n; }
+function nodeDesc(n) {
+  if (n.t === 'fight') return '⚔️ ' + T('Kampf gegen ', 'Fight vs ') + n.o.n + ' – ' + T('Belohnung: eine neue Karte', 'reward: a new card');
+  if (n.t === 'elite') return '💀 ' + T('Elitegegner ', 'Elite ') + n.o.n + ' – ' + T('stärker, dafür bessere Belohnung', 'tougher, better reward');
+  if (n.t === 'camp') return '🔥 ' + T('Lagerfeuer: rasten, stärken, schärfen oder aussortieren', 'Campfire: rest, strengthen, sharpen or cull');
+  if (n.t === 'pick') return '🎴 ' + T('Kartenfund: wähle eine von drei Karten', 'Card find: choose one of three cards');
+  if (n.t === 'trade') return '🪙 ' + T('Händler: tausche eine Karte gegen eine zufällige stärkere', 'Trader: swap a card for a random stronger one');
+  return '👑 ' + T('Boss ', 'Boss ') + n.o.n + ' – ' + HD.BOSS[n.o.boss][0] + ': ' + HD.BOSS[n.o.boss][1];
+}
+function genMap(ai) {
+  const A = AREAS[ai], R = Math.random, shuf = a => HD.shuffle(a.slice(), R), foes = shuf(A.foes), elites = shuf(A.elites); let fi = 0, ei = 0;
+  const mk = t => t === 'fight' ? { t, o: foes[fi++ % foes.length] } : t === 'elite' ? { t, o: elites[ei++ % elites.length] } : { t };
+  const kinds = [['fight', 'fight', 'fight'], ['fight', 'fight', 'pick', 'trade'], ['fight', 'elite', 'camp', 'pick', 'trade'], ['camp', 'pick', 'camp']], counts = [2, 3, 3, 2], layers = [];
+  counts.forEach((c, li) => { const row = []; for (let j = 0; j < c; j++) row.push(mk(kinds[li][Math.floor(R() * kinds[li].length)])); layers.push(row); });
+  if (!layers[3].some(n => n.t === 'camp')) layers[3][0] = mk('camp');
+  if (!layers[2].some(n => n.t === 'fight' || n.t === 'elite')) layers[2][0] = mk('fight');
+  layers.push([{ t: 'boss', o: A.boss }]);
+  for (let li = 0; li < layers.length - 1; li++) {
+    const a = layers[li], b = layers[li + 1]; a.forEach(n => n.next = []);
+    a.forEach((n, j) => { const t = a.length > 1 ? j * (b.length - 1) / (a.length - 1) : (b.length - 1) / 2, lo = Math.floor(t), hi = Math.ceil(t); n.next.push(lo); if (hi !== lo) n.next.push(hi); if (R() < .35 && b.length > 1) { const x = Math.max(0, Math.min(b.length - 1, lo + (R() < .5 ? -1 : 1))); if (n.next.indexOf(x) < 0) n.next.push(x); } });
+    b.forEach((_, k) => { if (!a.some(n => n.next.indexOf(k) >= 0)) { let best = 0, bd = 99; a.forEach((n, j) => { const d = Math.abs(j * (b.length - 1) / Math.max(1, a.length - 1) - k); if (d < bd) { bd = d; best = j; } }); a[best].next.push(k); } });
+  }
+  layers.forEach((row, li) => row.forEach((n, j) => { n.x = .17 + .74 * (li / (layers.length - 1)); n.y = li === layers.length - 1 ? .5 : .2 + .6 * ((j + .5) / row.length); }));
+  return { layers };
+}
+function newCamp() { const c = { a: 0, map: null, at: null, pend: null, hist: [], c: 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; c.map = genMap(0); return c; }
+const key = (l, i) => l + ':' + i, parse = k => k.split(':').map(Number), nodeAt = k => { const p = parse(k); return camp.map.layers[p[0]][p[1]]; };
+function reachable() {
+  if (camp.pend) return [];
+  if (!camp.at) return camp.map.layers[0].map((n, i) => key(0, i));
+  const n = camp.map.layers[camp.at.l][camp.at.i]; return n.next.map(i => key(camp.at.l + 1, i));
+}
+function nstate(k) {
+  if (camp.hist.indexOf(k) >= 0) return 'done'; if (camp.pend && camp.pend === k) return 'cur'; return reachable().indexOf(k) >= 0 ? 'reach' : 'lock';
+}
+function pawnPos() { const k = camp.pend || (camp.at ? key(camp.at.l, camp.at.i) : null); if (!k) return { x: .06, y: .5 }; const n = nodeAt(k); return { x: n.x, y: n.y }; }
+
+// ---------- Pixel-Grafik ----------
+const PAL = { k: '#120c06', w: '#f2ecd8', g: '#aab0b8', y: '#ffd23f', o: '#ff8a1f', r: '#d8392b', b: '#8a5a2b', B: '#5a3a1a', G: '#3fa84a', d: '#1f6a2a', p: '#9a6bff', c: '#4fd8ff', s: '#6b6f78', t: '#2a2a30' };
+const HALF = {
+  camp: ['........', '.......o', '......oo', '....o.oo', '...ooooy', '..oooyyy', '..ooyyyy', '.oooyyww', '.oooyyww', '.ooyyyww', '.ooyywww', '..oyyyww', '...ooyyy', 'bbbbbbbb', 'BBBBBBBB', '........'],
+  boss: ['y..y..yy', 'yyyyyyyy', 'yyyrryyy', '..wwwwww', '.wwwwwww', 'wwwwwwww', 'wwkkkwww', 'wwkkkkww', 'wwwkkkww', 'wwwwwwkk', '.wwwwwww', '..wkwkwk', '..wkwkwk', '...wwwww', '........', '........'],
+  elite: ['o.......', 'oo......', 'ooo.....', '.ooowwww', '..wwwwww', '..wwwwww', '..wrrwww', '..wrrrww', '..wwwrww', '...wwwwk', '...wwwww', '....wkwk', '....wkwk', '.....www', '........', '........'],
+  pick: ['........', '........', 'bbbbbbbb', 'bBBBBBBB', 'bBBBBBBB', 'yyyyyyyy', 'bbbbbbyy', 'bBBBBByk', 'bBBBBBBB', 'bBBBBBBB', 'bbbbbbbb', 'kkkkkkkk', '........', '........', '........', '........'],
+  trade: ['........', '.....yyy', '...yyyyy', '..yyoooo', '.yyooyyy', '.yyoyyyy', 'yyoyyyyy', 'yyoyyyyy', 'yyoyyyyy', '.yyoyyyy', '.yyooyyy', '..yyoooo', '...yyyyy', '.....yyy', '........', '........'],
+  pine: ['.....d', '.....d', '....dd', '...ddG', '....dd', '..dddG', '.ddddG', '...ddd', '.dddGG', 'ddddGG', '.....b', '.....b'],
+  tomb: ['..tttt', '.tssss', 'tssssk', 'tsskss', 'tsskss', 'tssssk', 'tssssk', 'tttttt'],
+  reed: ['......', '....G.', '...dG.', '...dG.', '..GdG.', '..GdGb', '..bdbb']
+};
+const iconCache = {};
+function sprCanvas(half, scale) {
+  const h = half.length, w = half[0].length * 2, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  half.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const ch = row[x]; if (ch === '.') continue; g.fillStyle = PAL[ch]; g.fillRect(x, y, 1, 1); g.fillRect(w - 1 - x, y, 1, 1); } });
+  return c;
+}
+function icon(t) {
+  if (iconCache[t]) return iconCache[t];
+  let c;
+  if (t === 'fight') { c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); for (let i = 0; i < 12; i++) { g.fillStyle = PAL.g; g.fillRect(2 + i, 1 + i, 2, 2); g.fillRect(12 - i, 1 + i, 2, 2); g.fillStyle = PAL.w; g.fillRect(2 + i, 1 + i, 1, 1); g.fillRect(13 - i, 1 + i, 1, 1); } g.fillStyle = PAL.y; g.fillRect(4, 10, 3, 2); g.fillRect(9, 10, 3, 2); g.fillStyle = PAL.B; g.fillRect(2, 13, 2, 2); g.fillRect(12, 13, 2, 2); }
+  else if (t === 'start') { c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.fillStyle = PAL.B; g.fillRect(4, 2, 2, 13); g.fillStyle = PAL.r; g.fillRect(6, 2, 7, 5); g.fillStyle = PAL.w; g.fillRect(8, 3, 2, 2); }
+  else c = sprCanvas(HALF[t]);
+  return (iconCache[t] = c);
+}
+const TCOL = { fight: '#c9a24e', elite: '#d8392b', boss: '#ff8a1f', camp: '#ff8a1f', pick: '#4fd8ff', trade: '#ffd23f' };
+let bgCache = {};
+function rng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+function mapBg(ai) {
+  if (bgCache[ai]) return bgCache[ai];
+  const W = 384, H = 240, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), R = rng(ai * 9973 + 17), th = ['wald', 'moor', 'gruft'][ai];
+  const base = { wald: ['#bda878', '#a89562'], moor: ['#a9b09a', '#8f9a86'], gruft: ['#9d8d7b', '#85776a'] }[th];
+  g.fillStyle = base[0]; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 2600; i++) { g.fillStyle = R() < .5 ? base[1] : 'rgba(255,255,255,.08)'; g.fillRect(R() * W | 0, R() * H | 0, 1 + (R() * 2 | 0), 1); }
+  for (let i = 0; i < 14; i++) { const x = R() * W | 0, y = R() * H | 0, r = 10 + R() * 22 | 0; g.fillStyle = 'rgba(90,60,30,.07)'; for (let yy = -r; yy <= r; yy += 2) { const w = Math.sqrt(r * r - yy * yy) | 0; g.fillRect(x - w, y + yy, w * 2, 2); } }
+  const deco = { wald: ['pine'], moor: ['reed', 'reed'], gruft: ['tomb', 'tomb'] }[th];
+  for (let i = 0; i < 34; i++) { const x = 8 + R() * (W - 40) | 0, y = 8 + R() * (H - 34) | 0, s = sprCanvas(HALF[deco[i % deco.length]]); g.globalAlpha = .75; g.drawImage(s, x, y); g.globalAlpha = 1; }
+  if (th === 'moor') for (let i = 0; i < 8; i++) { const x = R() * W | 0, y = R() * H | 0; g.fillStyle = 'rgba(70,110,130,.35)'; g.fillRect(x, y, 14 + R() * 18 | 0, 4); g.fillRect(x + 3, y + 4, 10, 2); }
+  g.strokeStyle = '#3a2410'; g.lineWidth = 3; g.strokeRect(1.5, 1.5, W - 3, H - 3); g.strokeStyle = 'rgba(58,36,16,.5)'; g.lineWidth = 1; g.strokeRect(5.5, 5.5, W - 11, H - 11);
+  g.fillStyle = '#3a2410'; g.font = 'bold 10px monospace'; g.fillText(AREAS[ai].n.toUpperCase(), 12, 18);
+  return (bgCache[ai] = c);
+}
+function dotLine(g, x0, y0, x1, y1, col) {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) | 0; g.fillStyle = col;
+  for (let i = 0; i <= n; i += 4) { const t = n ? i / n : 0; g.fillRect(Math.round(x0 + (x1 - x0) * t) - 1, Math.round(y0 + (y1 - y0) * t) - 1, 2, 2); }
+}
+// Zeichnet die Karte. plates = false: ohne Marken (die kommen dann als 3D-Figuren)
+let mapTick = 0;
+function drawMap(cv, plates) {
+  const W = 384, H = 240; if (cv.width !== W) { cv.width = W; cv.height = H; } const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.drawImage(mapBg(camp.a), 0, 0);
+  const L = camp.map.layers, P = n => [Math.round(n.x * W), Math.round(n.y * H)], taken = (a, b) => { const i = camp.hist.indexOf(a); return i >= 0 && camp.hist[i + 1] === b; };
+  const sx = Math.round(.06 * W), sy = Math.round(.5 * H);
+  L[0].forEach((n, i) => { const p = P(n); dotLine(g, sx, sy, p[0], p[1], camp.hist[0] === key(0, i) ? '#8a2a1a' : '#6b5030'); });
+  L.forEach((row, li) => row.forEach((n, i) => { if (!n.next) return; const p = P(n); n.next.forEach(j => { const q = P(L[li + 1][j]); dotLine(g, p[0], p[1], q[0], q[1], taken(key(li, i), key(li + 1, j)) ? '#8a2a1a' : '#6b5030'); }); }));
+  g.drawImage(icon('start'), sx - 8, sy - 8);
+  const rc = reachable();
+  if (plates) L.forEach((row, li) => row.forEach((n, i) => {
+    const k = key(li, i), st = nstate(k), p = P(n), pulse = st === 'reach' && (mapTick >> 2) % 2;
+    g.fillStyle = '#2a1a0c'; g.fillRect(p[0] - 11, p[1] - 11, 22, 22); g.fillStyle = pulse ? '#fff' : (TCOL[n.t] || '#c9a24e'); g.fillRect(p[0] - 11, p[1] - 11, 22, 2); g.fillRect(p[0] - 11, p[1] + 9, 22, 2); g.fillRect(p[0] - 11, p[1] - 11, 2, 22); g.fillRect(p[0] + 9, p[1] - 11, 2, 22);
+    g.drawImage(icon(n.t), p[0] - 8, p[1] - 8);
+    if (st === 'done' || st === 'lock') { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(p[0] - 9, p[1] - 9, 18, 18); }
+    if (st === 'done') { g.fillStyle = '#39ff14'; g.fillRect(p[0] + 2, p[1] + 4, 2, 2); g.fillRect(p[0] + 4, p[1] + 2, 2, 2); g.fillRect(p[0] + 6, p[1], 2, 2); g.fillRect(p[0] + 8, p[1] - 2, 2, 2); }
+  }));
+  // Figur (Pixel-Spielfigur mit Hut)
+  const pp = pawnPos(), px = Math.round(pp.x * W), py = Math.round(pp.y * H) - (plates ? 14 : 4) + Math.round(Math.sin(mapTick / 2));
+  if (plates) { g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px - 4, py + 12, 8, 2); g.fillStyle = '#7a1d1d'; g.fillRect(px - 4, py - 6, 8, 2); g.fillRect(px - 2, py - 9, 4, 3); g.fillStyle = '#f0d9b5'; g.fillRect(px - 2, py - 4, 4, 4); g.fillStyle = '#e8dcc0'; g.fillRect(px - 3, py, 6, 6); g.fillRect(px - 4, py + 6, 8, 4); g.fillStyle = '#5a3a1a'; g.fillRect(px - 3, py + 10, 2, 2); g.fillRect(px + 1, py + 10, 2, 2); }
+  return rc;
+}
+function pickNode(cv, e) {
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 384, y = (e.clientY - r.top) / r.height * 240; let best = null, bd = 16;
+  camp.map.layers.forEach((row, li) => row.forEach((n, i) => { const d = Math.hypot(n.x * 384 - x, n.y * 240 - y); if (d < bd) { bd = d; best = key(li, i); } }));
+  return best;
+}
+let mapTimer = 0;
+function setInfo(k) { $('mapinfo').textContent = k ? nodeDesc(nodeAt(k)) + (reachable().indexOf(k) >= 0 ? '' : (camp.hist.indexOf(k) >= 0 ? ' · ' + T('erledigt', 'done') : camp.pend === k ? '' : ' · ' + T('noch nicht erreichbar', 'not reachable yet'))) : (camp.pend ? T('Du steckst mitten in einem Ereignis: Mach dort weiter.', 'You are in the middle of an event: continue there.') : T('Wähle, wohin die Reise geht: Leuchtende Felder sind erreichbar.', 'Choose where to go: glowing spots are reachable.')); }
+$('mapc').addEventListener('mousemove', e => { const k = pickNode($('mapc'), e); setInfo(k); $('mapc').style.cursor = k && reachable().indexOf(k) >= 0 ? 'pointer' : 'default'; });
+$('mapc').addEventListener('click', e => { const k = pickNode($('mapc'), e); if (k) chooseNode(k); });
+
+// ---------- Kampagne: Ablauf ----------
 function save() { store.set(KEY, camp); }
+function inCamp() { return document.body.classList.contains('incamp') && !document.body.classList.contains('ingame'); }
 function showCamp() {
   document.body.classList.add('incamp'); document.body.classList.remove('ingame'); $('back').onclick = e => { e.preventDefault(); leaveCamp(); };
-  const A = AREAS[camp.a], node = A.nodes[camp.n];
+  const A = AREAS[camp.a];
   $('cT').textContent = '🗺️ ' + T('Kampagne', 'Campaign') + ' · ' + A.icon + ' ' + A.n;
   $('cCan').textContent = '🕯️'.repeat(camp.c) + ' ' + T('Kerzen', 'Candles');
-  $('cDeck').textContent = '🃏 ' + T('Deck', 'Deck') + ' (' + camp.deck.length + ')'; $('cExit').textContent = '☰ ' + T('Menü', 'Menu');
-  $('cmap').innerHTML = AREAS.map((a, ai) => '<div class="area' + (ai > camp.a ? ' lock' : '') + '" style="--c:' + a.c + '"><h3>' + a.icon + ' ' + a.n + '</h3><div class="nodes">' + a.nodes.map((nd, ni) => {
-    const st = ai < camp.a || (ai === camp.a && ni < camp.n) ? 'done' : (ai === camp.a && ni === camp.n ? 'cur' : ''), ic = nd.t === 'camp' ? '🔥' : nd.o.icon, nm = nd.t === 'camp' ? T('Lagerfeuer', 'Campfire') : nd.o.n;
-    return '<div class="nd ' + st + (nd.t === 'boss' ? ' boss' : '') + '"><b>' + ic + '</b>' + nm + (nd.t === 'boss' ? '<br><small>' + HD.BOSS[nd.o.boss][0] + '</small>' : '') + '</div>';
-  }).join('<span class="ar">→</span>') + '</div></div>').join('');
-  $('cGo').textContent = node.t === 'camp' ? '🔥 ' + T('Zum Lagerfeuer', 'To the campfire') : '⚔️ ' + T('Kampf gegen ', 'Fight ') + node.o.n;
+  $('cDeck').textContent = '🃏 ' + T('Deck', 'Deck') + ' (' + camp.deck.length + ')'; $('cExit').textContent = '☰ ' + T('Menü', 'Menu'); $('cm3').textContent = v3on ? '▦ 2D' : '🧊 3D';
+  $('cGo').style.display = camp.pend ? '' : 'none'; if (camp.pend) $('cGo').textContent = '▶ ' + T('Weiter: ', 'Continue: ') + nodeName(nodeAt(camp.pend));
+  setInfo(null); campView();
 }
-function leaveCamp() { document.body.classList.remove('incamp'); $('back').onclick = null; paintMenu(); }
+async function campView() {
+  clearInterval(mapTimer); mapTimer = 0;
+  if (v3on && window.V3 && V3.ready) { V3.attach($('cm3d')); V3.setMode('map'); V3.show(true); paint3dMap(); return; }
+  const tick = () => { if (!inCamp()) { clearInterval(mapTimer); mapTimer = 0; return; } mapTick++; drawMap($('mapc'), true); };
+  tick(); mapTimer = setInterval(tick, 180);
+}
+function paint3dMap() {
+  const cv = document.createElement('canvas'); drawMap(cv, false); const nodes = [];
+  camp.map.layers.forEach((row, li) => row.forEach((n, i) => { const k = key(li, i); nodes.push({ key: k, x: n.x, y: n.y, icon: icon(n.t), state: nstate(k) }); }));
+  V3.mapSet({ canvas: cv, nodes, pawn: pawnPos(), onNode: chooseNode });
+}
+function leaveCamp() { clearInterval(mapTimer); mapTimer = 0; document.body.classList.remove('incamp'); $('back').onclick = null; if (v3on && window.V3 && V3.ready) V3.show(false); paintMenu(); }
 $('cExit').onclick = leaveCamp;
+$('cm3').onclick = () => set3d(!v3on);
 $('cDeck').onclick = async () => { await chooser(T('Dein Deck', 'Your deck'), camp.deck.length + T(' Karten. Antippen schließt das Fenster.', ' cards. Tap a card to close.'), camp.deck, [{ t: T('Schließen', 'Close'), v: -1, alt: true }]); };
-$('cGo').onclick = async () => {
-  const A = AREAS[camp.a], node = A.nodes[camp.n];
-  if (node.t === 'camp') { await campfire(); advance(); showCamp(); return; }
-  fightNode = node; startDuel(node.o, camp.deck.slice());
-};
-function advance() {
-  camp.n++; const A = AREAS[camp.a];
-  if (camp.n >= A.nodes.length) { camp.a++; camp.n = 0; }
-  if (camp.a >= AREAS.length) { store.del(KEY); camp = null; return 'won'; }
-  save(); return null;
+async function chooseNode(k) {
+  if (!camp || camp.pend || reachable().indexOf(k) < 0 || busyNode) return;
+  camp.pend = k; save(); showCamp(); busyNode = true; await sleep(1000); busyNode = false; runNode();
+}
+let busyNode = false;
+$('cGo').onclick = () => { if (!busyNode) runNode(); };
+async function runNode() {
+  const n = nodeAt(camp.pend);
+  if (n.t === 'fight' || n.t === 'elite' || n.t === 'boss') { fightNode = n; startDuel(n.o, camp.deck.slice()); return; }
+  if (n.t === 'camp') await campfire(); else if (n.t === 'pick') await reward(false); else if (n.t === 'trade') await trade();
+  await completeNode();
+}
+async function completeNode() {
+  const p = parse(camp.pend), n = nodeAt(camp.pend); camp.hist.push(camp.pend); camp.at = { l: p[0], i: p[1] }; camp.pend = null; fightNode = null;
+  if (n.t === 'boss') {
+    camp.a++; camp.hist = []; camp.at = null;
+    if (camp.a >= AREAS.length) { store.del(KEY); const w = camp; camp = null; document.body.classList.remove('incamp', 'ingame'); await chooser('🏆 ' + T('Kampagne geschafft!', 'Campaign complete!'), T('Alle drei Bosse sind besiegt. Du hast ', 'All three bosses are defeated. You have ') + w.deck.length + T(' Karten im Deck.', ' cards in your deck.'), [], [{ t: T('Zum Menü', 'To the menu'), v: 1 }]); paintMenu(); return; }
+    await chooser('🗺️ ' + T('Gebiet geschafft!', 'Region cleared!'), T('Du betrittst: ', 'You enter: ') + AREAS[camp.a].icon + ' ' + AREAS[camp.a].n, [], [{ t: T('Weiter', 'Continue'), v: 1 }]);
+    camp.map = genMap(camp.a);
+  }
+  save(); showCamp();
 }
 async function campfire() {
   const o = await chooser('🔥 ' + T('Lagerfeuer', 'Campfire'), T('Wähle eine Hilfe. Du darfst nur eine nutzen.', 'Choose one help. You may use only one.'), [], [
@@ -260,11 +415,18 @@ async function campfire() {
   if (i < 0) return campfire();
   if (o === 'hp') camp.deck[i].h++; else if (o === 'atk') camp.deck[i].a++; else if (camp.deck.length > 8) camp.deck.splice(i, 1); else { alert(T('Das Deck braucht mindestens 8 Karten.', 'The deck needs at least 8 cards.')); return campfire(); }
 }
-async function reward(boss) {
-  const pool = AREAS[camp.a].pool.slice(), pick = [];
+async function reward(up) {
+  const pool = up ? T3.concat(T2, T3) : AREAS[camp.a].pool.slice(), pick = [];
   while (pick.length < 3) { const id = pool[Math.floor(Math.random() * pool.length)]; if (pick.indexOf(id) < 0) pick.push(id); }
-  const i = await chooser(T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick.map(id => ({ id, a: 0, h: 0 })), [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
+  const i = await chooser(up ? T('Beute des Elitegegners', 'Elite loot') : T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick.map(id => ({ id, a: 0, h: 0 })), [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
   if (i >= 0) camp.deck.push({ id: pick[i], a: 0, h: 0 });
+}
+async function trade() {
+  const i = await chooser('🪙 ' + T('Händler', 'Trader'), T('Gib eine Karte ab und erhalte eine zufällige stärkere.', 'Give a card and receive a random stronger one.'), camp.deck, [{ t: T('Nicht tauschen', 'No deal'), v: -1, alt: true }]);
+  if (i < 0) return;
+  const old = HD.CARDS[camp.deck[i].id], pw = old.atk + old.hp, pool = T2.concat(T3).filter(id => HD.CARDS[id].atk + HD.CARDS[id].hp >= pw && id !== old.id), id = (pool.length ? pool : T2)[Math.floor(Math.random() * (pool.length ? pool.length : T2.length))];
+  camp.deck[i] = { id, a: 0, h: 0 };
+  await chooser('🪙 ' + T('Der Händler grinst …', 'The trader grins …'), T('Du erhältst: ', 'You receive: ') + HD.CARDS[id].n, [{ id, a: 0, h: 0 }], [{ t: 'OK', v: 1 }]);
 }
 
 // ---------- Spielstart ----------
@@ -276,7 +438,7 @@ function startDuel(o, deck) {
   document.body.classList.add('ingame'); $('back').onclick = e => { e.preventDefault(); $('bMenu').onclick(); };
   const bi = $('bossInfo'); if (o.boss) { bi.style.display = 'block'; bi.innerHTML = '👑 <b>' + o.n + '</b> · ' + HD.BOSS[o.boss][0] + ': ' + HD.BOSS[o.boss][1] + ' ' + T('Sieg ab ', 'Win at ') + o.win + T(' Punkten Vorsprung.', ' points lead.'); } else bi.style.display = 'none';
   beginTurn(); render();
-  if (v3on && window.V3 && V3.ready) { V3.show(true); setTimeout(() => { V3.resize(); render(); }, 60); }
+  if (v3on && window.V3 && V3.ready) { V3.attach($('t3d')); V3.setMode('board'); V3.show(true); setTimeout(() => { V3.resize(); render(); }, 60); }
 }
 function toMenu() {
   document.body.classList.remove('ingame'); $('ov').classList.remove('show'); $('back').onclick = null; G = null; done = true;
@@ -326,13 +488,15 @@ let libP = null;
 const loadJs = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error(src)); document.head.appendChild(s); });
 async function set3d(on) {
   try { localStorage.setItem('hd-3d', on ? '1' : '0'); } catch (e) {}
-  if (!on) { v3on = false; document.body.classList.remove('v3'); if (window.V3 && V3.ready) V3.show(false); $('b3d').textContent = '🧊 3D'; render(); return; }
+  const camping = document.body.classList.contains('incamp') && !document.body.classList.contains('ingame'), gaming = document.body.classList.contains('ingame');
+  if (!on) { v3on = false; document.body.classList.remove('v3'); if (window.V3 && V3.ready) V3.show(false); $('b3d').textContent = '🧊 3D'; if (camping) showCamp(); else render(); return; }
   try {
     if (!window.THREE) await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');
     if (!window.V3) await loadJs('view3d.js?v=' + Date.now());
-    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); } });
-    v3on = true; document.body.classList.add('v3'); $('b3d').textContent = '▦ 2D'; V3.show(true); render();
-  } catch (e) { v3on = false; document.body.classList.remove('v3'); say(T('3D konnte nicht geladen werden (Internet?). Es bleibt bei 2D.', '3D could not be loaded. Staying in 2D.')); }
+    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); }, onHover: k => { if (camp && inCamp()) setInfo(k); } });
+    v3on = true; document.body.classList.add('v3'); $('b3d').textContent = '▦ 2D';
+    if (camping) showCamp(); else if (gaming) { V3.attach($('t3d')); V3.setMode('board'); V3.show(true); render(); }
+  } catch (e) { v3on = false; document.body.classList.remove('v3'); say(T('3D konnte nicht geladen werden (Internet?). Es bleibt bei 2D.', '3D could not be loaded. Staying in 2D.')); if (camping) showCamp(); }
 }
 $('b3d').onclick = () => set3d(!v3on);
 addEventListener('resize', () => { if (v3on && window.V3) V3.resize(); });
@@ -383,8 +547,8 @@ function finish() {
 $('ovB').onclick = async () => {
   $('ov').classList.remove('show');
   if (fightNode && camp) {
-    const win = G.over === 0, boss = fightNode.t === 'boss';
-    if (win) { await reward(boss); const r = advance(); if (r === 'won') { document.body.classList.remove('ingame'); alert(T('🏆 Du hast alle Bosse besiegt! Die Kampagne ist geschafft.', '🏆 You defeated all bosses! Campaign complete.')); G = null; paintMenu(); document.body.classList.remove('incamp'); return; } toMenu(); return; }
+    const win = G.over === 0;
+    if (win) { await reward(fightNode.t !== 'fight'); await completeNode(); return; }
     if (camp.c <= 0) { store.del(KEY); camp = null; fightNode = null; G = null; document.body.classList.remove('incamp'); toMenu(); return; }
     startDuel(opp, camp.deck.slice()); return;
   }
@@ -396,6 +560,7 @@ if (window.SITE && SITE.guard) SITE.guard(() => !!G && !done);
 paintMenu(); paintBook();
 let want3 = true; try { want3 = localStorage.getItem('hd-3d') !== '0'; } catch (e) {}
 if (want3) set3d(true);
+window.__hdReady = true;
 window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS };
 })();
 </script>
