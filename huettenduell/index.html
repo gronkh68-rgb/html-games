@@ -84,7 +84,8 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .ar{color:var(--muted)}
 .cbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
 .mrow{display:flex;gap:10px;flex-wrap:wrap}
-#mapc{display:block;width:100%;image-rendering:pixelated;border:3px solid #5a3a1c;border-radius:10px;background:#000;cursor:default}
+#mapc{display:block;width:100%;aspect-ratio:8/7;max-height:72vh;image-rendering:pixelated;border:3px solid #5a3a1c;border-radius:10px;background:#000;cursor:default}
+@media (max-aspect-ratio:1/1){#mapc{aspect-ratio:4/5}}
 #cm3d{display:none;height:min(62vh,540px);border-radius:14px;overflow:hidden;border:3px solid #5a3a1c;background:#0b0705;position:relative}
 body.v3 #cm3d{display:block}
 @media (max-aspect-ratio:1/1){#cm3d{height:min(56vh,84vw)}}body.v3 #mapc{display:none}
@@ -197,7 +198,8 @@ const AREAS = [
   ], boss: { n: 'Der Knochenfürst', icon: '👑', diff: 3, boss: 'necro', win: 7, d: ['rattler', 'rattler', 'cockroach', 'cockroach', 'bat', 'bat', 'adder', 'grizzly', 'ouro', 'direwolf', 'vulture', 'mantis_god', 'ox'] } }
 ];
 const STARTER = ['stoat', 'wolf_cub', 'frog', 'adder', 'raven', 'elk_fawn', 'porcupine', 'mole', 'mantis', 'warren', 'wolf', 'hound', 'cat', 'goat', 'otter'];
-const KEY = 'hd-camp-v2';
+const KEY = 'hd-camp-v2', DKEY = 'hd-death-v1';
+const deaths = () => store.get(DKEY) || [];
 let G = null, opp = null, ui = { sel: null, sac: [] }, busy = false, done = false, camp = null, fightNode = null, v3on = false;
 
 // ---------- Kartenelemente ----------
@@ -224,7 +226,7 @@ function paintMenu() {
   const sv = store.get(KEY), B = $('kBtns'); B.innerHTML = '';
   const mk = (t, f, alt) => { const b = document.createElement('button'); b.className = 'btn' + (alt ? ' alt' : ''); b.textContent = t; b.onclick = f; B.appendChild(b); };
   if (sv) mk('▶ ' + T('Kampagne fortsetzen', 'Continue') + ' (' + AREAS[sv.a].icon + ' ' + AREAS[sv.a].n + ')', () => { camp = sv; showCamp(); });
-  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = newCamp(); store.set(KEY, camp); showCamp(); }, !!sv);
+  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = newCamp(); offerDeath().then(() => { store.set(KEY, camp); showCamp(); }); }, !!sv);
   $('mT').textContent = T('Freies Duell', 'Free duel');
   $('rules').innerHTML = T(
     '<b>So geht es:</b> Du und der Gegner habt je vier Bahnen. Karten kosten <b>Opfer 🩸</b> (eigene Karten vom Feld) oder <b>Knochen 🦴</b> (entstehen, wenn Karten sterben). Jede Runde ziehst du eine Karte aus dem <b>Wald</b> oder ein <b>Eichhörnchen</b>. Mit der <b>Klingel 🔔</b> greifen alle deine Karten an: Gegenüber trifft eine Karte, sonst geht der Schaden auf die <b>Waage</b>. Wer die Waage <b>5 Punkte</b> auf seine Seite bringt, gewinnt. Die Karten des Gegners warten erst in der Reihe dahinter.',
@@ -250,21 +252,24 @@ function nodeDesc(n) {
   if (n.t === 'trade') return '🪙 ' + T('Händler: tausche eine Karte gegen eine zufällige stärkere', 'Trader: swap a card for a random stronger one');
   return '👑 ' + T('Boss ', 'Boss ') + n.o.n + ' – ' + HD.BOSS[n.o.boss][0] + ': ' + HD.BOSS[n.o.boss][1];
 }
+const WW = 320, STEP = 72, PAD = 150;      // Karte: Breite in Pixeln, Abstand der Ebenen, Rand oben/unten
 function genMap(ai) {
   const A = AREAS[ai], R = Math.random, shuf = a => HD.shuffle(a.slice(), R), foes = shuf(A.foes), elites = shuf(A.elites); let fi = 0, ei = 0;
   const mk = t => t === 'fight' ? { t, o: foes[fi++ % foes.length] } : t === 'elite' ? { t, o: elites[ei++ % elites.length] } : { t };
-  const kinds = [['fight', 'fight', 'fight'], ['fight', 'fight', 'pick', 'trade'], ['fight', 'elite', 'camp', 'pick', 'trade'], ['camp', 'pick', 'camp']], counts = [2, 3, 3, 2], layers = [];
+  const kinds = [['fight'], ['fight', 'fight', 'pick', 'trade'], ['fight', 'fight', 'pick', 'trade'], ['camp', 'fight', 'pick'], ['fight', 'elite', 'camp', 'pick', 'trade'], ['fight', 'elite', 'camp', 'pick', 'trade'], ['fight', 'elite', 'camp'], ['camp', 'pick', 'camp']], counts = [2, 3, 3, 2, 3, 3, 3, 2], layers = [];
   counts.forEach((c, li) => { const row = []; for (let j = 0; j < c; j++) row.push(mk(kinds[li][Math.floor(R() * kinds[li].length)])); layers.push(row); });
   if (!layers[3].some(n => n.t === 'camp')) layers[3][0] = mk('camp');
-  if (!layers[2].some(n => n.t === 'fight' || n.t === 'elite')) layers[2][0] = mk('fight');
+  if (!layers[7].some(n => n.t === 'camp')) layers[7][0] = mk('camp');
+  [2, 4, 5, 6].forEach(li => { if (!layers[li].some(n => n.t === 'fight' || n.t === 'elite')) layers[li][0] = mk('fight'); });
   layers.push([{ t: 'boss', o: A.boss }]);
   for (let li = 0; li < layers.length - 1; li++) {
     const a = layers[li], b = layers[li + 1]; a.forEach(n => n.next = []);
     a.forEach((n, j) => { const t = a.length > 1 ? j * (b.length - 1) / (a.length - 1) : (b.length - 1) / 2, lo = Math.floor(t), hi = Math.ceil(t); n.next.push(lo); if (hi !== lo) n.next.push(hi); if (R() < .35 && b.length > 1) { const x = Math.max(0, Math.min(b.length - 1, lo + (R() < .5 ? -1 : 1))); if (n.next.indexOf(x) < 0) n.next.push(x); } });
     b.forEach((_, k) => { if (!a.some(n => n.next.indexOf(k) >= 0)) { let best = 0, bd = 99; a.forEach((n, j) => { const d = Math.abs(j * (b.length - 1) / Math.max(1, a.length - 1) - k); if (d < bd) { bd = d; best = j; } }); a[best].next.push(k); } });
   }
-  layers.forEach((row, li) => row.forEach((n, j) => { n.x = .17 + .74 * (li / (layers.length - 1)); n.y = li === layers.length - 1 ? .5 : .2 + .6 * ((j + .5) / row.length); }));
-  return { layers };
+  const H = PAD * 2 + (layers.length - 1) * STEP;       // Die Reise geht von unten (Start) nach oben (Boss)
+  layers.forEach((row, li) => row.forEach((n, j) => { n.x = Math.max(.15, Math.min(.85, .5 + (j - (row.length - 1) / 2) * .27 + (R() - .5) * .06)); n.wy = Math.round(H - PAD - li * STEP + (R() - .5) * 10); if (li === layers.length - 1) n.x = .5; }));
+  return { layers, H };
 }
 function newCamp() { const c = { a: 0, map: null, at: null, pend: null, hist: [], c: 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; c.map = genMap(0); return c; }
 const key = (l, i) => l + ':' + i, parse = k => k.split(':').map(Number), nodeAt = k => { const p = parse(k); return camp.map.layers[p[0]][p[1]]; };
@@ -276,7 +281,7 @@ function reachable() {
 function nstate(k) {
   if (camp.hist.indexOf(k) >= 0) return 'done'; if (camp.pend && camp.pend === k) return 'cur'; return reachable().indexOf(k) >= 0 ? 'reach' : 'lock';
 }
-function pawnPos() { const k = camp.pend || (camp.at ? key(camp.at.l, camp.at.i) : null); if (!k) return { x: .06, y: .5 }; const n = nodeAt(k); return { x: n.x, y: n.y }; }
+function pawnPos() { const k = camp.pend || (camp.at ? key(camp.at.l, camp.at.i) : null); if (!k) return { x: .5, wy: camp.map.H - PAD + 54 }; const n = nodeAt(k); return { x: n.x, wy: n.wy }; }
 
 // ---------- Pixel-Grafik ----------
 const PAL = { k: '#120c06', w: '#f2ecd8', g: '#aab0b8', y: '#ffd23f', o: '#ff8a1f', r: '#d8392b', b: '#8a5a2b', B: '#5a3a1a', G: '#3fa84a', d: '#1f6a2a', p: '#9a6bff', c: '#4fd8ff', s: '#6b6f78', t: '#2a2a30' };
@@ -307,61 +312,69 @@ function icon(t) {
 const TCOL = { fight: '#c9a24e', elite: '#d8392b', boss: '#ff8a1f', camp: '#ff8a1f', pick: '#4fd8ff', trade: '#ffd23f' };
 let bgCache = {};
 function rng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
-function mapBg(ai) {
-  if (bgCache[ai]) return bgCache[ai];
-  const W = 384, H = 240, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), R = rng(ai * 9973 + 17), th = ['wald', 'moor', 'gruft'][ai];
+function mapBg(ai, H) {
+  const ck = ai + ':' + H; if (bgCache[ck]) return bgCache[ck];
+  const W = WW, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), R = rng(ai * 9973 + 17), th = ['wald', 'moor', 'gruft'][ai];
   const base = { wald: ['#bda878', '#a89562'], moor: ['#a9b09a', '#8f9a86'], gruft: ['#9d8d7b', '#85776a'] }[th];
   g.fillStyle = base[0]; g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 2600; i++) { g.fillStyle = R() < .5 ? base[1] : 'rgba(255,255,255,.08)'; g.fillRect(R() * W | 0, R() * H | 0, 1 + (R() * 2 | 0), 1); }
-  for (let i = 0; i < 14; i++) { const x = R() * W | 0, y = R() * H | 0, r = 10 + R() * 22 | 0; g.fillStyle = 'rgba(90,60,30,.07)'; for (let yy = -r; yy <= r; yy += 2) { const w = Math.sqrt(r * r - yy * yy) | 0; g.fillRect(x - w, y + yy, w * 2, 2); } }
+  for (let i = 0; i < H * 9; i++) { g.fillStyle = R() < .5 ? base[1] : 'rgba(255,255,255,.08)'; g.fillRect(R() * W | 0, R() * H | 0, 1 + (R() * 2 | 0), 1); }
+  for (let i = 0; i < H / 17; i++) { const x = R() * W | 0, y = R() * H | 0, r = 10 + R() * 22 | 0; g.fillStyle = 'rgba(90,60,30,.07)'; for (let yy = -r; yy <= r; yy += 2) { const w = Math.sqrt(r * r - yy * yy) | 0; g.fillRect(x - w, y + yy, w * 2, 2); } }
   const deco = { wald: ['pine'], moor: ['reed', 'reed'], gruft: ['tomb', 'tomb'] }[th];
-  for (let i = 0; i < 34; i++) { const x = 8 + R() * (W - 40) | 0, y = 8 + R() * (H - 34) | 0, s = sprCanvas(HALF[deco[i % deco.length]]); g.globalAlpha = .75; g.drawImage(s, x, y); g.globalAlpha = 1; }
-  if (th === 'moor') for (let i = 0; i < 8; i++) { const x = R() * W | 0, y = R() * H | 0; g.fillStyle = 'rgba(70,110,130,.35)'; g.fillRect(x, y, 14 + R() * 18 | 0, 4); g.fillRect(x + 3, y + 4, 10, 2); }
-  g.strokeStyle = '#3a2410'; g.lineWidth = 3; g.strokeRect(1.5, 1.5, W - 3, H - 3); g.strokeStyle = 'rgba(58,36,16,.5)'; g.lineWidth = 1; g.strokeRect(5.5, 5.5, W - 11, H - 11);
-  g.fillStyle = '#3a2410'; g.font = 'bold 10px monospace'; g.fillText(AREAS[ai].n.toUpperCase(), 12, 18);
-  return (bgCache[ai] = c);
+  for (let i = 0; i < H / 7; i++) { const x = 4 + R() * (W - 24) | 0, y = 4 + R() * (H - 20) | 0, s = sprCanvas(HALF[deco[i % deco.length]]); g.globalAlpha = .75; g.drawImage(s, x, y); g.globalAlpha = 1; }
+  if (th === 'moor') for (let i = 0; i < H / 30; i++) { const x = R() * W | 0, y = R() * H | 0; g.fillStyle = 'rgba(70,110,130,.35)'; g.fillRect(x, y, 14 + R() * 18 | 0, 4); g.fillRect(x + 3, y + 4, 10, 2); }
+  g.fillStyle = '#3a2410'; g.font = 'bold 12px monospace'; g.textAlign = 'center'; g.fillText(AREAS[ai].n.toUpperCase(), W / 2, H - 56); g.fillText('▲ ' + (T('BOSS', 'BOSS')), W / 2, PAD - 52);
+  return (bgCache[ck] = c);
 }
 function dotLine(g, x0, y0, x1, y1, col) {
   const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) | 0; g.fillStyle = col;
   for (let i = 0; i <= n; i += 4) { const t = n ? i / n : 0; g.fillRect(Math.round(x0 + (x1 - x0) * t) - 1, Math.round(y0 + (y1 - y0) * t) - 1, 2, 2); }
 }
-// Zeichnet die Karte. plates = false: ohne Marken (die kommen dann als 3D-Figuren)
-let mapTick = 0;
+// Zeichnet die Karte. Ansicht = Ausschnitt der langen Karte (camY), die Ränder der Karte bleiben außerhalb. plates = false: ohne Marken (die kommen dann als 3D-Figuren)
+let mapTick = 0, camY = null, camManual = 0, VH = 240;
+function camTarget() { const H = camp.map.H, pp = pawnPos(); return Math.max(0, Math.min(H - VH, pp.wy - VH * .64 + camManual)); }
 function drawMap(cv, plates) {
-  const W = 384, H = 240; if (cv.width !== W) { cv.width = W; cv.height = H; } const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
-  g.drawImage(mapBg(camp.a), 0, 0);
-  const L = camp.map.layers, P = n => [Math.round(n.x * W), Math.round(n.y * H)], taken = (a, b) => { const i = camp.hist.indexOf(a); return i >= 0 && camp.hist[i + 1] === b; };
-  const sx = Math.round(.06 * W), sy = Math.round(.5 * H);
+  const W = WW, H = camp.map.H;
+  if (plates) { const cw = cv.clientWidth || 320, ch = cv.clientHeight || 240; VH = Math.max(160, Math.min(520, Math.round(W * ch / cw))); if (cv.width !== W || cv.height !== VH) { cv.width = W; cv.height = VH; } if (camY === null) camY = camTarget(); camY += (camTarget() - camY) * .14; if (Math.abs(camTarget() - camY) < .3) camY = camTarget(); }
+  else { if (cv.width !== W * 3 || cv.height !== H) { cv.width = W * 3; cv.height = H; } }
+  const oy = plates ? Math.round(camY) : 0, g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+  if (plates) g.drawImage(mapBg(camp.a, H), 0, oy, W, VH, 0, 0, W, VH); else { for (let k = 0; k < 3; k++) g.drawImage(mapBg(camp.a, H), k * W, 0); g.translate(W, 0); }      // 3D: breiter Teppich, damit seitlich kein Kartenrand sichtbar wird
+  const L = camp.map.layers, P = n => [Math.round(n.x * W), Math.round(n.wy) - oy], taken = (a, b) => { const i = camp.hist.indexOf(a); return i >= 0 && camp.hist[i + 1] === b; };
+  const pp0 = pawnPos(), st0 = { x: .5, wy: H - PAD + 54 }, sx = Math.round(st0.x * W), sy = st0.wy - oy;
   L[0].forEach((n, i) => { const p = P(n); dotLine(g, sx, sy, p[0], p[1], camp.hist[0] === key(0, i) ? '#8a2a1a' : '#6b5030'); });
   L.forEach((row, li) => row.forEach((n, i) => { if (!n.next) return; const p = P(n); n.next.forEach(j => { const q = P(L[li + 1][j]); dotLine(g, p[0], p[1], q[0], q[1], taken(key(li, i), key(li + 1, j)) ? '#8a2a1a' : '#6b5030'); }); }));
   g.drawImage(icon('start'), sx - 8, sy - 8);
   const rc = reachable();
   if (plates) L.forEach((row, li) => row.forEach((n, i) => {
     const k = key(li, i), st = nstate(k), p = P(n), pulse = st === 'reach' && (mapTick >> 2) % 2;
+    if (p[1] < -14 || p[1] > VH + 14) return;
     g.fillStyle = '#2a1a0c'; g.fillRect(p[0] - 11, p[1] - 11, 22, 22); g.fillStyle = pulse ? '#fff' : (TCOL[n.t] || '#c9a24e'); g.fillRect(p[0] - 11, p[1] - 11, 22, 2); g.fillRect(p[0] - 11, p[1] + 9, 22, 2); g.fillRect(p[0] - 11, p[1] - 11, 2, 22); g.fillRect(p[0] + 9, p[1] - 11, 2, 22);
     g.drawImage(icon(n.t), p[0] - 8, p[1] - 8);
     if (st === 'done' || st === 'lock') { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(p[0] - 9, p[1] - 9, 18, 18); }
     if (st === 'done') { g.fillStyle = '#39ff14'; g.fillRect(p[0] + 2, p[1] + 4, 2, 2); g.fillRect(p[0] + 4, p[1] + 2, 2, 2); g.fillRect(p[0] + 6, p[1], 2, 2); g.fillRect(p[0] + 8, p[1] - 2, 2, 2); }
   }));
   // Figur (Pixel-Spielfigur mit Hut)
-  const pp = pawnPos(), px = Math.round(pp.x * W), py = Math.round(pp.y * H) - (plates ? 14 : 4) + Math.round(Math.sin(mapTick / 2));
+  const px = Math.round(pp0.x * W), py = Math.round(pp0.wy) - oy - (plates ? 14 : 4) + Math.round(Math.sin(mapTick / 2));
   if (plates) { g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px - 4, py + 12, 8, 2); g.fillStyle = '#7a1d1d'; g.fillRect(px - 4, py - 6, 8, 2); g.fillRect(px - 2, py - 9, 4, 3); g.fillStyle = '#f0d9b5'; g.fillRect(px - 2, py - 4, 4, 4); g.fillStyle = '#e8dcc0'; g.fillRect(px - 3, py, 6, 6); g.fillRect(px - 4, py + 6, 8, 4); g.fillStyle = '#5a3a1a'; g.fillRect(px - 3, py + 10, 2, 2); g.fillRect(px + 1, py + 10, 2, 2); }
+  // Rand der Ansicht: Dunkelheit statt Kartenrand (gerastert, damit es zum Pixel-Stil passt)
+  if (plates) for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(10,6,2,' + (.55 - i * .09).toFixed(2) + ')'; g.fillRect(0, i * 4, W, 4); g.fillRect(0, VH - (i + 1) * 4, W, 4); g.fillRect(i * 3, 0, 3, VH); g.fillRect(W - (i + 1) * 3, 0, 3, VH); }
   return rc;
 }
 function pickNode(cv, e) {
-  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 384, y = (e.clientY - r.top) / r.height * 240; let best = null, bd = 16;
-  camp.map.layers.forEach((row, li) => row.forEach((n, i) => { const d = Math.hypot(n.x * 384 - x, n.y * 240 - y); if (d < bd) { bd = d; best = key(li, i); } }));
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * WW, y = (e.clientY - r.top) / r.height * VH + Math.round(camY || 0); let best = null, bd = 18;
+  camp.map.layers.forEach((row, li) => row.forEach((n, i) => { const d = Math.hypot(n.x * WW - x, n.wy - y); if (d < bd) { bd = d; best = key(li, i); } }));
   return best;
 }
 let mapTimer = 0;
 function setInfo(k) { $('mapinfo').textContent = k ? nodeDesc(nodeAt(k)) + (reachable().indexOf(k) >= 0 ? '' : (camp.hist.indexOf(k) >= 0 ? ' · ' + T('erledigt', 'done') : camp.pend === k ? '' : ' · ' + T('noch nicht erreichbar', 'not reachable yet'))) : (camp.pend ? T('Du steckst mitten in einem Ereignis: Mach dort weiter.', 'You are in the middle of an event: continue there.') : T('Wähle, wohin die Reise geht: Leuchtende Felder sind erreichbar.', 'Choose where to go: glowing spots are reachable.')); }
 $('mapc').addEventListener('mousemove', e => { const k = pickNode($('mapc'), e); setInfo(k); $('mapc').style.cursor = k && reachable().indexOf(k) >= 0 ? 'pointer' : 'default'; });
+$('mapc').addEventListener('wheel', e => { e.preventDefault(); camManual = Math.max(-260, Math.min(260, camManual - e.deltaY * .4)); }, { passive: false });
 $('mapc').addEventListener('click', e => { const k = pickNode($('mapc'), e); if (k) chooseNode(k); });
 
 // ---------- Kampagne: Ablauf ----------
 function save() { store.set(KEY, camp); }
 function inCamp() { return document.body.classList.contains('incamp') && !document.body.classList.contains('ingame'); }
 function showCamp() {
+  camY = null;
   document.body.classList.add('incamp'); document.body.classList.remove('ingame'); $('back').onclick = e => { e.preventDefault(); leaveCamp(); };
   const A = AREAS[camp.a];
   $('cT').textContent = '🗺️ ' + T('Kampagne', 'Campaign') + ' · ' + A.icon + ' ' + A.n;
@@ -377,9 +390,9 @@ async function campView() {
   tick(); mapTimer = setInterval(tick, 180);
 }
 function paint3dMap() {
-  const cv = document.createElement('canvas'); drawMap(cv, false); const nodes = [];
-  camp.map.layers.forEach((row, li) => row.forEach((n, i) => { const k = key(li, i); nodes.push({ key: k, x: n.x, y: n.y, icon: icon(n.t), state: nstate(k) }); }));
-  V3.mapSet({ canvas: cv, nodes, pawn: pawnPos(), onNode: chooseNode });
+  const cv = document.createElement('canvas'); drawMap(cv, false); const nodes = [], H = camp.map.H, pw = pawnPos();
+  camp.map.layers.forEach((row, li) => row.forEach((n, i) => { const k = key(li, i); nodes.push({ key: k, x: (n.x * WW + WW) / (3 * WW), y: n.wy / H, icon: icon(n.t), state: nstate(k) }); }));
+  V3.mapSet({ canvas: cv, nodes, pawn: { x: (pw.x * WW + WW) / (3 * WW), y: pw.wy / H }, onNode: chooseNode, sheetW: 22.2, viewW: 5.9 });
 }
 function leaveCamp() { clearInterval(mapTimer); mapTimer = 0; document.body.classList.remove('incamp'); $('back').onclick = null; if (v3on && window.V3 && V3.ready) V3.show(false); paintMenu(); }
 $('cExit').onclick = leaveCamp;
@@ -387,7 +400,7 @@ $('cm3').onclick = () => set3d(!v3on);
 $('cDeck').onclick = async () => { await chooser(T('Dein Deck', 'Your deck'), camp.deck.length + T(' Karten. Antippen schließt das Fenster.', ' cards. Tap a card to close.'), camp.deck, [{ t: T('Schließen', 'Close'), v: -1, alt: true }]); };
 async function chooseNode(k) {
   if (!camp || camp.pend || reachable().indexOf(k) < 0 || busyNode) return;
-  camp.pend = k; save(); showCamp(); busyNode = true; await sleep(1000); busyNode = false; runNode();
+  camp.pend = k; camManual = 0; save(); showCamp(); busyNode = true; await sleep(1000); busyNode = false; runNode();
 }
 let busyNode = false;
 $('cGo').onclick = () => { if (!busyNode) runNode(); };
@@ -418,9 +431,28 @@ async function campfire() {
 }
 async function reward(up) {
   const pool = up ? T3.concat(T2, T3) : AREAS[camp.a].pool.slice(), pick = [];
-  while (pick.length < 3) { const id = pool[Math.floor(Math.random() * pool.length)]; if (pick.indexOf(id) < 0) pick.push(id); }
-  const i = await chooser(up ? T('Beute des Elitegegners', 'Elite loot') : T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick.map(id => ({ id, a: 0, h: 0 })), [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
-  if (i >= 0) camp.deck.push({ id: pick[i], a: 0, h: 0 });
+  while (pick.length < 3) { const id = pool[Math.floor(Math.random() * pool.length)]; if (!pick.some(p => p.id === id)) pick.push({ id, a: 0, h: 0 }); }
+  const dl = deaths(); if (dl.length && Math.random() < .4) pick[2] = { id: 'death', dc: dl[Math.floor(Math.random() * dl.length)], a: 0, h: 0 };
+  const i = await chooser(up ? T('Beute des Elitegegners', 'Elite loot') : T('Belohnung', 'Reward'), T('Wähle eine neue Karte für dein Deck.', 'Choose a new card for your deck.'), pick, [{ t: T('Keine nehmen', 'Take none'), v: -1, alt: true }]);
+  if (i >= 0) camp.deck.push(pick[i]);
+}
+// ---------- Todeskarte: Aus dem Scheitern entsteht eine Karte für spätere Kampagnen ----------
+async function makeDeathCard() {
+  const ids = [...new Set(camp.deck.map(d => d.id).filter(id => id !== 'death'))], pickIds = HD.shuffle(ids, Math.random).slice(0, 6);
+  const fi = await chooser('💀 ' + T('Deine Todeskarte', 'Your death card'), T('Die letzte Kerze ist erloschen. Aus deinem Scheitern entsteht eine Karte, die dir in einer späteren Kampagne helfen kann. Wähle ihr Gesicht.', 'The last candle is out. Your failure becomes a card that can help in a later campaign. Choose its face.'), pickIds.map(id => ({ id, a: 0, h: 0 })), []);
+  const face = HD.CARDS[pickIds[fi]];
+  const sigs = [...new Set([].concat(...camp.deck.map(d => HD.CARDS[d.id].sig)).filter(x => x !== 'fledge'))], offer = HD.shuffle(sigs, Math.random).slice(0, 3);
+  const si = await chooser('💀 ' + T('Fähigkeit wählen', 'Choose an ability'), T('Eine Fähigkeit aus deinem Deck geht auf die Todeskarte über.', 'One ability from your deck passes to the death card.'), [], offer.map((k, i) => ({ t: HD.SIG[k][1] + ' ' + HD.SIG[k][0] + ': ' + HD.SIG[k][2], v: i })).concat([{ t: T('Keine Fähigkeit', 'No ability'), v: -1, alt: true }]));
+  const sig = si >= 0 ? [offer[si]] : [], prog = camp.a * 9 + camp.hist.length;
+  const atk = Math.min(4, 1 + Math.floor(prog / 8)), hp = Math.max(1, Math.min(7, 2 + Math.floor(prog / 5) - (sig.length ? 1 : 0)));
+  const dc = { n: T('Geist: ', 'Ghost: ') + face.n, atk, hp, sig, art: face.art, cost: { b: 1 + (atk + hp >= 6 ? 1 : 0) + (atk + hp >= 9 ? 1 : 0) } };
+  const list = deaths(); list.push(dc); store.set(DKEY, list.slice(-6));
+  await chooser('💀 ' + T('Die Todeskarte ist fertig', 'The death card is ready'), T('Sie wartet auf deine nächste Kampagne: Du kannst sie beim Start mitnehmen oder als Fund erhalten.', 'It waits for your next campaign: take it at the start or find it as loot.'), [{ id: 'death', dc }], [{ t: 'OK', v: 1 }]);
+}
+async function offerDeath() {
+  const list = deaths(); if (!list.length) return;
+  const i = await chooser('💀 ' + T('Todeskarte mitnehmen?', 'Take a death card?'), T('Eine Karte aus früheren Kampagnen darf ins Startdeck.', 'A card from earlier campaigns may join your starting deck.'), list.map(dc => ({ id: 'death', dc })), [{ t: T('Ohne Todeskarte starten', 'Start without'), v: -1, alt: true }]);
+  if (i >= 0) camp.deck.push({ id: 'death', dc: list[i], a: 0, h: 0 });
 }
 async function trade() {
   const i = await chooser('🪙 ' + T('Händler', 'Trader'), T('Gib eine Karte ab und erhalte eine zufällige stärkere.', 'Give a card and receive a random stronger one.'), camp.deck, [{ t: T('Nicht tauschen', 'No deal'), v: -1, alt: true }]);
@@ -550,7 +582,7 @@ $('ovB').onclick = async () => {
   if (fightNode && camp) {
     const win = G.over === 0;
     if (win) { await reward(fightNode.t !== 'fight'); await completeNode(); return; }
-    if (camp.c <= 0) { store.del(KEY); camp = null; fightNode = null; G = null; document.body.classList.remove('incamp'); toMenu(); return; }
+    if (camp.c <= 0) { await makeDeathCard(); store.del(KEY); camp = null; fightNode = null; G = null; document.body.classList.remove('incamp'); toMenu(); return; }
     startDuel(opp, camp.deck.slice()); return;
   }
   startDuel(opp, STARTER.map(id => ({ id, a: 0, h: 0 })));
@@ -562,7 +594,7 @@ paintMenu(); paintBook();
 let want3 = true; try { want3 = localStorage.getItem('hd-3d') !== '0'; } catch (e) {}
 if (want3) set3d(true);
 window.__hdReady = true;
-window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS };
+window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS, chooseNode: k => chooseNode(k) };
 })();
 </script>
 </body>

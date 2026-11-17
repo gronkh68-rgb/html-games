@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var V3 = window.V3 = { ready: false, on: false };
-  var host, r, scene, camera, raf = 0, last = 0, cards = {}, dying = [], slots = [], pick = [], hov = null, beam, pans, teeth = [], portrait, flame = [], lights = [], texCache = {}, texN = 0, ray, mouse, opts, sd = null, shake = 0, wob = 0, tgt = [], w = 0, h = 0, portraitKey = '', tm = 0, leatherM, postM, mode = 'board', mapG = null, mapNodes = [], mapPawn = null, mapPlane = null, mapCb = null, mapDim = { w: 9.4, h: 5.9 }, pawnT = null, mapHov = null;
+  var host, r, scene, camera, raf = 0, last = 0, cards = {}, dying = [], slots = [], pick = [], hov = null, beam, pans, teeth = [], portrait, flame = [], lights = [], texCache = {}, texN = 0, ray, mouse, opts, sd = null, shake = 0, wob = 0, tgt = [], w = 0, h = 0, portraitKey = '', tm = 0, leatherM, postM, mode = 'board', mapG = null, mapNodes = [], mapPawn = null, mapPlane = null, mapCb = null, mapDim = { w: 7.4, h: 6 }, mapCam = { d: 8, f: 0 }, pawnT = null, mapHov = null;
   var CW = 1, CH = 1.45, GX = 1.28, Z = { oq: -2.5, ob: -1.0, pb: .85 };
   function cvs(wd, ht) { var c = document.createElement('canvas'); c.width = wd; c.height = ht; return c; }
   function tex(c) { var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t; }
@@ -102,11 +102,12 @@
     var i = ray.intersectObjects(list, false)[0]; if (!i) return null; var o = i.object; return o.userData.slot ? o : (o.userData.at ? { userData: o.userData.at } : null);
   }
   // Nebel an den Kamera-Abstand koppeln (im Hochformat steht die Kamera weit weg und alles wäre sonst schwarz)
+  function placeMapCam() { var d = mapCam.d, f = mapCam.f; camera.position.set(0, d * .8, f + d * .6); camera.lookAt(0, 0, f - d * .12); }
   function fogFit() { var d = camera.position.length(); scene.fog.near = d * 1.0; scene.fog.far = d * 2.4; }
   V3.resize = function () {
     if (!V3.ready) return; w = host.clientWidth || 600; h = host.clientHeight || 400; r.setSize(w, h, false); camera.aspect = w / h;
     var a = w / h;
-    if (mode === 'map') { var dm = Math.max(7, (mapDim.w * 1.06 / 2) / (Math.tan(21 * Math.PI / 180) * a)), dv = new THREE.Vector3(0, .86, .5).normalize(); camera.position.copy(dv.multiplyScalar(dm)).add(new THREE.Vector3(0, 0, .3)); camera.lookAt(0, 0, .25); fogFit(); camera.updateProjectionMatrix(); V3.draw(); return; }
+    if (mode === 'map') { mapCam.d = Math.max(5.4, ((mapCam.vw || 5.9) / 2) / (Math.tan(21 * Math.PI / 180) * a)); placeMapCam(); fogFit(); camera.updateProjectionMatrix(); V3.draw(); return; }
     var d = Math.max(9.6, (8.4 / 2) / (Math.tan(21 * Math.PI / 180) * a));
     var dir = new THREE.Vector3(0, .78, .62).normalize(); camera.position.copy(dir.multiplyScalar(d)).add(new THREE.Vector3(0, 0, -1.2)); camera.lookAt(0, .3, -1.3); fogFit(); camera.updateProjectionMatrix(); V3.draw();
   };
@@ -166,7 +167,7 @@
   function pxTex(c) { var t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.anisotropy = 4; return t; }
   // M = { canvas, nodes:[{key,x,y,icon,state:'reach'|'done'|'lock'|'cur'}], pawn:{x,y}, onNode }
   V3.mapSet = function (M) {
-    mapCb = M.onNode; var asp = M.canvas.width / M.canvas.height; mapDim = { w: 9.4, h: 9.4 / asp };
+    mapCb = M.onNode; var asp = M.canvas.width / M.canvas.height; mapDim = { w: M.sheetW || 7.4, h: (M.sheetW || 7.4) / asp }; mapCam.vw = M.viewW || mapDim.w * .8;
     if (!mapG) { mapG = new THREE.Group(); scene.add(mapG); }
     while (mapG.children.length) { var o = mapG.children.pop(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) { if (m.map) m.map.dispose(); m.dispose(); }); } }
     mapNodes = []; mapPawn = null;
@@ -188,11 +189,14 @@
     var px = (M.pawn.x - .5) * mapDim.w, pz = (M.pawn.y - .5) * mapDim.h;
     if (pawnT && pawnT.cur) { mapPawn.position.set(pawnT.cur.x, .2, pawnT.cur.z); pawnT = { cur: pawnT.cur, from: { x: pawnT.cur.x, z: pawnT.cur.z }, to: { x: px, z: pz }, t: 0 }; if (Math.hypot(px - pawnT.from.x, pz - pawnT.from.z) < .01) pawnT.t = 1; }
     else { mapPawn.position.set(px, .2, pz); pawnT = { cur: { x: px, z: pz }, from: { x: px, z: pz }, to: { x: px, z: pz }, t: 1 }; }
-    mapG.add(mapPawn); mapG.visible = mode === 'map'; V3.resize();
+    mapG.add(mapPawn); mapG.visible = mode === 'map';
+    var lim0 = Math.max(0, mapDim.h / 2 - 1.4); if (pawnT.t >= 1 || mapCam.first === undefined) { mapCam.f = Math.max(-lim0, Math.min(lim0, pz - .4)); mapCam.first = 1; }
+    V3.resize();
   };
   V3.mapAnim = function (dt, t) {
     if (!mapG || mode !== 'map') return;
     mapNodes.forEach(function (m) { var u = m.userData, hv = mapHov === u.key; m.position.y = u.base + (u.state === 'reach' ? (.05 + Math.sin(t * 4 + m.position.x) * .04 + (hv ? .08 : 0)) : 0); var sc = hv && u.state === 'reach' ? 1.18 : 1; m.scale.x += (sc - m.scale.x) * .2; m.scale.z = m.scale.x; });
+    if (mapPawn) { var lim = Math.max(0, mapDim.h / 2 - 1.4), tz = Math.max(-lim, Math.min(lim, mapPawn.position.z - .4)); mapCam.f += (tz - mapCam.f) * Math.min(1, dt * 3); placeMapCam(); }
     if (pawnT && mapPawn) { pawnT.t = Math.min(1, pawnT.t + dt * 1.6); var k = pawnT.t, e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; pawnT.cur.x = pawnT.from.x + (pawnT.to.x - pawnT.from.x) * e; pawnT.cur.z = pawnT.from.z + (pawnT.to.z - pawnT.from.z) * e; mapPawn.position.set(pawnT.cur.x, .22 + Math.sin(k * Math.PI) * .45 + .12, pawnT.cur.z); }
   };
   V3.screenMap = function (nx, ny) { var v = new THREE.Vector3((nx - .5) * mapDim.w, .2, (ny - .5) * mapDim.h).project(camera); return { x: (v.x + 1) / 2 * w, y: (1 - v.y) / 2 * h }; };

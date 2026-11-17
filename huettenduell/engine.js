@@ -66,6 +66,7 @@
     goat: ['Schwarze Ziege', 0, 1, { b: 1 }, ['worthy'], '🐐'],
     skink: ['Skink', 1, 2, { b: 1 }, ['tail'], '🦎'],
     skeleton: ['Skelett', 1, 1, {}, [], '💀'],
+    death: ['Todeskarte', 1, 1, { b: 1 }, [], '💀'],
     dam: ['Damm', 0, 2, {}, [], '🪵'],
     skink_tail: ['Schwanz', 0, 2, {}, [], '🦎']
   };
@@ -78,8 +79,9 @@
     necro: ['Totenbeschwörung', 'Stirbt eine seiner Karten, steht an derselben Stelle ein Skelett auf (einmal pro Karte).']
   };
   var uid = 1;
-  HD.make = function (x) { var up = typeof x === 'object' ? x : { id: x }, id = up.id, d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false, up: up.a || up.h ? { a: up.a || 0, h: up.h || 0 } : null }; if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } return c; };
-  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1 };
+  HD.make = function (x) { var up = typeof x === 'object' ? x : { id: x }, id = up.id, d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false, up: up.a || up.h ? { a: up.a || 0, h: up.h || 0 } : null }; if (up.dc) { var dc = up.dc; c.n = dc.n; c.atk = dc.atk; c.hp = dc.hp; c.sig = dc.sig.slice(); c.art = dc.art; c.cost = dc.cost; c.max = c.hp; c.dead = true; }
+    if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } return c; };
+  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1, death: 1 };
   function dies(c) { return !(HD.has(c, 'lives') && c.lives > 1); }
   // Ameisen: Angriff = Zahl der eigenen Ameisen
   HD.refresh = function (G) { for (var s = 0; s < 2; s++) { var b = G.p[s].board, n = 0, i; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) n++; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) b[i].atk = n; } };
