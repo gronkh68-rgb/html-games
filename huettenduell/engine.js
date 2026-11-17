@@ -79,6 +79,8 @@
     necro: ['Totenbeschwörung', 'Stirbt eine seiner Karten, steht an derselben Stelle ein Skelett auf (einmal pro Karte).']
   };
   var uid = 1;
+  // Nach dem Laden eines Spielstands (Host-Wechsel): Kartennummern fortsetzen
+  HD.sync = function (G) { var m = 0; G.p.forEach(function (P) { [].concat(P.deck, P.side, P.hand, P.board, P.queue).forEach(function (c) { if (c && c.uid > m) m = c.uid; }); }); if (m >= uid) uid = m + 1; };
   HD.make = function (x) { var up = typeof x === 'object' ? x : { id: x }, id = up.id, d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false, up: up.a || up.h ? { a: up.a || 0, h: up.h || 0 } : null }; if (up.dc) { var dc = up.dc; c.n = dc.n; c.atk = dc.atk; c.hp = dc.hp; c.sig = dc.sig.slice(); c.art = dc.art; c.cost = dc.cost; c.max = c.hp; c.dead = true; }
     if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } return c; };
   HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1, death: 1 };
@@ -90,9 +92,9 @@
   HD.shuffle = shuffle;
   // opts: { decks:[[id..],[id..]], npc: true|false, rnd }
   HD.newGame = function (opts) {
-    var G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd || Math.random, log: [], win: opts.win || WIN, boss: opts.boss || null, bossRisen: 0 };
+    var rnd0 = opts.rnd || Math.random, G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd, log: [], win: opts.win || WIN, boss: opts.boss || null, bossRisen: 0 };
     for (var s = 0; s < 2; s++) {
-      var deck = shuffle(opts.decks[s].map(HD.make), G.rnd), side = []; for (var i = 0; i < 20; i++) side.push(HD.make('squirrel'));
+      var deck = shuffle(opts.decks[s].map(function (x) { return HD.make(x); }), rnd0), side = []; for (var i = 0; i < 20; i++) side.push(HD.make('squirrel'));
       var P = { deck: deck, side: side, hand: [], board: [null, null, null, null], queue: [null, null, null, null], bones: 0, dmg: 0, drew: false };
       G.p.push(P);
       for (var h = 0; h < 3; h++) if (P.deck.length) P.hand.push(P.deck.pop());
@@ -216,7 +218,7 @@
   };
   // Legt neue Karten in die Warteschlange; diff = Schwierigkeit 1..3
   HD.fillQueue = function (G, s, diff) {
-    var P = G.p[s], O = G.p[1 - s], rnd = G.rnd, n = 1 + (diff >= 2 && G.n > 5 ? 1 : 0) + (diff >= 3 && G.n > 3 ? 1 : 0) + (G.boss === 'pack' && HD.diff(G) >= 3 ? 1 : 0);
+    var P = G.p[s], O = G.p[1 - s], rnd = G.rnd || Math.random, n = 1 + (diff >= 2 && G.n > 5 ? 1 : 0) + (diff >= 3 && G.n > 3 ? 1 : 0) + (G.boss === 'pack' && HD.diff(G) >= 3 ? 1 : 0);
     for (var k = 0; k < n && P.deck.length; k++) {
       var free = []; for (var i = 0; i < LANES; i++) if (!P.queue[i]) free.push(i);
       if (!free.length) break;
@@ -230,7 +232,7 @@
   };
   // Einfacher Spieler-Bot (für Tests und als Platzhalter): zieht, spielt so viel wie möglich, gibt zurück
   HD.botPlay = async function (G, s, hook) {
-    var P = G.p[s]; HD.draw(G, s, P.deck.length && G.rnd() < .7 ? 'deck' : 'side');
+    var P = G.p[s]; HD.draw(G, s, P.deck.length && (G.rnd || Math.random)() < .7 ? 'deck' : 'side');
     for (var guard = 0; guard < 10; guard++) {
       var done = true;
       var order = P.hand.map(function (c, i) { return i; }).sort(function (a, b) { var A = P.hand[a], B = P.hand[b]; return (B.atk + B.hp) - (A.atk + A.hp); });

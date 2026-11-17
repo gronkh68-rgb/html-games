@@ -378,7 +378,7 @@ const grid=document.querySelector('.grid'),cards=[...grid.querySelectorAll('.gc'
 const META={
  'wortgitter':['brett','2–4',1,0],'hoellen-tycoon':['brett','2–6',1,1],'heldengilde':['karten','2–6',1,0],'auf-und-ab':['karten','1–5',1,0],'rummikub':['brett','2–4',1,1],
  'zollkreuzwort':['denken','1',0,0],'mensch-aergere-dich-nicht':['wuerfel','2–4',1,1],'farbchaos':['karten','2–4',1,0],'hanafuda':['karten','2',1,1],'puzzle':['denken','1',0,1],
- 'tron':['arcade','1–4',1,1],'arcade':['arcade','1',0,1],'huettenduell':['karten','1',0,1],'poker':['karten','2–6',1,1],'blackjack':['karten','1–5',1,1],'vier-gewinnt':['brett','2',1,0],'muehle':['brett','2',1,0],
+ 'tron':['arcade','1–4',1,1],'arcade':['arcade','1',0,1],'huettenduell':['karten','1–2',1,1],'poker':['karten','2–6',1,1],'blackjack':['karten','1–5',1,1],'vier-gewinnt':['brett','2',1,0],'muehle':['brett','2',1,0],
  'schiffe-versenken':['brett','2',1,0],'chomp-arena':['arcade','1–4',0,0],'mensch-teams':['wuerfel','2–4',1,1],'domino':['brett','2–4',1,0],'billard':['arcade','2',1,1],
  'jenga':['arcade','2–4',1,1],'neun-welten':['karten','2–4',1,0],'fixer-fritz':['arcade','1',0,0],'netrunner-aergere-dich-nicht':['wuerfel','2–6',1,1]};
 const CATS=[['brett','🧩 Brett','🧩 Board'],['karten','🃏 Karten','🃏 Cards'],['wuerfel','🎲 Würfel','🎲 Dice'],['denken','🧠 Denken','🧠 Puzzle'],['arcade','🕹 Arcade','🕹 Arcade']];
@@ -431,7 +431,7 @@ inst.onclick=async()=>{
 paintInstall();
 paintHero();paintGrid();
 // ---------- Offene Spiele: eigene (zum Wiederaufnehmen) und öffentliche Räume aller Spiele ----------
-const PF={'mensch-aergere-dich-nicht':'mdn-v1-','mensch-teams':'mtm-v1-','hoellen-tycoon':'htc-v1-','heldengilde':'hgl-v1-','auf-und-ab':'aua-v1-','wortgitter':'wgt-v1-','domino':'dom-v1-','billard':'bil-v1-','jenga':'jng-v1-','neun-welten':'nwl-v1-','farbchaos':'fch-v1-','hanafuda':'hnf-v1-','muehle':'mue-v1-','netrunner-aergere-dich-nicht':'ndn-v1-','poker':'pkr-v1-','blackjack':'bjk-v1-','schiffe-versenken':'sv-v1-','tron':'tron-v1-','vier-gewinnt':'c4-v1-'};
+const PF={'huettenduell':'hdl-v1-','mensch-aergere-dich-nicht':'mdn-v1-','mensch-teams':'mtm-v1-','hoellen-tycoon':'htc-v1-','heldengilde':'hgl-v1-','auf-und-ab':'aua-v1-','wortgitter':'wgt-v1-','domino':'dom-v1-','billard':'bil-v1-','jenga':'jng-v1-','neun-welten':'nwl-v1-','farbchaos':'fch-v1-','hanafuda':'hnf-v1-','muehle':'mue-v1-','netrunner-aergere-dich-nicht':'ndn-v1-','poker':'pkr-v1-','blackjack':'bjk-v1-','schiffe-versenken':'sv-v1-','tron':'tron-v1-','vier-gewinnt':'c4-v1-'};
 const info=path=>{const c=cards.find(x=>pathOf(x)===path+'/');return c?{n:c.querySelector('h2').textContent,i:c.querySelector('.icon').textContent,path:path+'/'}:{n:path,i:'🎮',path:path+'/'};};
 const byPrefix={};Object.keys(PF).forEach(p=>byPrefix[PF[p]]=p);
 const ago=ms=>{const m=Math.max(1,Math.round(ms/60000));return m<60?T(`vor ${m} Min.`,`${m} min ago`):T(`vor ${Math.round(m/60)} Std.`,`${Math.round(m/60)} h ago`);};
