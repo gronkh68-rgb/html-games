@@ -101,12 +101,14 @@
     var list = pick.slice(); Object.keys(cards).forEach(function (k) { list.push(cards[k]); });
     var i = ray.intersectObjects(list, false)[0]; if (!i) return null; var o = i.object; return o.userData.slot ? o : (o.userData.at ? { userData: o.userData.at } : null);
   }
+  // Nebel an den Kamera-Abstand koppeln (im Hochformat steht die Kamera weit weg und alles wäre sonst schwarz)
+  function fogFit() { var d = camera.position.length(); scene.fog.near = d * 1.0; scene.fog.far = d * 2.4; }
   V3.resize = function () {
     if (!V3.ready) return; w = host.clientWidth || 600; h = host.clientHeight || 400; r.setSize(w, h, false); camera.aspect = w / h;
     var a = w / h;
-    if (mode === 'map') { var dm = Math.max(7, (mapDim.w * 1.06 / 2) / (Math.tan(21 * Math.PI / 180) * a)), dv = new THREE.Vector3(0, .86, .5).normalize(); camera.position.copy(dv.multiplyScalar(dm)).add(new THREE.Vector3(0, 0, .3)); camera.lookAt(0, 0, .25); camera.updateProjectionMatrix(); V3.draw(); return; }
+    if (mode === 'map') { var dm = Math.max(7, (mapDim.w * 1.06 / 2) / (Math.tan(21 * Math.PI / 180) * a)), dv = new THREE.Vector3(0, .86, .5).normalize(); camera.position.copy(dv.multiplyScalar(dm)).add(new THREE.Vector3(0, 0, .3)); camera.lookAt(0, 0, .25); fogFit(); camera.updateProjectionMatrix(); V3.draw(); return; }
     var d = Math.max(9.6, (8.4 / 2) / (Math.tan(21 * Math.PI / 180) * a));
-    var dir = new THREE.Vector3(0, .78, .62).normalize(); camera.position.copy(dir.multiplyScalar(d)).add(new THREE.Vector3(0, 0, -1.2)); camera.lookAt(0, .3, -1.3); camera.updateProjectionMatrix(); V3.draw();
+    var dir = new THREE.Vector3(0, .78, .62).normalize(); camera.position.copy(dir.multiplyScalar(d)).add(new THREE.Vector3(0, 0, -1.2)); camera.lookAt(0, .3, -1.3); fogFit(); camera.updateProjectionMatrix(); V3.draw();
   };
   function slotPos(row, l) { return { x: (l - 1.5) * GX, z: Z[row], s: row === 'oq' ? .62 : 1 }; }
   var cardGeo = null, edgeMat = null;

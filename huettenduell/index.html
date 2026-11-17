@@ -86,7 +86,8 @@ body{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .mrow{display:flex;gap:10px;flex-wrap:wrap}
 #mapc{display:block;width:100%;image-rendering:pixelated;border:3px solid #5a3a1c;border-radius:10px;background:#000;cursor:default}
 #cm3d{display:none;height:min(62vh,540px);border-radius:14px;overflow:hidden;border:3px solid #5a3a1c;background:#0b0705;position:relative}
-body.v3 #cm3d{display:block}body.v3 #mapc{display:none}
+body.v3 #cm3d{display:block}
+@media (max-aspect-ratio:1/1){#cm3d{height:min(56vh,84vw)}}body.v3 #mapc{display:none}
 #mapinfo{min-height:2.6em;margin-top:8px;color:var(--muted);text-align:center;font-size:.9rem}
 #t3d{display:none;position:relative;height:min(58vh,540px);border-radius:16px;overflow:hidden;border:2px solid #5a3a1c;background:#0b0705}
 body.v3 #t3d{display:block}body.v3 #t2d{display:none}
