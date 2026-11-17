@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var V3 = window.V3 = { ready: false, on: false };
-  var host, r, scene, camera, raf = 0, last = 0, cards = {}, dying = [], slots = [], pick = [], hov = null, beam, pans, teeth = [], portrait, flame = [], lights = [], texCache = {}, texN = 0, ray, mouse, opts, sd = null, shake = 0, wob = 0, tgt = [], w = 0, h = 0, portraitKey = '', tm = 0, leatherM, postM, mode = 'board', mapG = null, mapNodes = [], mapPawn = null, mapPlane = null, mapCb = null, mapDim = { w: 7.4, h: 6 }, mapCam = { d: 8, f: 0 }, pawnT = null, mapHov = null;
+  var host, r, scene, camera, raf = 0, last = 0, cards = {}, dying = [], slots = [], pick = [], hov = null, beam, pans, teeth = [], portrait, flame = [], lights = [], texCache = {}, texN = 0, ray, mouse, opts, sd = null, shake = 0, wob = 0, tgt = [], tgo = [], w = 0, h = 0, portraitKey = '', tm = 0, leatherM, postM, mode = 'board', mapG = null, mapNodes = [], mapPawn = null, mapPlane = null, mapCb = null, mapDim = { w: 7.4, h: 6 }, mapCam = { d: 8, f: 0 }, pawnT = null, mapHov = null;
   var CW = 1, CH = 1.45, GX = 1.28, Z = { oq: -2.5, ob: -1.0, pb: .85 };
   function cvs(wd, ht) { var c = document.createElement('canvas'); c.width = wd; c.height = ht; return c; }
   function tex(c) { var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t; }
@@ -139,7 +139,7 @@
     var tm = new THREE.MeshStandardMaterial({ color: 0xf2ecd8, roughness: .5 });
     [[G.p[0].dmg, 1.6], [G.p[1].dmg, -1.6]].forEach(function (a) { for (var n = 0; n < Math.min(8, a[0]); n++) { var t = new THREE.Mesh(new THREE.BoxGeometry(.14, .18, .1), tm); t.position.set(((n % 4) - 1.5) * .17, -.17 + Math.floor(n / 4) * .2, a[1] + ((n % 2) ? .06 : -.06)); t.userData.pan = a[1] > 0 ? 0 : 1; beam.add(t); teeth.push(t); } });
     teeth = teeth.slice();
-    tgt = S.tg || [];
+    tgt = S.tg || []; tgo = S.tgo || [];
     if (S.opp && portraitKey !== S.opp.icon) { portraitKey = S.opp.icon; portrait.material.map = emojiTex(S.opp.icon); portrait.material.needsUpdate = true; }
     V3.draw();
   };
@@ -217,7 +217,7 @@
     for (i = dying.length - 1; i >= 0; i--) { var d = dying[i]; d.scale.x -= dt * 4; d.scale.z = d.scale.x; d.position.y += dt * 1.2; if (d.scale.x <= .05) { scene.remove(d); d.material[2].dispose(); dying.splice(i, 1); } else busy = true; }
     if (beam) { var tl = beam.userData.tilt || 0, w2 = wob > 0 ? Math.sin(t * 22) * .05 * wob : 0; wob = Math.max(0, wob - dt * 1.4); beam.rotation.x += (-tl + w2 - beam.rotation.x) * Math.min(1, dt * 6); if (Math.abs(-tl - beam.rotation.x) > .004 || wob > 0) busy = true; }
     // Platzmarkierung
-    slots.forEach(function (s) { var on = s.userData.row === 'pb' && tgt.indexOf(s.userData.l) >= 0; s.material.color.setRGB(on ? .5 + .5 * Math.sin(t * 6) : 1, on ? 1 : 1, on ? 1 : 1); s.material.opacity = on ? 1 : (s.userData.row === 'oq' ? .6 : .95); if (on) busy = true; });
+    slots.forEach(function (s) { var on = (s.userData.row === 'pb' && tgt.indexOf(s.userData.l) >= 0) || (s.userData.row === 'ob' && tgo.indexOf(s.userData.l) >= 0); s.material.color.setRGB(on ? .5 + .5 * Math.sin(t * 6) : 1, on ? 1 : 1, on ? 1 : 1); s.material.opacity = on ? 1 : (s.userData.row === 'oq' ? .6 : .95); if (on) busy = true; });
     // Kerzenflackern (leicht, unabhängig vom restlichen Geschehen)
     lights.forEach(function (l, j) { l.intensity = (j ? .55 : 1.15) * (.93 + Math.sin(t * 9 + j * 2) * .05 + Math.sin(t * 23 + j) * .02); });
     flame.forEach(function (f, j) { f.scale.y = 1.4 + Math.sin(t * 11 + j) * .25; });

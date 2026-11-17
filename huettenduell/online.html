@@ -54,6 +54,7 @@ body #game:not([hidden]){display:block}
         <div class="piles"><button class="pile" id="dDeck"></button><button class="pile" id="dSide"></button></div>
         <div class="hand" id="hand"></div>
         <div class="bar"><button class="btn bell" id="bell">🔔</button></div>
+        <div id="items"></div>
         <div id="info"></div>
       </div>
       <div class="hk-side">
@@ -76,7 +77,9 @@ const RULES = () => `<ul>
 <li>${T('Zwei Spieler, je vier Bahnen. Jede Runde ziehst du eine Karte aus dem Wald oder ein Eichhörnchen.', 'Two players, four lanes each. Each turn you draw a card from the forest or a squirrel.')}</li>
 <li>${T('Karten kosten Opfer 🩸 (eigene Karten vom Feld) oder Knochen 🦴 (entstehen, wenn Karten sterben).', 'Cards cost sacrifices 🩸 (your cards on the field) or bones 🦴 (created when cards die).')}</li>
 <li>${T('Mit der Klingel 🔔 greifen alle deine Karten an: Gegenüber trifft eine Karte, sonst geht der Schaden auf die Waage.', 'The bell 🔔 makes all your cards attack: the card opposite is hit, otherwise the damage goes to the scale.')}</li>
-<li>${T('Wer die Waage um die eingestellte Punktzahl auf seine Seite bringt, gewinnt.', 'Tip the scale by the chosen number of points to win.')}</li></ul>`;
+<li>${T('Wer die Waage um die eingestellte Punktzahl (5) auf seine Seite bringt, verliert das gegnerische Leben: Jeder hat zwei Leben (Kerzen). Dann beginnt eine neue Runde: Das Feld wird geräumt (ohne Knochen), Hand und Knochen bleiben, beide ziehen 3 Karten und 1 Eichhörnchen, der Verlierer erhält den Großen Rauch und beginnt.', 'Whoever tips the scale by the chosen number of points (5) takes a life from the other: everyone has two lives (candles). Then a new round starts: the field is cleared (no bones), hand and bones stay, both draw 3 cards and 1 squirrel, the loser gets the Great Smoke and starts.')}</li>
+<li>${T('Im ersten Zug jedes Spielers (und nach einem verlorenen Leben) zählen höchstens 3 Punkte auf der Waage.', 'In each player’s first turn (and after a lost life) at most 3 points count on the scale.')}</li>
+<li>${T('Wer genau 4 Punkte im Rückstand ist, erhält einen Gegenstand (Zange, Schere, Sanduhr, Harpyienfächer, Angelhaken, Elsternlupe, Flaschen, Sparschwein). Gegenstände benutzt du jederzeit in deinem Zug.', 'Whoever is behind by exactly 4 gets an item (pliers, scissors, hourglass, harpy fan, fish hook, magpie lens, bottles, piggy bank). Use items any time on your turn.')}</li></ul>`;
 $('setup').innerHTML = `<h2>🕯️ ${T('Hüttenduell: Duell', 'Hut Duel: duel')}</h2>
 <p style="margin:0 0 10px;color:var(--muted)">${T('Das Opfer-Kartenspiel für zwei Spieler. Gegen den Computer oder online. Jeder wählt vor dem Start sein Deck.', 'The sacrifice card game for two. Against the computer or online. Everyone chooses a deck before the start.')}</p>
 <div class="row"><label for="nopp">${T('Computer-Gegner', 'Computer opponent')}</label><select id="nopp"><option value="1" selected>1</option></select></div>
@@ -93,7 +96,7 @@ function cleanDeck(d) {
   for (const x of d) {
     const o = typeof x === 'string' ? { id: x } : x; if (!o || typeof o.id !== 'string' || !HD.CARDS[o.id]) return null;
     const a = Math.max(0, Math.min(3, o.a | 0)), h = Math.max(0, Math.min(3, o.h | 0));
-    if (o.id === 'death') { const dc = o.dc; if (!dc || typeof dc.n !== 'string' || !Array.isArray(dc.sig) || dc.sig.length > 2 || dc.sig.some(k => !SIGS[k] || k === 'fledge') || !(dc.atk >= 0 && dc.atk <= 4) || !(dc.hp >= 1 && dc.hp <= 7)) return null; out.push({ id: 'death', a, h, dc: { n: dc.n.slice(0, 40), atk: dc.atk | 0, hp: dc.hp | 0, sig: dc.sig.slice(), art: String(dc.art || '💀').slice(0, 8), cost: { b: Math.max(0, Math.min(3, (dc.cost && dc.cost.b) | 0)) } } }); }
+    if (o.id === 'death') { const dc = o.dc; if (!dc || typeof dc.n !== 'string' || !Array.isArray(dc.sig) || dc.sig.length > 2 || dc.sig.some(k => !SIGS[k] || k === 'fledge') || !(dc.atk >= 0 && dc.atk <= 4) || !(dc.hp >= 1 && dc.hp <= 7)) return null; out.push({ id: 'death', a, h, dc: { n: dc.n.slice(0, 40), atk: dc.atk | 0, hp: dc.hp | 0, sig: dc.sig.slice(), art: String(dc.art || '💀').slice(0, 8), cost: { b: Math.max(0, Math.min(3, (dc.cost && dc.cost.b) | 0)), o: Math.max(0, Math.min(6, (dc.cost && dc.cost.o) | 0)) } } }); }
     else if (HD.TOKENS[o.id]) return null; else out.push({ id: o.id, a, h });
   }
   return out;
@@ -117,7 +120,7 @@ function view(g, s) {
   const names = g.seats.map(x => x.name), log = K.logFor(s);
   if (!g.p || g.p.length < 2) return { wait: true, me: s, names, log, over: null };
   const me = s < 0 ? 0 : s, op = 1 - me;
-  const strip = (P, own) => ({ deck: new Array(P.deck.length).fill(0), side: new Array(P.side.length).fill(0), hand: own ? P.hand : P.hand.map(() => 0), board: P.board, queue: P.queue, bones: P.bones, dmg: P.dmg, drew: P.drew });
+  const strip = (P, own) => ({ deck: new Array(P.deck.length).fill(0), side: new Array(P.side.length).fill(0), hand: own ? P.hand : P.hand.map(() => 0), board: P.board, queue: P.queue, bones: P.bones, dmg: P.dmg, drew: P.drew, lives: P.lives, items: own ? P.items : P.items.map(() => 0), first: P.first });
   return { p: [strip(g.p[me], s >= 0), strip(g.p[op], false)], cur: g.turn, n: g.n, phase: g.phase, over: g.over === null ? null : (g.over === me ? 0 : 1), win: g.win, names: [names[me], names[op]], types: [g.seats[me].type, g.seats[op].type], me: s, mySeat: me, log };
 }
 function valid(spec, a, g, p) {
@@ -126,39 +129,53 @@ function valid(spec, a, g, p) {
   if (a.t === 'draw') return g.turn === p && g.phase === 'draw' && !g.p[p].drew && (a.from === 'deck' || a.from === 'side');
   if (a.t === 'play') return Number.isInteger(a.i) && Number.isInteger(a.lane) && Array.isArray(a.sac) && a.sac.every(Number.isInteger) && new Set(a.sac).size === a.sac.length && !HD.check(g, p, a.i, a.lane, a.sac);
   if (a.t === 'end') return g.turn === p && g.phase === 'main';
+  if (a.t === 'item') {
+    const id = g.p[p].items[a.idx]; if (!id || g.turn !== p || (g.phase !== 'main' && g.phase !== 'draw')) return false; const k = HD.ITEMS[id][3], O = g.p[1 - p];
+    if (k === 'e') return Number.isInteger(a.l) && !!O.board[a.l];
+    if (k === 'h') return Number.isInteger(a.l) && Number.isInteger(a.to) && !!O.board[a.l] && a.to >= 0 && a.to < 4 && !g.p[p].board[a.to];
+    return true;
+  }
   return false;
 }
 async function chooseDecks() {
   const g = K.G, mine = starterDeck();
   const decks = await Promise.all(g.seats.map((s, q) => s.type === 'cpu' ? Promise.resolve(randomDeck()) : K.ask(q, { k: 'deck' }, () => mine).then(a => (a && a.deck && cleanDeck(a.deck)) || cleanDeck(a) || mine)));
-  const ng = HD.newGame({ decks, npc: false, win: g.opts.win });
-  g.p = ng.p; g.n = 0; g.over = null; g.win = ng.win; g.turn = 0; g.boss = null; HD.startTurn(g, HK.rnd(2));
+  const ng = HD.newGame({ decks, npc: false, win: g.opts.win, lives: 2 });
+  g.p = ng.p; g.n = 0; g.over = null; g.win = ng.win; g.turn = 0; g.boss = null; g.itemPile = ng.itemPile; g.lastDiff = 0; g.npc = false; HD.startTurn(g, HK.rnd(2));
   K.say(-1, L2('Die Karten sind gemischt. ' + K.nm(g.turn) + ' beginnt.', 'The cards are shuffled. ' + K.nm(g.turn) + ' starts.')); K.push();
 }
 async function main() {
   const g = K.G; HD.sync(g);
   const hook = async ev => { K.fx({ k: 'ev', ev }); K.push(); await K.sleep(ev.k === 'atk' ? 300 : ev.k === 'play' ? 160 : 380); };
-  while (g.over === null) {
+  while (!HD.matchOver(g)) {
+    if (g.over !== null) { await nextRound(); continue; }
     const p = g.turn;
     if (g.phase !== 'attack') {
-      for (let guard = 0; guard < 80; guard++) {
+      for (let guard = 0; guard < 120 && g.over === null; guard++) {
         K.snap('turn'); K.push();
         if (g.seats[p].type === 'cpu') { await K.sleep(600); await HD.botPlay(g, p, hook); break; }
         const a = await K.ask(p, { k: 'turn', st: g.phase }, () => ({ t: 'bot' }));
         if (!a || a.t === 'bot') { await HD.botPlay(g, p, hook); break; }
         if (a.t === 'draw') { HD.draw(g, p, a.from); K.say(p, L2(K.nm(p) + ' zieht eine Karte.', K.nm(p) + ' draws a card.'), L2('Du ziehst eine Karte.', 'You draw a card.')); K.sfx('take'); continue; }
         if (a.t === 'play') { const c = g.p[p].hand[a.i]; const nm = c ? c.n : '?'; await HD.play(g, p, a.i, a.lane, a.sac, hook); K.say(p, L2(K.nm(p) + ' spielt ' + nm + '.', K.nm(p) + ' plays ' + nm + '.'), L2('Du spielst ' + nm + '.', 'You play ' + nm + '.')); K.sfx('lay'); continue; }
+        if (a.t === 'item') { const id = g.p[p].items[a.idx], nm = id ? HD.ITEMS[id][0] : '?'; HD.useItem(g, p, a.idx, a); K.say(p, L2(K.nm(p) + ' benutzt ' + nm + '.', K.nm(p) + ' uses ' + nm + '.'), L2('Du benutzt ' + nm + '.', 'You use ' + nm + '.')); K.sfx('lay'); continue; }
         break;
       }
-      K.say(-1, L2(K.nm(p) + ' läutet die Klingel.', K.nm(p) + ' rings the bell.'));
-      await HD.attack(g, p, hook);
+      if (g.over === null) { K.say(-1, L2(K.nm(p) + ' läutet die Klingel.', K.nm(p) + ' rings the bell.')); await HD.attack(g, p, hook); }
     }
-    if (g.over !== null) break;
-    HD.endTurn(g, p); HD.startTurn(g, 1 - p); K.push();
+    if (g.over !== null) continue;
+    HD.endTurn(g, p); const nx = 1 - p;
+    if (g.p[nx].skip) { g.p[nx].skip = false; K.say(-1, L2(K.nm(nx) + ' muss aussetzen (Sanduhr).', K.nm(nx) + ' has to skip (hourglass).')); HD.startTurn(g, p); } else HD.startTurn(g, nx);
+    K.push();
   }
   const w = g.over; K.push(); K.sfx('win');
-  const again = await K.vote(q => ({ ico: '🏆', title: q === w ? L2('Du hast gewonnen!', 'You won!') : L2(g.seats[w].name + ' gewinnt!', g.seats[w].name + ' wins!'), html: L2('Die Waage kippt zu ' + esc(g.seats[w].name) + '.<br><br><b>Abstimmung:</b> Noch eine Partie?', 'The scale tips to ' + esc(g.seats[w].name) + '.<br><br><b>Vote:</b> play again?'), btns: [L2('Nochmal spielen', 'Play again'), L2('Beenden', 'Quit')] }));
+  const again = await K.vote(q => ({ ico: '🏆', title: q === w ? L2('Du hast gewonnen!', 'You won!') : L2(g.seats[w].name + ' gewinnt!', g.seats[w].name + ' wins!'), html: L2('Beide Kerzen von ' + esc(g.seats[1 - w].name) + ' sind erloschen.<br><br><b>Abstimmung:</b> Noch eine Partie?', esc(g.seats[1 - w].name) + ' has no candles left.<br><br><b>Vote:</b> play again?'), btns: [L2('Nochmal spielen', 'Play again'), L2('Beenden', 'Quit')] }));
   if (again) startGame(g.seats.map(s => ({ type: s.type, name: s.name, seat: s.seat, orig: s.orig, away: s.away })), g.opts); else K.exit(false);
+}
+async function nextRound() {
+  const g = K.G, w = g.over, l = 1 - w; K.sfx('bad'); K.push();
+  await K.dlgAll(q => ({ ico: '🕯️', title: q === l ? L2('Eine Kerze erlischt', 'A candle goes out') : q === w ? L2('Du gewinnst die Runde!', 'You win the round!') : L2(g.seats[l].name + ' verliert ein Leben', g.seats[l].name + ' loses a life'), html: L2(esc(g.seats[l].name) + ' hat noch <b>' + g.p[l].lives + '</b> Kerze(n). Neue Runde: ' + esc(g.seats[l].name) + ' beginnt und erhält den Großen Rauch.', esc(g.seats[l].name) + ' has <b>' + g.p[l].lives + '</b> candle(s) left. New round: ' + esc(g.seats[l].name) + ' starts and gets the Great Smoke.'), btns: [L2('Weiter', 'Continue')] }), 0);
+  HD.newRound(g); K.say(-1, L2('Neue Runde. ' + K.nm(g.turn) + ' beginnt.', 'New round. ' + K.nm(g.turn) + ' starts.')); K.push();
 }
 function startGame(seats, opts) {
   K.reset(); K.G = { seats, opts, log: [], p: [], turn: 0, n: 0, phase: 'draw', over: null, win: opts.win }; K.push();
@@ -174,6 +191,26 @@ function cardEl(c, cls) {
 }
 function slotEl(row, l, c, cls) { const s = document.createElement('div'); s.className = 'slot'; s.dataset.l = l; s.dataset.row = row; if (c) s.appendChild(cardEl(c, cls)); return s; }
 const pseudo = v => ({ p: v.p, turn: 0, phase: v.phase, over: null, win: v.win });
+let itm = null;      // gewählter Gegenstand mit Ziel: { idx, l }
+function itemTargets() {
+  if (!itm || !V || V.wait) return { o: [], p: [] }; const id = V.p[0].items[itm.idx]; if (!id) return { o: [], p: [] }; const k = HD.ITEMS[id][3], o = [], p = [];
+  if (k === 'e' || (k === 'h' && itm.l == null)) V.p[1].board.forEach((c, l) => { if (c) o.push(l); }); if (k === 'h' && itm.l != null) V.p[0].board.forEach((c, l) => { if (!c) p.push(l); }); return { o, p };
+}
+function paintItems() {
+  const el = $('items'); const P = V.p[0], can = myTurn();
+  el.innerHTML = P.items.length ? '<span class="il">' + T('Gegenstände', 'Items') + ':</span>' + P.items.map((id, i) => id ? '<button class="itm' + (itm && itm.idx === i ? ' on' : '') + '" data-i="' + i + '"' + (can ? '' : ' disabled') + ' title="' + HD.ITEMS[id][2] + '">' + HD.ITEMS[id][1] + ' ' + HD.ITEMS[id][0] + '</button>' : '').join('') : '';
+}
+$('items').addEventListener('click', e => {
+  const b = e.target.closest('.itm'); if (!b || !myTurn()) return; const i = +b.dataset.i, id = V.p[0].items[i], k = HD.ITEMS[id][3];
+  if (k) { itm = itm && itm.idx === i ? null : { idx: i, l: null }; hintTxt = itm ? (k === 'h' ? T('Wähle die gegnerische Karte, die du dir holst.', 'Choose the enemy card to take.') : T('Wähle das Ziel.', 'Choose the target.')) : ''; sel = null; sac = []; K.apply(); return; }
+  answer({ t: 'item', idx: i });
+});
+function oppSlotAction(l) {
+  if (!itm || !myTurn()) return; const t = itemTargets(); if (t.o.indexOf(l) < 0) return; const id = V.p[0].items[itm.idx];
+  if (HD.ITEMS[id][3] === 'h') { itm.l = l; hintTxt = T('Wähle eine freie Bahn auf deiner Seite.', 'Choose an empty lane on your side.'); K.apply(); return; }
+  const a = { t: 'item', idx: itm.idx, l }; answer(a);
+}
+$('ob').addEventListener('click', e => { const sl = e.target.closest('.slot'); if (sl) oppSlotAction(+sl.dataset.l); });
 const myTurn = () => !!(V && !V.wait && inp && V.cur === V.mySeat && V.over === null);
 function targets() {
   if (!myTurn() || sel == null || inp.st !== 'main') return []; const P = V.p[0], c = P.hand[sel], r = []; if (!c) return r;
@@ -200,10 +237,11 @@ function render(v, prev) {
   if (mine && !(prev && !prev.wait && prev.cur === v.cur && inp && prev.phase === v.phase && 0)) {}
   $('hkStatus').textContent = hintTxt || (v.log[0] ? tx(v.log[0]) : '');
   $('hkLog').innerHTML = v.log.slice(1, 50).map(l => `<div>${esc(tx(l))}</div>`).join('');
-  $('scores').innerHTML = [[0, P], [1, O]].map(([i, Q]) => `<div class="ps${(i === 0) === (v.cur === v.mySeat) && v.over === null ? ' turn' : ''}"><span>${i === 0 && v.me >= 0 ? T('Du', 'You') : esc(v.names[i])}${v.types[i] === 'cpu' ? ' 🤖' : ''}<br><small>${Q.hand.length} ${T('Handkarten', 'cards in hand')} · 🦴 ${Q.bones}</small></span><b>${Q.dmg}</b></div>`).join('');
+  $('scores').innerHTML = [[0, P], [1, O]].map(([i, Q]) => `<div class="ps${(i === 0) === (v.cur === v.mySeat) && v.over === null ? ' turn' : ''}"><span>${i === 0 && v.me >= 0 ? T('Du', 'You') : esc(v.names[i])}${v.types[i] === 'cpu' ? ' 🤖' : ''}<br><small>${Q.hand.length} ${T('Handkarten', 'cards in hand')} · 🦴 ${Q.bones}${Q.items.length ? ' · 🎒 ' + Q.items.length : ''} · ${'🕯️'.repeat(Math.max(0, Q.lives))}</small></span><b>${Q.dmg}</b></div>`).join('');
   $('sinfo').textContent = T('Runde ', 'Round ') + v.n + T(' · Sieg ab ', ' · win at ') + v.win;
+  paintItems(); { const it = itemTargets(); [...$('ob').children].forEach(sl => { if (it.o.indexOf(+sl.dataset.l) >= 0) sl.classList.add('tgt'); }); [...$('pb').children].forEach(sl => { if (it.p.indexOf(+sl.dataset.l) >= 0) sl.classList.add('tgt'); }); }
   $('t2d').classList.toggle('myturn', mine); $('t3d').classList.toggle('myturn', mine);
-  if (v3on && window.V3 && V3.ready) V3.sync({ G: pseudo(v), tg, sac, opp: { icon: '🧑' } });
+  if (v3on && window.V3 && V3.ready) { const it = itemTargets(); V3.sync({ G: pseudo(v), tg: tg.concat(it.p), tgo: it.o, sac, opp: { icon: '🧑' } }); }
 }
 function fx(d) {
   if (!d || d.k !== 'ev' || !V || V.wait) return; const ev = d.ev, s = V.me < 0 ? (ev.s === 0 ? 0 : 1) : (ev.s === V.me ? 0 : 1), e2 = Object.assign({}, ev, { s });
@@ -216,7 +254,7 @@ function ui(spec) {
     if (spec.k === 'turn') { inp = { res, st: spec.st }; sel = null; sac = []; hintTxt = ''; K.apply(); } else res(null);
   });
 }
-function answer(a) { if (!inp) return; const r = inp.res; inp = null; sel = null; sac = []; hintTxt = ''; K.apply(); r(a); }
+function answer(a) { if (!inp) return; const r = inp.res; inp = null; sel = null; sac = []; itm = null; hintTxt = ''; K.apply(); r(a); }
 $('dDeck').onclick = () => { if (inp && inp.st === 'draw') answer({ t: 'draw', from: 'deck' }); };
 $('dSide').onclick = () => { if (inp && inp.st === 'draw') answer({ t: 'draw', from: 'side' }); };
 $('bell').onclick = () => { if (inp && inp.st === 'main') answer({ t: 'end' }); };
@@ -225,6 +263,7 @@ $('hand').addEventListener('click', e => {
   const c = sel != null ? V.p[0].hand[sel] : null; if (c) { hintTxt = (c.cost.o || 0) > V.p[0].bones ? T('Dafür fehlen Knochen 🦴.', 'Not enough bones 🦴.') : (c.cost.b || 0) > 0 ? T('Wähle ' + c.cost.b + ' Karte(n) als Opfer 🩸.', 'Choose ' + c.cost.b + ' card(s) to sacrifice 🩸.') : T('Wähle eine freie Bahn.', 'Choose an empty lane.'); K.apply(); }
 });
 function slotAction(l) {
+  if (itm && itm.l != null && myTurn()) { if (itemTargets().p.indexOf(l) >= 0) answer({ t: 'item', idx: itm.idx, l: itm.l, to: l }); return; }
   if (!myTurn() || inp.st !== 'main' || sel == null) return; const P = V.p[0], c = P.hand[sel];
   if (targets().indexOf(l) >= 0) { answer({ t: 'play', i: sel, lane: l, sac: sac.slice() }); return; }
   if (P.board[l] && (c.cost.b || 0) > 0) { const k = sac.indexOf(l); if (k >= 0) sac.splice(k, 1); else sac.push(l); hintTxt = targets().length ? T('Wähle die Bahn für die neue Karte.', 'Choose the lane for the new card.') : ''; K.apply(); }
@@ -240,7 +279,7 @@ async function set3d(on) {
   try {
     if (!window.THREE) await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');
     if (!window.V3) await loadJs('view3d.js?v=' + Date.now());
-    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); } });
+    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); else if (row === 'ob') oppSlotAction(l); } });
     v3on = true; document.body.classList.add('v3'); $('b3d').textContent = '▦ 2D'; V3.attach($('t3d')); V3.setMode('board'); V3.show(true); setTimeout(() => { V3.resize(); if (V) K.apply(); }, 60);
   } catch (e) { v3on = false; document.body.classList.remove('v3'); }
 }

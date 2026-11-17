@@ -23,6 +23,15 @@
     dam: ['Dammbauer', '🪵', 'Beim Ausspielen entsteht in jeder freien Nachbarbahn ein Damm (0/2).'],
     submerge: ['Abtauchen', '🌊', 'Taucht während des Gegnerzugs ab: Angriffe gehen an ihr vorbei auf die Waage.'],
     ant: ['Ameise', '🐜', 'Der Angriff entspricht der Zahl deiner Ameisen auf dem Feld.'],
+    leader: ['Anführer', '📣', 'Karten auf den Nachbarbahnen erhalten +1 Angriff.'],
+    stinky: ['Gestank', '🦨', 'Die gegenüberliegende Karte verliert 1 Angriff.'],
+    boneking: ['Knochenkönig', '🦴', 'Beim Tod gibt sie 4 Knochen statt 1.'],
+    rabbit: ['Kaninchenloch', '🕳️', 'Beim Ausspielen kommt ein Kaninchen auf die Hand.'],
+    antspawn: ['Ameisenzüchter', '🏺', 'Beim Ausspielen kommt eine Arbeiterameise auf die Hand.'],
+    bees: ['Bienenschwarm', '🐝', 'Wird sie getroffen, kommt eine Biene auf die Hand.'],
+    trinket: ['Krämer', '🧳', 'Beim Ausspielen erhältst du einen Gegenstand.'],
+    handy: ['Handvoll', '🖐️', 'Der Angriff entspricht der Zahl deiner Handkarten.'],
+    mirror: ['Spiegelbild', '🪞', 'Der Angriff entspricht dem Angriff der gegenüberliegenden Karte (0 ohne Gegner).'],
     tail: ['Abgeworfener Schwanz', '🦎', 'Wird sie angegriffen, bleibt ein Schwanz (0/2) zurück und sie weicht in eine freie Nachbarbahn aus (einmal).']
   };
   // Karten: Name, Angriff, Leben, Kosten {b: Opfer, o: Knochen}, Fähigkeiten, Symbol, Entwicklung
@@ -66,6 +75,19 @@
     goat: ['Schwarze Ziege', 0, 1, { b: 1 }, ['worthy'], '🐐'],
     skink: ['Skink', 1, 2, { b: 1 }, ['tail'], '🦎'],
     skeleton: ['Skelett', 1, 1, {}, [], '💀'],
+    rabbit: ['Kaninchen', 0, 1, {}, [], '🐇'],
+    bee: ['Biene', 1, 1, {}, ['airborne'], '🐝'],
+    smoke: ['Großer Rauch', 1, 3, {}, ['leap'], '🌫️'],
+    snapper: ['Schnappschildkröte', 1, 6, { b: 2 }, [], '🐢'],
+    packleader: ['Rudelführer', 1, 3, { b: 2 }, ['leader'], '🐺'],
+    skunk: ['Stinktier', 1, 2, { b: 1 }, ['stinky'], '🦨'],
+    ratking: ['Rattenkönig', 2, 2, { b: 2 }, ['boneking'], '🐀'],
+    hare: ['Hase', 0, 2, { b: 1 }, ['rabbit'], '🐇'],
+    anthill: ['Ameisenhügel', 0, 3, { b: 2 }, ['antspawn'], '🏺'],
+    hive: ['Bienenstock', 0, 2, { b: 1 }, ['bees'], '🐝'],
+    peddler: ['Hausierer', 1, 2, { b: 1 }, ['trinket'], '🧳'],
+    juggler: ['Gaukler', 0, 3, { b: 1 }, ['handy'], '🤹'],
+    mirrortoad: ['Spiegelkröte', 0, 3, { b: 1 }, ['mirror'], '🪞'],
     death: ['Todeskarte', 1, 1, { b: 1 }, [], '💀'],
     dam: ['Damm', 0, 2, {}, [], '🪵'],
     skink_tail: ['Schwanz', 0, 2, {}, [], '🦎']
@@ -82,20 +104,69 @@
   // Nach dem Laden eines Spielstands (Host-Wechsel): Kartennummern fortsetzen
   HD.sync = function (G) { var m = 0; G.p.forEach(function (P) { [].concat(P.deck, P.side, P.hand, P.board, P.queue).forEach(function (c) { if (c && c.uid > m) m = c.uid; }); }); if (m >= uid) uid = m + 1; };
   HD.make = function (x) { var up = typeof x === 'object' ? x : { id: x }, id = up.id, d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false, up: up.a || up.h ? { a: up.a || 0, h: up.h || 0 } : null }; if (up.dc) { var dc = up.dc; c.n = dc.n; c.atk = dc.atk; c.hp = dc.hp; c.sig = dc.sig.slice(); c.art = dc.art; c.cost = dc.cost; c.max = c.hp; c.dead = true; }
-    if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } return c; };
-  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1, death: 1 };
+    if (c.up) { c.atk += c.up.a; c.hp += c.up.h; c.max = c.hp; } c.base = c.atk; return c; };
+  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1, skeleton: 1, death: 1, rabbit: 1, bee: 1, smoke: 1 };
   function dies(c) { return !(HD.has(c, 'lives') && c.lives > 1); }
-  // Ameisen: Angriff = Zahl der eigenen Ameisen
-  HD.refresh = function (G) { for (var s = 0; s < 2; s++) { var b = G.p[s].board, n = 0, i; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) n++; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) b[i].atk = n; } };
+  // Angriffswerte neu berechnen: Ameisen, Handvoll, Spiegelbild, Anführer (Nachbarn +1) und Gestank (-1)
+  HD.refresh = function (G) {
+    for (var s = 0; s < 2; s++) {
+      var P = G.p[s], O = G.p[1 - s], b = P.board, ants = 0, i, j;
+      for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) ants++;
+      for (i = 0; i < LANES; i++) {
+        var c = b[i]; if (!c) continue; var a = c.base != null ? c.base : c.atk, e = O.board[i];
+        if (HD.has(c, 'ant')) a = ants; if (HD.has(c, 'handy')) a = P.hand.length; if (HD.has(c, 'mirror')) a = e ? (e.base != null ? e.base : e.atk) : 0;
+        [i - 1, i + 1].forEach(function (k) { if (k >= 0 && k < LANES && HD.has(b[k], 'leader')) a++; });
+        if (e && HD.has(e, 'stinky')) a--;
+        c.atk = Math.max(0, a);
+      }
+    }
+  };
+  // ---------- Gegenstände (Regelbuch: Wer genau 4 Punkte im Rückstand ist, erhält einen Gegenstand) ----------
+  HD.ITEMS = {
+    pliers: ['Zange', '🔧', 'Du erhältst 1 Punkt auf der Waage.', 0],
+    scissors: ['Schere', '✂️', 'Tötet eine gegnerische Karte deiner Wahl.', 'e'],
+    hourglass: ['Sanduhr', '⏳', 'Der Gegner überspringt seinen nächsten Zug.', 0],
+    fan: ['Harpyienfächer', '🪶', 'Alle deine Karten greifen in diesem Zug mit Flug an.', 0],
+    hook: ['Angelhaken', '🪝', 'Nimm eine gegnerische Karte auf eine freie Bahn deiner Seite.', 'h'],
+    lens: ['Elsternlupe', '🔍', 'Ziehe eine Karte aus dem Wald auf die Hand.', 0],
+    sbottle: ['Flasche mit Eichhörnchen', '🍶', 'Ein Eichhörnchen kommt auf deine Hand.', 0],
+    gbottle: ['Flasche mit Ziege', '🍶', 'Eine Schwarze Ziege kommt auf deine Hand.', 0],
+    bank: ['Sparschwein', '🐷', 'Du erhältst sofort 4 Knochen.', 0]
+  };
+  function giveItem(G, p) {
+    if (G.npc && p === 1) return; if (!G.itemPile || !G.itemPile.length) return;
+    var id = G.itemPile.pop(); G.p[p].items.push(id);
+  }
+  HD.giveItem = giveItem;
+  function scaleTick(G) {
+    var d = HD.diff(G); if (G.lastDiff === d) return; G.lastDiff = d;
+    if (d === 4) giveItem(G, 1); else if (d === -4) giveItem(G, 0);
+  }
+  // Gegenstand idx von Spieler s benutzen; t = { l: Bahn des Gegners, to: eigene freie Bahn }. Gibt null oder einen Fehlertext zurück.
+  HD.useItem = function (G, s, idx, t) {
+    var P = G.p[s], O = G.p[1 - s], id = P.items[idx]; t = t || {};
+    if (!id) return 'Kein Gegenstand'; if (G.over !== null) return 'Spiel vorbei'; if (G.turn !== s || (G.phase !== 'main' && G.phase !== 'draw')) return 'Nicht am Zug';
+    if (id === 'scissors') { if (!O.board[t.l]) return 'Kein Ziel'; kill(G, 1 - s, t.l); }
+    else if (id === 'hook') { if (!O.board[t.l] || t.to == null || P.board[t.to]) return 'Kein Ziel'; P.board[t.to] = O.board[t.l]; O.board[t.l] = null; P.board[t.to].age = 0; onEnter(G, s, t.to); }
+    else if (id === 'pliers') { P.dmg++; }
+    else if (id === 'hourglass') O.skip = true;
+    else if (id === 'fan') P.fan = true;
+    else if (id === 'lens') { if (!P.deck.length) return 'Wald leer'; P.hand.push(P.deck.pop()); }
+    else if (id === 'sbottle') P.hand.push(HD.make('squirrel'));
+    else if (id === 'gbottle') P.hand.push(HD.make('goat'));
+    else if (id === 'bank') P.bones += 4;
+    P.items.splice(idx, 1); G.itemPile.unshift(id); HD.refresh(G); check(G); return null;
+  };
   HD.has = function (c, s) { return c && c.sig.indexOf(s) >= 0; };
   function shuffle(a, rnd) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor((rnd || Math.random)() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   HD.shuffle = shuffle;
   // opts: { decks:[[id..],[id..]], npc: true|false, rnd }
   HD.newGame = function (opts) {
-    var rnd0 = opts.rnd || Math.random, G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd, log: [], win: opts.win || WIN, hard: !!opts.hard, boss: opts.boss || null, bossRisen: 0 };
+    var rnd0 = opts.rnd || Math.random, G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd, log: [], win: opts.win || WIN, hard: !!opts.hard, boss: opts.boss || null, bossRisen: 0, lastDiff: 0, itemPile: [] };
+    Object.keys(HD.ITEMS).forEach(function (k) { G.itemPile.push(k, k); }); shuffle(G.itemPile, opts.rnd || Math.random);
     for (var s = 0; s < 2; s++) {
       var deck = shuffle(opts.decks[s].map(function (x) { return HD.make(x); }), rnd0), side = []; for (var i = 0; i < 10; i++) side.push(HD.make('squirrel'));      // begrenzter Opfer-Vorrat: Jedes Eichhörnchen zählt
-      var P = { deck: deck, side: side, hand: [], board: [null, null, null, null], queue: [null, null, null, null], bones: 0, dmg: 0, drew: false };
+      var P = { deck: deck, side: side, hand: [], board: [null, null, null, null], queue: [null, null, null, null], bones: 0, dmg: 0, drew: false, lives: opts.lives || 1, first: true, skip: false, fan: false, items: [], dead: [] };
       G.p.push(P);
       for (var h = 0; h < 3; h++) if (P.deck.length) P.hand.push(P.deck.pop());
       P.hand.push(side.pop());
@@ -103,7 +174,23 @@
     return G;
   };
   HD.diff = function (G) { return G.p[0].dmg - G.p[1].dmg; };
-  function check(G) { var d = HD.diff(G); if (d >= G.win) G.over = 0; else if (d <= -G.win) G.over = 1; return G.over !== null; }
+  // Waage prüfen: Bei 5 (bzw. G.win) Punkten Vorsprung verliert der andere ein Leben. Gewinner = G.over; ist ihm kein Leben mehr übrig, ist das Spiel aus (HD.matchOver).
+  function check(G) {
+    if (G.over !== null) return true; var d = HD.diff(G); scaleTick(G);
+    if (d >= G.win) { G.p[1].lives--; G.over = 0; } else if (d <= -G.win) { G.p[0].lives--; G.over = 1; }
+    return G.over !== null;
+  }
+  HD.matchOver = function (G) { return G.over !== null && G.p[1 - G.over].lives <= 0; };
+  // Neue Runde nach verlorenem Leben (Regelbuch): Karten auf dem Feld wandern ohne Knochen in den Friedhof, Hand und Knochen bleiben,
+  // beide ziehen 3 Karten und 1 Eichhörnchen, die Waage beginnt bei 0, der Verlierer erhält den Großen Rauch und beginnt.
+  HD.newRound = function (G) {
+    var loser = 1 - G.over;
+    G.p.forEach(function (P, s) {
+      P.board.forEach(function (c) { if (c) P.dead.push(c); }); P.board = [null, null, null, null]; P.queue = [null, null, null, null]; P.dmg = 0; P.first = true; P.skip = false; P.fan = false; P.drew = false;
+      for (var h = 0; h < 3; h++) if (P.deck.length) P.hand.push(P.deck.pop()); if (P.side.length) P.hand.push(P.side.pop());
+    });
+    G.p[loser].hand.push(HD.make('smoke')); G.over = null; G.lastDiff = 0; HD.startTurn(G, loser);
+  };
   // ---------- Aktionen ----------
   HD.draw = function (G, s, from) {
     var P = G.p[s]; if (P.drew || G.over !== null) return null;
@@ -130,6 +217,9 @@
     P.bones -= (c.cost.o || 0); P.board[lane] = c; c.age = 0;
     if (HD.has(c, 'fecund')) P.hand.push(HD.make(c.id));
     if (HD.has(c, 'hoard') && P.deck.length) P.hand.push(P.deck.pop());
+    if (HD.has(c, 'rabbit')) P.hand.push(HD.make('rabbit'));
+    if (HD.has(c, 'antspawn')) P.hand.push(HD.make('ant'));
+    if (HD.has(c, 'trinket')) giveItem(G, s);
     if (HD.has(c, 'dam')) [lane - 1, lane + 1].forEach(function (a) { if (a >= 0 && a < LANES && !P.board[a]) P.board[a] = HD.make('dam'); });
     onEnter(G, s, lane); HD.refresh(G);
     if (hook) await hook({ k: 'play', s: s, l: lane });
@@ -137,7 +227,7 @@
   };
   function kill(G, s, l, sacrificed) {
     var P = G.p[s], c = P.board[l]; if (!c) return;
-    P.board[l] = null; P.bones++;
+    P.board[l] = null; P.bones += (!sacrificed && HD.has(c, 'boneking')) ? 4 : 1; P.dead.push(c);
     if (s === 1 && G.boss && !sacrificed) bossDeath(G, l, c);
     if (!sacrificed && HD.has(c, 'unkill')) P.hand.push(HD.make(c.id));
     if (!sacrificed && HD.has(c, 'lives') && c.lives > 1) { var n = HD.make(c.id); n.lives = c.lives - 1; P.hand.push(n); }
@@ -164,7 +254,7 @@
   }
   // Angriff aller Karten von Spieler s; hook(ev) wird nach jedem Schritt aufgerufen (Animation)
   HD.attack = async function (G, s, hook) {
-    var o = 1 - s, P = G.p[s], O = G.p[o]; G.phase = 'attack';
+    var o = 1 - s, P = G.p[s], O = G.p[o], cap = P.first ? 3 : 1e9, dealt = 0; G.phase = 'attack';      // Regelbuch: Im ersten Zug jedes Spielers (und nach einem verlorenen Leben) zählen höchstens 3 Punkte
     for (var l = 0; l < LANES && G.over === null; l++) {
       var c = P.board[l]; if (!c || c.atk <= 0) continue;
       var tg = HD.has(c, 'tri') ? [l - 1, l, l + 1] : HD.has(c, 'bi') ? [l - 1, l + 1] : [l];
@@ -178,18 +268,20 @@
         }
         if (d && d.sub) d = null;
         if (d && HD.has(d, 'tail') && !d.tailUsed) { var adj = [tl - 1, tl + 1].filter(function (a) { return a >= 0 && a < LANES && !O.board[a]; })[0]; if (adj !== undefined) { d.tailUsed = true; O.board[adj] = d; d = O.board[tl] = HD.make('skink_tail'); } }
-        if (d && HD.has(c, 'airborne') && !HD.has(d, 'leap')) d = null;
+        if (d && (HD.has(c, 'airborne') || P.fan) && !HD.has(d, 'leap')) d = null;
         if (d) {
           d.hp -= c.atk; var dead = d.hp <= 0 || HD.has(c, 'death');
           if (HD.has(d, 'quills')) c.hp -= 1;
+          if (HD.has(d, 'bees')) O.hand.push(HD.make('bee'));
           if (hook) await hook({ k: 'hit', s: o, l: tl, n: c.atk });
           if (dead) { var dl = O.board.indexOf(d); if (dl >= 0) kill(G, o, dl); if (hook) await hook({ k: 'die', s: o, l: tl }); }
           if (c.hp <= 0) { kill(G, s, l); if (hook) await hook({ k: 'die', s: s, l: l }); break; }
         } else {
-          P.dmg += c.atk; if (hook) await hook({ k: 'scale', s: s, n: c.atk }); if (check(G)) break;
+          var dn = Math.min(c.atk, cap - dealt); if (dn <= 0) continue; dealt += dn; P.dmg += dn; if (hook) await hook({ k: 'scale', s: s, n: dn }); if (check(G)) break;
         }
       }
     }
+    P.first = false; P.fan = false; HD.refresh(G); scaleTick(G);
     return G.over;
   };
   // Zugende von s: Läufer bewegen sich, Jungtiere entwickeln sich

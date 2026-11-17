@@ -61,6 +61,7 @@
     <div class="piles"><button class="pile" id="dDeck"></button><button class="pile" id="dSide"></button></div>
     <div class="hand" id="hand"></div>
     <div class="bar"><button class="btn bell" id="bell">🔔 Angriff</button></div>
+    <div id="items"></div>
     <div id="info"></div>
   </div>
 </div>
@@ -79,8 +80,8 @@ const OPP = [
   { id: 'hexe', n: 'Die Moorhexe', icon: '🧙', c: '#a06bff', diff: 2, d: ['adder', 'adder', 'bat', 'bat', 'rattler', 'coyote', 'raven', 'raven', 'mantis', 'mantis_god', 'wolf', 'hound', 'ouro', 'packrat', 'cat', 'cockroach', 'ant', 'ant', 'ant_queen', 'kingfisher'], t: 'Mittel: Gift, Flieger und Knochen-Karten.' },
   { id: 'hirsch', n: 'Der Hirschkönig', icon: '🦌', c: '#ff8a00', diff: 3, d: ['elk', 'elk', 'elk_fawn', 'grizzly', 'grizzly', 'ox', 'vulture', 'hound', 'wolf', 'wolf', 'raven', 'mantis_god', 'bat', 'rattler', 'direwolf', 'shark', 'beaver', 'mole_man'], t: 'Schwer: große Tiere, schnelle Läufer.' }
 ];
-const T1 = ['stoat', 'wolf_cub', 'frog', 'adder', 'porcupine', 'mole', 'mantis', 'warren', 'goat', 'cat', 'otter', 'tadpole', 'raven_egg', 'ant', 'skink', 'opossum', 'elk_fawn'];
-const T2 = ['raven', 'bat', 'wolf', 'hound', 'packrat', 'coyote', 'beaver', 'kingfisher', 'ant_queen', 'cockroach', 'elk', 'mantis_god'];
+const T1 = ['stoat', 'wolf_cub', 'frog', 'adder', 'porcupine', 'mole', 'mantis', 'warren', 'goat', 'cat', 'otter', 'tadpole', 'raven_egg', 'ant', 'skink', 'opossum', 'elk_fawn', 'skunk', 'hare', 'hive', 'peddler'];
+const T2 = ['raven', 'bat', 'wolf', 'hound', 'packrat', 'coyote', 'beaver', 'kingfisher', 'ant_queen', 'cockroach', 'elk', 'mantis_god', 'snapper', 'packleader', 'ratking', 'anthill', 'juggler', 'mirrortoad'];
 const T3 = ['grizzly', 'rattler', 'direwolf', 'shark', 'ouro', 'mole_man', 'vulture', 'ox'];
 const AREAS = [
   { id: 'wald', n: 'Nebelwald', icon: '🌲', c: '#39ff14', pool: T1.concat(T1, T2), foes: [
@@ -111,7 +112,7 @@ const AREAS = [
 const STARTER = ['stoat', 'wolf_cub', 'frog', 'adder', 'raven', 'elk_fawn', 'porcupine', 'mole', 'mantis', 'warren', 'wolf', 'hound', 'cat', 'goat', 'otter'];
 const KEY = 'hd-camp-v2', DKEY = 'hd-death-v1';
 const deaths = () => store.get(DKEY) || [];
-let G = null, opp = null, ui = { sel: null, sac: [] }, busy = false, done = false, camp = null, fightNode = null, v3on = false;
+let G = null, opp = null, ui = { sel: null, sac: [], item: null }, busy = false, done = false, camp = null, fightNode = null, v3on = false;
 
 // ---------- Kartenelemente ----------
 function costHtml(c) { let s = ''; for (let i = 0; i < (c.cost.b || 0); i++) s += '🩸'; if (c.cost.o) s += (s ? '<br>' : '') + '🦴' + (c.cost.o > 1 ? '×' + c.cost.o : ''); return s; }
@@ -353,15 +354,20 @@ async function reward(up) {
   if (i >= 0) camp.deck.push(pick[i]);
 }
 // ---------- Todeskarte: Aus dem Scheitern entsteht eine Karte für spätere Kampagnen ----------
-async function makeDeathCard() {
-  const ids = [...new Set(camp.deck.map(d => d.id).filter(id => id !== 'death'))], pickIds = HD.shuffle(ids, Math.random).slice(0, 6);
-  const fi = await chooser('💀 ' + T('Deine Todeskarte', 'Your death card'), T('Die letzte Kerze ist erloschen. Aus deinem Scheitern entsteht eine Karte, die dir in einer späteren Kampagne helfen kann. Wähle ihr Gesicht.', 'The last candle is out. Your failure becomes a card that can help in a later campaign. Choose its face.'), pickIds.map(id => ({ id, a: 0, h: 0 })), []);
-  const face = HD.CARDS[pickIds[fi]];
-  const sigs = [...new Set([].concat(...camp.deck.map(d => HD.CARDS[d.id].sig)).filter(x => x !== 'fledge'))], offer = HD.shuffle(sigs, Math.random).slice(0, 3);
-  const si = await chooser('💀 ' + T('Fähigkeit wählen', 'Choose an ability'), T('Eine Fähigkeit aus deinem Deck geht auf die Todeskarte über.', 'One ability from your deck passes to the death card.'), [], offer.map((k, i) => ({ t: HD.SIG[k][1] + ' ' + HD.SIG[k][0] + ': ' + HD.SIG[k][2], v: i })).concat([{ t: T('Keine Fähigkeit', 'No ability'), v: -1, alt: true }]));
-  const sig = si >= 0 ? [offer[si]] : [], prog = camp.a * 9 + camp.hist.length;
-  const atk = Math.min(4, 1 + Math.floor(prog / 8)), hp = Math.max(1, Math.min(7, 2 + Math.floor(prog / 5) - (sig.length ? 1 : 0)));
-  const dc = { n: T('Geist: ', 'Ghost: ') + face.n, atk, hp, sig, art: face.art, cost: { b: 1 + (atk + hp >= 6 ? 1 : 0) + (atk + hp >= 9 ? 1 : 0) } };
+async function makeDeathCard() {      // Ablauf nach dem Regelbuch: je drei Karten zeigen und daraus Kosten, Werte und Fähigkeit wählen
+  const ids = [...new Set(camp.deck.map(d => d.id).filter(id => id !== 'death' && !HD.TOKENS[id]))], R = () => HD.shuffle(ids.slice(), Math.random);
+  const three = () => { const r = R(); while (r.length < 3) r.push(ids[Math.floor(Math.random() * ids.length)]); return r.slice(0, 3); };
+  const ask = async (title, text) => { const t = three(), i = await chooser(title, text, t.map(id => ({ id, a: 0, h: 0 })), []); return HD.CARDS[t[i]]; };
+  const faceIds = R().slice(0, 6), fi = await chooser('💀 ' + T('Gesicht', 'Face'), T('Die letzte Kerze ist erloschen. Aus deinem Scheitern entsteht eine Todeskarte. Wähle ihr Gesicht.', 'The last candle is out. Your failure becomes a death card. Choose its face.'), faceIds.map(id => ({ id, a: 0, h: 0 })), []);
+  const face = HD.CARDS[faceIds[fi]];
+  const cc = await ask('💀 ' + T('Kosten', 'Cost'), T('Wähle die Karte, deren Kosten die Todeskarte erhält.', 'Choose the card whose cost the death card gets.'));
+  const sc = await ask('💀 ' + T('Angriff und Leben', 'Power and health'), T('Wähle die Karte, deren Angriff und Leben du übernimmst.', 'Choose the card whose power and health you take.'));
+  const gc = await ask('💀 ' + T('Fähigkeit', 'Sigil'), T('Wähle die Karte, deren Fähigkeit du übernimmst (ohne Fähigkeit bleibt sie leer).', 'Choose the card whose sigil you take (none if it has none).'));
+  let atk = sc.atk, hp = sc.hp, sig = gc.sig.filter(k => k !== 'fledge').slice(0, 2);
+  if (gc.sig.indexOf('fledge') >= 0) { atk += 1; hp += 2; }      // Regelbuch: Jungtier-Fähigkeit gibt +1 Angriff und +2 Leben
+  atk = Math.min(4, atk); hp = Math.max(1, Math.min(7, hp));
+  let nm = ''; try { nm = prompt(T('Wie heißt deine Todeskarte?', 'What is your death card called?'), T('Geist: ', 'Ghost: ') + face.n) || ''; } catch (e) {} nm = (nm.trim() || T('Geist: ', 'Ghost: ') + face.n).slice(0, 30);
+  const dc = { n: nm, atk, hp, sig, art: face.art, cost: { b: cc.cost.b || 0, o: cc.cost.o || 0 } };
   const list = deaths(); list.push(dc); store.set(DKEY, list.slice(-6));
   await chooser('💀 ' + T('Die Todeskarte ist fertig', 'The death card is ready'), T('Sie wartet auf deine nächste Kampagne: Du kannst sie beim Start mitnehmen oder als Fund erhalten.', 'It waits for your next campaign: take it at the start or find it as loot.'), [{ id: 'death', dc }], [{ t: 'OK', v: 1 }]);
 }
@@ -426,12 +432,35 @@ function targets() {
   for (let l = 0; l < 4; l++) if (!HD.check(G, 0, ui.sel, l, ui.sac)) r.push(l);
   return r;
 }
+function itemTargets() { // gültige Gegner-/Eigenbahnen für den gerade gewählten Gegenstand
+  const it = ui.item; if (!it || !G) return { o: [], p: [] }; const P = G.p[0], O = G.p[1], kind = HD.ITEMS[P.items[it.i]][3];
+  const o = [], p = []; if (kind === 'e' || (kind === 'h' && it.l == null)) O.board.forEach((c, l) => { if (c) o.push(l); });
+  if (kind === 'h' && it.l != null) P.board.forEach((c, l) => { if (!c) p.push(l); });
+  return { o, p };
+}
+function paintItems() {
+  const el = $('items'); if (!G) return; const P = G.p[0], can = G.turn === 0 && !busy && G.over === null && (G.phase === 'draw' || G.phase === 'main');
+  el.innerHTML = P.items.length ? '<span class="il">' + T('Gegenstände', 'Items') + ':</span>' + P.items.map((id, i) => '<button class="itm' + (ui.item && ui.item.i === i ? ' on' : '') + '" data-i="' + i + '"' + (can ? '' : ' disabled') + ' title="' + HD.ITEMS[id][2] + '">' + HD.ITEMS[id][1] + ' ' + HD.ITEMS[id][0] + '</button>').join('') : '';
+}
+$('items').addEventListener('click', async e => {
+  const b = e.target.closest('.itm'); if (!b || busy || !G || G.turn !== 0) return; const i = +b.dataset.i, id = G.p[0].items[i], kind = HD.ITEMS[id][3];
+  info(null); $('info').innerHTML = '<b>' + HD.ITEMS[id][1] + ' ' + HD.ITEMS[id][0] + '</b>: ' + HD.ITEMS[id][2];
+  if (kind) { ui = { sel: null, sac: [], item: ui.item && ui.item.i === i ? null : { i, l: null } }; say(ui.item ? (kind === 'h' ? T('Wähle die gegnerische Karte, die du dir holst.', 'Choose the enemy card to take.') : T('Wähle das Ziel.', 'Choose the target.')) : ''); render(); return; }
+  busy = true; HD.useItem(G, 0, i, {}); busy = false; if (finish()) return; render();
+});
+async function oppSlotAction(l) {
+  if (!ui.item || busy) return; const t = itemTargets(); if (t.o.indexOf(l) < 0) return; const id = G.p[0].items[ui.item.i], kind = HD.ITEMS[id][3];
+  if (kind === 'h') { ui.item.l = l; say(T('Wähle eine freie Bahn auf deiner Seite.', 'Choose an empty lane on your side.')); render(); return; }
+  const i = ui.item.i; ui.item = null; busy = true; const r = HD.useItem(G, 0, i, { l }); busy = false; if (r) say(r); if (finish()) return; render();
+}
+$('ob').addEventListener('click', e => { const sl = e.target.closest('.slot'); if (sl) oppSlotAction(+sl.dataset.l); });
 function render() {
-  if (!G) return; HD.refresh(G);
+  if (!G) return; HD.refresh(G); paintItems();
   const P = G.p[0], O = G.p[1], tg = targets(), c = ui.sel != null ? P.hand[ui.sel] : null;
   const needSac = c && (c.cost.b || 0) > 0 && tg.length === 0;
   const fillRow = (id, row, arr, cls, mine) => { const el = $(id); el.innerHTML = ''; for (let l = 0; l < 4; l++) { const s = slotEl(row, l, arr[l], cls); if (mine) { if (tg.indexOf(l) >= 0) s.classList.add('tgt'); const cd = s.firstChild; if (cd) { if (ui.sac.indexOf(l) >= 0) cd.classList.add('sac'); if (needSac) cd.classList.add('ok'); } } el.appendChild(s); } };
   fillRow('oq', 'oq', O.queue, 'opp', false); fillRow('ob', 'ob', O.board, 'opp', false); fillRow('pb', 'pb', P.board, '', true);
+  const it = itemTargets(); [...$('ob').children].forEach(sl => { if (it.o.indexOf(+sl.dataset.l) >= 0) sl.classList.add('tgt'); }); [...$('pb').children].forEach(sl => { if (it.p.indexOf(+sl.dataset.l) >= 0) sl.classList.add('tgt'); });
   const h = $('hand'); h.innerHTML = ''; P.hand.forEach((cd, i) => { const e = cardEl(cd, 'ok' + (i === ui.sel ? ' sel' : '')); e.dataset.i = i; h.appendChild(e); });
   const d = HD.diff(G); $('mk').style.left = (50 + d * (45 / G.win)) + '%';
   $('lbO').textContent = opp.n + ' · ' + O.dmg; $('lbY').textContent = T('Du', 'You') + ' · ' + P.dmg;
@@ -442,7 +471,7 @@ function render() {
   $('dDeck').classList.toggle('on', canDraw); $('dSide').classList.toggle('on', canDraw);
   $('bell').disabled = !(my && G.phase === 'main');
   $('turnS').textContent = T('Runde ', 'Round ') + G.n;
-  if (v3on && window.V3 && V3.ready) V3.sync({ G, tg, sac: ui.sac, opp });
+  if (v3on && window.V3 && V3.ready) V3.sync({ G, tg: tg.concat(it.p), tgo: it.o, sac: ui.sac, opp });
 }
 function flash(s, l, cls) { const el = document.querySelector('.slot[data-row="' + (s === 0 ? 'pb' : 'ob') + '"][data-l="' + l + '"] .card'); if (el) el.classList.add(cls); }
 async function hook(ev) {
@@ -462,7 +491,7 @@ async function set3d(on) {
   try {
     if (!window.THREE) await loadJs('https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js');
     if (!window.V3) await loadJs('view3d.js?v=' + Date.now());
-    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); }, onHover: k => { if (camp && inCamp()) setInfo(k); } });
+    if (!V3.ready) V3.init($('t3d'), { onSlot: (row, l) => { if (row === 'pb') slotAction(l); else if (row === 'ob') oppSlotAction(l); }, onHover: k => { if (camp && inCamp()) setInfo(k); } });
     v3on = true; document.body.classList.add('v3'); $('b3d').textContent = '▦ 2D';
     if (camping) showCamp(); else if (gaming) { V3.attach($('t3d')); V3.setMode('board'); V3.show(true); render(); }
   } catch (e) { v3on = false; document.body.classList.remove('v3'); say(T('3D konnte nicht geladen werden (Internet?). Es bleibt bei 2D.', '3D could not be loaded. Staying in 2D.')); if (camping) showCamp(); }
@@ -480,6 +509,7 @@ $('hand').addEventListener('click', e => {
   if (c) { if ((c.cost.o || 0) > G.p[0].bones) say(T('Dafür fehlen Knochen 🦴.', 'Not enough bones 🦴.')); else if ((c.cost.b || 0) > 0) say(T('Wähle ', 'Choose ') + c.cost.b + T(' Karte(n) als Opfer 🩸.', ' card(s) to sacrifice 🩸.')); else say(T('Wähle eine freie Bahn.', 'Choose an empty lane.')); }
 });
 async function slotAction(l) {
+  if (ui.item && ui.item.l != null && !busy) { const t = itemTargets(); if (t.p.indexOf(l) >= 0) { const i = ui.item.i, el = ui.item.l; ui.item = null; busy = true; HD.useItem(G, 0, i, { l: el, to: l }); busy = false; if (finish()) return; render(); } return; }
   if (busy || !G || G.turn !== 0 || ui.sel == null) return;
   const P = G.p[0], c = P.hand[ui.sel], tg = targets();
   if (tg.indexOf(l) >= 0) { busy = true; const idx = ui.sel, sac = ui.sac.slice(); ui = { sel: null, sac: [] }; await HD.play(G, 0, idx, l, sac, hook); busy = false; say(T('Weiter ausspielen oder die Klingel läuten.', 'Play more cards or ring the bell.')); render(); return; }
@@ -492,7 +522,7 @@ $('bell').onclick = async () => {
   if (busy || G.turn !== 0 || G.phase !== 'main') return; busy = true; ui = { sel: null, sac: [] }; render(); say(T('Angriff!', 'Attack!'));
   await HD.attack(G, 0, hook); if (finish()) return;
   HD.endTurn(G, 0); render(); await sleep(300);
-  await npcTurn(); if (finish()) return;
+  if (G.p[1].skip) { G.p[1].skip = false; say(T('⏳ Der Gegner überspringt seinen Zug.', '⏳ The enemy skips their turn.')); await sleep(900); } else { await npcTurn(); if (finish()) return; }
   busy = false; beginTurn(); render();
 };
 async function npcTurn() {
