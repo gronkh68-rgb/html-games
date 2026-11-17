@@ -92,9 +92,9 @@
   HD.shuffle = shuffle;
   // opts: { decks:[[id..],[id..]], npc: true|false, rnd }
   HD.newGame = function (opts) {
-    var rnd0 = opts.rnd || Math.random, G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd, log: [], win: opts.win || WIN, boss: opts.boss || null, bossRisen: 0 };
+    var rnd0 = opts.rnd || Math.random, G = { p: [], turn: 0, n: 0, phase: 'draw', over: null, npc: !!opts.npc, rnd: opts.rnd, log: [], win: opts.win || WIN, hard: !!opts.hard, boss: opts.boss || null, bossRisen: 0 };
     for (var s = 0; s < 2; s++) {
-      var deck = shuffle(opts.decks[s].map(function (x) { return HD.make(x); }), rnd0), side = []; for (var i = 0; i < 20; i++) side.push(HD.make('squirrel'));
+      var deck = shuffle(opts.decks[s].map(function (x) { return HD.make(x); }), rnd0), side = []; for (var i = 0; i < 10; i++) side.push(HD.make('squirrel'));      // begrenzter Opfer-Vorrat: Jedes Eichhörnchen zählt
       var P = { deck: deck, side: side, hand: [], board: [null, null, null, null], queue: [null, null, null, null], bones: 0, dmg: 0, drew: false };
       G.p.push(P);
       for (var h = 0; h < 3; h++) if (P.deck.length) P.hand.push(P.deck.pop());
@@ -216,18 +216,28 @@
     var P = G.p[s];
     for (var i = 0; i < LANES; i++) if (P.queue[i] && !P.board[i]) { P.board[i] = P.queue[i]; P.queue[i] = null; P.board[i].age = 0; onEnter(G, s, i); }
   };
-  // Legt neue Karten in die Warteschlange; diff = Schwierigkeit 1..3
+  // Legt neue Karten in die Warteschlange; diff = Schwierigkeit 1..3. Der Gegner wählt Karte und Bahn passend zu deinem Feld
+  // (Blocker gegen deine starken Karten, Angreifer in deine leeren Bahnen), die Stärke der Karten wächst mit der Rundenzahl.
   HD.fillQueue = function (G, s, diff) {
-    var P = G.p[s], O = G.p[1 - s], rnd = G.rnd || Math.random, n = 1 + (diff >= 2 && G.n > 5 ? 1 : 0) + (diff >= 3 && G.n > 3 ? 1 : 0) + (G.boss === 'pack' && HD.diff(G) >= 3 ? 1 : 0);
+    var P = G.p[s], O = G.p[1 - s], rnd = G.rnd || Math.random, hard = G.hard ? 1 : 0;
+    var n = 1 + (diff >= 2 && G.n > 5 ? 1 : 0) + (diff >= 3 && G.n > 3 ? 1 : 0) + (G.boss === 'pack' && HD.diff(G) >= 3 ? 1 : 0) + (hard && G.n > 4 ? 1 : 0);
     for (var k = 0; k < n && P.deck.length; k++) {
-      var free = []; for (var i = 0; i < LANES; i++) if (!P.queue[i]) free.push(i);
-      if (!free.length) break;
-      var lane = free[0], best = -99;
-      free.forEach(function (l) { var sc = rnd() * 2; if (O.board[l]) sc += 2 + O.board[l].atk * .5; if (!P.board[l]) sc += 1; if (P.board[l]) sc -= 3; if (sc > best) { best = sc; lane = l; } });
-      var lim = 3 + G.n * (.7 + diff * .3), el = [], mn = 0;
-      P.deck.forEach(function (c, ix) { var pw = c.atk + c.hp; if (pw <= lim) el.push(ix); if (pw < P.deck[mn].atk + P.deck[mn].hp) mn = ix; });
-      var pick = el.length ? el[Math.floor(rnd() * el.length)] : mn;
-      P.queue[lane] = P.deck.splice(pick, 1)[0];
+      var lim = (3 + G.n * (.7 + diff * .3)) * (hard ? 1.25 : 1), best = null, bs = -99, any = null;
+      for (var l = 0; l < LANES; l++) {
+        if (P.queue[l]) continue;
+        for (var ix = 0; ix < P.deck.length; ix++) {
+          var c = P.deck[ix], pw = c.atk + c.hp; if (!any || pw < any.pw) any = { ix: ix, l: l, pw: pw };
+          if (pw > lim) continue;
+          var e = O.board[l], sc = rnd() * 1.6 + pw * .25;
+          if (e) { if (c.hp > e.atk) sc += 2; if (c.atk >= e.hp) sc += 2.5; if (e.atk > 0 && c.hp <= e.atk && !HD.has(c, 'death')) sc -= 1.5; if (HD.has(c, 'airborne')) sc += .5; }
+          else sc += c.atk * 1.4 + (HD.has(c, 'airborne') ? 1 : 0);
+          if (P.board[l]) sc -= 3;
+          if (HD.has(c, 'death') || HD.has(c, 'quills')) sc += e ? 1 : 0;
+          if (sc > bs) { bs = sc; best = { ix: ix, l: l }; }
+        }
+      }
+      var pick = best || any; if (!pick) break;
+      P.queue[pick.l] = P.deck.splice(pick.ix, 1)[0];
     }
   };
   // Einfacher Spieler-Bot (für Tests und als Platzhalter): zieht, spielt so viel wie möglich, gibt zurück

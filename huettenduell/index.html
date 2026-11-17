@@ -133,11 +133,13 @@ function chooser(title, text, cards, opts) {      // Auswahl-Fenster: cards = [{
 // ---------- Menü ----------
 function paintMenu() {
   $('kT').textContent = T('Kampagne', 'Campaign');
-  $('kP').innerHTML = T('Zieh durch drei Gebiete mit je zwei Kämpfen, einem Lagerfeuer und einem <b>Boss</b>. Nach jedem Sieg wählst du eine neue Karte. Du hast <b>zwei Kerzen</b>: Jede Niederlage löscht eine. Bosse haben eigene Regeln und brauchen <b>7</b> Punkte Vorsprung. Dein Fortschritt wird im Browser gespeichert.', 'Travel through three regions with two fights, a campfire and a <b>boss</b> each. After every win you pick a new card. You have <b>two candles</b>: every defeat snuffs one. Bosses have special rules and need a <b>7</b> point lead. Your progress is saved in your browser.');
+  $('kP').innerHTML = T('Zieh durch drei Gebiete mit je zwei Kämpfen, einem Lagerfeuer und einem <b>Boss</b>. Nach jedem Sieg wählst du eine neue Karte. Du hast <b>zwei Kerzen</b> (im schweren Modus nur eine): Jede Niederlage löscht eine. Bosse haben eigene Regeln und brauchen <b>7</b> Punkte Vorsprung. Dein Fortschritt wird im Browser gespeichert.', 'Travel through three regions with two fights, a campfire and a <b>boss</b> each. After every win you pick a new card. You have <b>two candles</b> (one in hard mode): every defeat snuffs one. Bosses have special rules and need a <b>7</b> point lead. Your progress is saved in your browser.');
   const sv = store.get(KEY), B = $('kBtns'); B.innerHTML = '';
   const mk = (t, f, alt) => { const b = document.createElement('button'); b.className = 'btn' + (alt ? ' alt' : ''); b.textContent = t; b.onclick = f; B.appendChild(b); };
   if (sv) mk('▶ ' + T('Kampagne fortsetzen', 'Continue') + ' (' + AREAS[sv.a].icon + ' ' + AREAS[sv.a].n + ')', () => { camp = sv; showCamp(); });
-  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = newCamp(); offerDeath().then(() => { store.set(KEY, camp); showCamp(); }); }, !!sv);
+  const fresh = hard => () => { if (sv && !confirm(T('Gespeicherte Kampagne überschreiben?', 'Overwrite saved campaign?'))) return; camp = newCamp(hard); offerDeath().then(() => { store.set(KEY, camp); showCamp(); }); };
+  mk(sv ? T('Neue Kampagne', 'New campaign') : '▶ ' + T('Kampagne starten', 'Start campaign'), fresh(false), !!sv);
+  mk('💀 ' + T('Schwer: 1 Kerze, stärkere Gegner', 'Hard: 1 candle, tougher enemies'), fresh(true), true);
   $('oT').textContent = T('Mehrspieler', 'Multiplayer'); $('oP').textContent = T('Duell gegen einen anderen Spieler online oder gegen den Computer, mit eigenem Deck, Wiederbeitritt und Zuschauern.', 'Duel another player online or the computer, with your own deck, rejoin and spectators.'); $('oBtn').textContent = '🌐 ' + T('Duell spielen', 'Play a duel');
   $('mT').textContent = T('Freies Duell', 'Free duel');
   $('rules').innerHTML = T(
@@ -155,12 +157,13 @@ $('ogrid').addEventListener('click', e => { const b = e.target.closest('[data-o]
 
 // ---------- Kampagne: verzweigte Karte ----------
 const NAME = { fight: 'Kampf', elite: 'Elitekampf', camp: 'Lagerfeuer', pick: 'Kartenfund', trade: 'Händler', boss: 'Boss' };
-function nodeName(n) { return n.t === 'camp' ? T('Lagerfeuer', 'Campfire') : n.t === 'pick' ? T('Kartenfund', 'Card find') : n.t === 'trade' ? T('Händler', 'Trader') : n.o.n; }
+function nodeName(n) { return n.t === 'event' ? T('Ereignis', 'Event') : n.t === 'camp' ? T('Lagerfeuer', 'Campfire') : n.t === 'pick' ? T('Kartenfund', 'Card find') : n.t === 'trade' ? T('Händler', 'Trader') : n.o.n; }
 function nodeDesc(n) {
   if (n.t === 'fight') return '⚔️ ' + T('Kampf gegen ', 'Fight vs ') + n.o.n + ' – ' + T('Belohnung: eine neue Karte', 'reward: a new card');
   if (n.t === 'elite') return '💀 ' + T('Elitegegner ', 'Elite ') + n.o.n + ' – ' + T('stärker, dafür bessere Belohnung', 'tougher, better reward');
   if (n.t === 'camp') return '🔥 ' + T('Lagerfeuer: rasten, stärken, schärfen oder aussortieren', 'Campfire: rest, strengthen, sharpen or cull');
   if (n.t === 'pick') return '🎴 ' + T('Kartenfund: wähle eine von drei Karten', 'Card find: choose one of three cards');
+  if (n.t === 'event') return '👁️ ' + T('Ereignis: etwas Unheimliches am Weg. Du musst dich entscheiden.', 'Event: something uncanny on the road. You must decide.');
   if (n.t === 'trade') return '🪙 ' + T('Händler: tausche eine Karte gegen eine zufällige stärkere', 'Trader: swap a card for a random stronger one');
   return '👑 ' + T('Boss ', 'Boss ') + n.o.n + ' – ' + HD.BOSS[n.o.boss][0] + ': ' + HD.BOSS[n.o.boss][1];
 }
@@ -168,7 +171,7 @@ const WW = 320, STEP = 72, PAD = 150;      // Karte: Breite in Pixeln, Abstand d
 function genMap(ai) {
   const A = AREAS[ai], R = Math.random, shuf = a => HD.shuffle(a.slice(), R), foes = shuf(A.foes), elites = shuf(A.elites); let fi = 0, ei = 0;
   const mk = t => t === 'fight' ? { t, o: foes[fi++ % foes.length] } : t === 'elite' ? { t, o: elites[ei++ % elites.length] } : { t };
-  const kinds = [['fight'], ['fight', 'fight', 'pick', 'trade'], ['fight', 'fight', 'pick', 'trade'], ['camp', 'fight', 'pick'], ['fight', 'elite', 'camp', 'pick', 'trade'], ['fight', 'elite', 'camp', 'pick', 'trade'], ['fight', 'elite', 'camp'], ['camp', 'pick', 'camp']], counts = [2, 3, 3, 2, 3, 3, 3, 2], layers = [];
+  const kinds = [['fight'], ['fight', 'fight', 'pick', 'event'], ['fight', 'fight', 'trade', 'event'], ['camp', 'fight', 'event'], ['fight', 'elite', 'camp', 'event', 'trade'], ['fight', 'elite', 'camp', 'event', 'pick'], ['fight', 'elite', 'camp', 'event'], ['camp', 'pick', 'camp']], counts = [2, 3, 3, 2, 3, 3, 3, 2], layers = [];
   counts.forEach((c, li) => { const row = []; for (let j = 0; j < c; j++) row.push(mk(kinds[li][Math.floor(R() * kinds[li].length)])); layers.push(row); });
   if (!layers[3].some(n => n.t === 'camp')) layers[3][0] = mk('camp');
   if (!layers[7].some(n => n.t === 'camp')) layers[7][0] = mk('camp');
@@ -183,7 +186,7 @@ function genMap(ai) {
   layers.forEach((row, li) => row.forEach((n, j) => { n.x = Math.max(.15, Math.min(.85, .5 + (j - (row.length - 1) / 2) * .27 + (R() - .5) * .06)); n.wy = Math.round(H - PAD - li * STEP + (R() - .5) * 10); if (li === layers.length - 1) n.x = .5; }));
   return { layers, H };
 }
-function newCamp() { const c = { a: 0, map: null, at: null, pend: null, hist: [], c: 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; c.map = genMap(0); return c; }
+function newCamp(hard) { const c = { a: 0, map: null, at: null, pend: null, hist: [], hard: !!hard, c: hard ? 1 : 2, deck: STARTER.map(id => ({ id, a: 0, h: 0 })) }; c.map = genMap(0); return c; }
 const key = (l, i) => l + ':' + i, parse = k => k.split(':').map(Number), nodeAt = k => { const p = parse(k); return camp.map.layers[p[0]][p[1]]; };
 function reachable() {
   if (camp.pend) return [];
@@ -202,6 +205,7 @@ const HALF = {
   boss: ['y..y..yy', 'yyyyyyyy', 'yyyrryyy', '..wwwwww', '.wwwwwww', 'wwwwwwww', 'wwkkkwww', 'wwkkkkww', 'wwwkkkww', 'wwwwwwkk', '.wwwwwww', '..wkwkwk', '..wkwkwk', '...wwwww', '........', '........'],
   elite: ['o.......', 'oo......', 'ooo.....', '.ooowwww', '..wwwwww', '..wwwwww', '..wrrwww', '..wrrrww', '..wwwrww', '...wwwwk', '...wwwww', '....wkwk', '....wkwk', '.....www', '........', '........'],
   pick: ['........', '........', 'bbbbbbbb', 'bBBBBBBB', 'bBBBBBBB', 'yyyyyyyy', 'bbbbbbyy', 'bBBBBByk', 'bBBBBBBB', 'bBBBBBBB', 'bbbbbbbb', 'kkkkkkkk', '........', '........', '........', '........'],
+  event: ['........', '........', '..kkkkkk', '.kwwwwww', 'kwwwpppp', 'kwwppkkk', 'kwwppkkk', 'kwwwpppp', '.kwwwwww', '..kkkkkk', '........', '........', '........', '........', '........', '........'],
   trade: ['........', '.....yyy', '...yyyyy', '..yyoooo', '.yyooyyy', '.yyoyyyy', 'yyoyyyyy', 'yyoyyyyy', 'yyoyyyyy', '.yyoyyyy', '.yyooyyy', '..yyoooo', '...yyyyy', '.....yyy', '........', '........'],
   pine: ['.....d', '.....d', '....dd', '...ddG', '....dd', '..dddG', '.ddddG', '...ddd', '.dddGG', 'ddddGG', '.....b', '.....b'],
   tomb: ['..tttt', '.tssss', 'tssssk', 'tsskss', 'tsskss', 'tssssk', 'tssssk', 'tttttt'],
@@ -221,7 +225,7 @@ function icon(t) {
   else c = sprCanvas(HALF[t]);
   return (iconCache[t] = c);
 }
-const TCOL = { fight: '#c9a24e', elite: '#d8392b', boss: '#ff8a1f', camp: '#ff8a1f', pick: '#4fd8ff', trade: '#ffd23f' };
+const TCOL = { event: '#a06bff', fight: '#c9a24e', elite: '#d8392b', boss: '#ff8a1f', camp: '#ff8a1f', pick: '#4fd8ff', trade: '#ffd23f' };
 let bgCache = {};
 function rng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
 function mapBg(ai, H) {
@@ -319,7 +323,7 @@ $('cGo').onclick = () => { if (!busyNode) runNode(); };
 async function runNode() {
   const n = nodeAt(camp.pend);
   if (n.t === 'fight' || n.t === 'elite' || n.t === 'boss') { fightNode = n; startDuel(n.o, camp.deck.slice()); return; }
-  if (n.t === 'camp') await campfire(); else if (n.t === 'pick') await reward(false); else if (n.t === 'trade') await trade();
+  if (n.t === 'camp') await campfire(); else if (n.t === 'pick') await reward(false); else if (n.t === 'trade') await trade(); else if (n.t === 'event') await event();
   await completeNode();
 }
 async function completeNode() {
@@ -336,7 +340,7 @@ async function campfire() {
   const o = await chooser('🔥 ' + T('Lagerfeuer', 'Campfire'), T('Wähle eine Hilfe. Du darfst nur eine nutzen.', 'Choose one help. You may use only one.'), [], [
     { t: '🕯️ ' + T('Rasten: eine Kerze entzünden (höchstens 3)', 'Rest: light a candle (max 3)'), v: 'rest' }, { t: '❤️ ' + T('Stärken: eine Karte erhält +1 Leben', 'Strengthen: a card gets +1 health'), v: 'hp' },
     { t: '⚔️ ' + T('Schärfen: eine Karte erhält +1 Angriff', 'Sharpen: a card gets +1 attack'), v: 'atk' }, { t: '🗑️ ' + T('Aussortieren: eine Karte aus dem Deck entfernen', 'Cull: remove a card from the deck'), v: 'cull' }]);
-  if (o === 'rest') { camp.c = Math.min(3, camp.c + 1); return; }
+  if (o === 'rest') { camp.c = Math.min(camp.hard ? 2 : 3, camp.c + 1); return; }
   const i = await chooser(o === 'hp' ? T('Welche Karte stärken?', 'Which card?') : o === 'atk' ? T('Welche Karte schärfen?', 'Which card?') : T('Welche Karte entfernen?', 'Which card?'), '', camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]);
   if (i < 0) return campfire();
   if (o === 'hp') camp.deck[i].h++; else if (o === 'atk') camp.deck[i].a++; else if (camp.deck.length > 8) camp.deck.splice(i, 1); else { alert(T('Das Deck braucht mindestens 8 Karten.', 'The deck needs at least 8 cards.')); return campfire(); }
@@ -366,6 +370,25 @@ async function offerDeath() {
   const i = await chooser('💀 ' + T('Todeskarte mitnehmen?', 'Take a death card?'), T('Eine Karte aus früheren Kampagnen darf ins Startdeck.', 'A card from earlier campaigns may join your starting deck.'), list.map(dc => ({ id: 'death', dc })), [{ t: T('Ohne Todeskarte starten', 'Start without'), v: -1, alt: true }]);
   if (i >= 0) camp.deck.push({ id: 'death', dc: list[i], a: 0, h: 0 });
 }
+// Ereignisse: Entscheidungen mit Preis
+async function event() {
+  const ev = Math.floor(Math.random() * 3), deckN = () => camp.deck.length;
+  if (ev === 0) {
+    const o = await chooser('👁️ ' + T('Der Pakt am Wegesrand', 'The pact by the road'), T('Eine verhüllte Gestalt bietet dir eine mächtige Karte an. Der Preis: eine Kerze.', 'A hooded figure offers a powerful card. The price: a candle.'), [], [{ t: '🕯️ ' + T('Annehmen: starke Karte, aber eine Kerze erlischt', 'Accept: strong card, but a candle goes out'), v: 'yes' }, { t: T('Ablehnen und weitergehen', 'Decline and move on'), v: 'no', alt: true }]);
+    if (o === 'yes') { if (camp.c <= 1) { await chooser('👁️', T('Die Gestalt lacht: „Deine letzte Kerze? Nein.“ Sie verschwindet.', 'The figure laughs: "Your last candle? No." It vanishes.'), [], [{ t: 'OK', v: 1 }]); return; } camp.c--; const id = T3[Math.floor(Math.random() * T3.length)]; camp.deck.push({ id, a: 0, h: 0 }); await chooser('👁️ ' + T('Der Pakt gilt', 'The pact holds'), T('Du erhältst: ', 'You receive: ') + HD.CARDS[id].n, [{ id, a: 0, h: 0 }], [{ t: 'OK', v: 1 }]); }
+  } else if (ev === 1) {
+    const o = await chooser('👁️ ' + T('Der Verwundete', 'The wounded wanderer'), T('Ein Wanderer liegt im Dreck. Hilfst du ihm, kostet es dich eine Karte, aber er stärkt deine Kerzen.', 'A wanderer lies in the dirt. Helping costs you a card, but he strengthens your candles.'), [], [{ t: '❤️ ' + T('Helfen: eine Karte abgeben, eine Kerze entzünden', 'Help: give a card, light a candle'), v: 'yes' }, { t: T('Weitergehen', 'Move on'), v: 'no', alt: true }]);
+    if (o === 'yes' && deckN() > 8) { const i = await chooser(T('Welche Karte gibst du ab?', 'Which card do you give?'), '', camp.deck, [{ t: T('Doch nicht', 'Never mind'), v: -1, alt: true }]); if (i >= 0) { camp.deck.splice(i, 1); camp.c = Math.min(camp.hard ? 2 : 3, camp.c + 1); } }
+  } else {
+    const o = await chooser('👁️ ' + T('Der Opferstein', 'The sacrificial stone'), T('Opfere zwei Karten deines Decks, und eine andere erhält +2 Angriff und +2 Leben.', 'Sacrifice two deck cards and another gets +2 attack and +2 health.'), [], [{ t: '🩸 ' + T('Opfern', 'Sacrifice'), v: 'yes' }, { t: T('Weitergehen', 'Move on'), v: 'no', alt: true }]);
+    if (o === 'yes' && deckN() > 10) {
+      const a = await chooser(T('Erstes Opfer', 'First sacrifice'), '', camp.deck, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (a < 0) return;
+      const rest = camp.deck.filter((_, i) => i !== a), b = await chooser(T('Zweites Opfer', 'Second sacrifice'), '', rest, [{ t: T('Abbrechen', 'Cancel'), v: -1, alt: true }]); if (b < 0) return;
+      const first = camp.deck[a], second = rest[b]; camp.deck = camp.deck.filter(x => x !== first && x !== second);
+      const t = await chooser(T('Wer wird gestärkt?', 'Who is empowered?'), T('+2 Angriff und +2 Leben für immer.', '+2 attack and +2 health forever.'), camp.deck, []); camp.deck[t].a += 2; camp.deck[t].h += 2;
+    }
+  }
+}
 async function trade() {
   const i = await chooser('🪙 ' + T('Händler', 'Trader'), T('Gib eine Karte ab und erhalte eine zufällige stärkere.', 'Give a card and receive a random stronger one.'), camp.deck, [{ t: T('Nicht tauschen', 'No deal'), v: -1, alt: true }]);
   if (i < 0) return;
@@ -376,9 +399,10 @@ async function trade() {
 
 // ---------- Spielstart ----------
 function startDuel(o, deck) {
-  opp = o; done = false; busy = false; ui = { sel: null, sac: [] };
-  G = HD.newGame({ decks: [deck, o.d.map(id => ({ id, a: 0, h: 0 }))], npc: true, boss: o.boss || null, win: o.win || 5 });
-  HD.fillQueue(G, 1, o.diff);
+  const hard = !!(camp && fightNode && camp.hard);
+  const base = o.base || o.diff; opp = Object.assign({}, o, { base, diff: Math.min(3, base + (hard ? 1 : 0)) }); o = opp; done = false; busy = false; ui = { sel: null, sac: [] };
+  G = HD.newGame({ decks: [deck, o.d.map(id => ({ id, a: 0, h: 0 }))], npc: true, boss: o.boss || null, win: o.win || 5, hard });
+  if (o.boss || hard || o.diff >= 2) HD.fillQueue(G, 1, o.diff);      // Erster Gegner-Zug: ab mittlerer Stufe, bei Bossen und im schweren Modus wartet schon eine Karte
   if (o.boss === 'curse') HD.fillQueue(G, 1, o.diff);
   document.body.classList.add('ingame'); $('back').onclick = e => { e.preventDefault(); $('bMenu').onclick(); };
   const bi = $('bossInfo'); if (o.boss) { bi.style.display = 'block'; bi.innerHTML = '👑 <b>' + o.n + '</b> · ' + HD.BOSS[o.boss][0] + ': ' + HD.BOSS[o.boss][1] + ' ' + T('Sieg ab ', 'Win at ') + o.win + T(' Punkten Vorsprung.', ' points lead.'); } else bi.style.display = 'none';
@@ -506,7 +530,7 @@ paintMenu(); paintBook();
 let want3 = true; try { want3 = localStorage.getItem('hd-3d') !== '0'; } catch (e) {}
 if (want3) set3d(true);
 window.__hdReady = true;
-window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS, chooseNode: k => chooseNode(k) };
+window.HDUI = { get G() { return G; }, get camp() { return camp; }, startDuel, set3d, AREAS, chooseNode: k => chooseNode(k), event: () => event(), newCamp };
 })();
 </script>
 </body>
