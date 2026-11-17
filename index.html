@@ -250,10 +250,10 @@ html[data-fx="off"][data-style="dark"] .gc,html[data-fx="off"][data-style="dark"
       <p>Eigenes Foto oder Bilder aus der Galerie, 6 bis 150 Teile, verschiedene Teileformen, Drag &amp; Drop mit Animationen. Wahlweise flach in 2D oder als 3D-Tisch mit Schatten.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="gc" href="tetris/">
-      <div class="icon">🧱</div>
-      <h2>Tetris</h2>
-      <p>Der Klassiker mit Hold, Vorschau, Schatten-Stein, Wandtritten und Level. Mit Tastatur oder Touch.</p>
+    <a class="gc" href="arcade/">
+      <div class="icon">🕹️</div>
+      <h2>Arcade</h2>
+      <p>Spielhalle mit acht Klassikern: Tetris, Chomp Klassik, Snake, Sternenjäger, Fass-Kletterer, Ziegelbrecher, Asteroiden und Straßenhüpfer. Mit Highscores, Tastatur und Touch.</p>
       <span class="play">Spielen →</span>
     </a>
     <a class="gc" href="tron/">
@@ -322,12 +322,6 @@ html[data-fx="off"][data-style="dark"] .gc,html[data-fx="off"][data-style="dark"
       <p>Der Klötzchenturm in 3D für 2 bis 4 Spieler: Klotz wählen, mit ruhiger Hand herausziehen, oben auflegen. Wer den Turm umwirft, verliert.</p>
       <span class="play">Spielen →</span>
     </a>
-    <a class="gc" href="chomp-klassik/">
-      <div class="icon">🟡</div>
-      <h2>Chomp Klassik</h2>
-      <p>Das klassische Labyrinth für einen Spieler: alle Punkte fressen, vier Geister mit eigenem Verhalten, große Punkte, Früchte, Tunnel und steigende Level.</p>
-      <span class="play">Spielen →</span>
-    </a>
     <a class="gc" href="fixer-fritz/">
       <div class="icon">🔨</div>
       <h2>Fixer Fritz</h2>
@@ -378,9 +372,9 @@ const grid=document.querySelector('.grid'),cards=[...grid.querySelectorAll('.gc'
 const META={
  'wortgitter':['brett','2–4',1,0],'hoellen-tycoon':['brett','2–6',1,1],'heldengilde':['karten','2–6',1,0],'auf-und-ab':['karten','1–5',1,0],'rummikub':['brett','2–4',1,1],
  'zollkreuzwort':['denken','1',0,0],'mensch-aergere-dich-nicht':['wuerfel','2–4',1,1],'farbchaos':['karten','2–4',1,0],'hanafuda':['karten','2',1,1],'puzzle':['denken','1',0,1],
- 'tron':['arcade','1–4',1,1],'tetris':['arcade','1',0,1],'poker':['karten','2–6',1,1],'blackjack':['karten','1–5',1,1],'vier-gewinnt':['brett','2',1,0],'muehle':['brett','2',1,0],
+ 'tron':['arcade','1–4',1,1],'arcade':['arcade','1',0,1],'poker':['karten','2–6',1,1],'blackjack':['karten','1–5',1,1],'vier-gewinnt':['brett','2',1,0],'muehle':['brett','2',1,0],
  'schiffe-versenken':['brett','2',1,0],'chomp-arena':['arcade','1–4',0,0],'mensch-teams':['wuerfel','2–4',1,1],'domino':['brett','2–4',1,0],'billard':['arcade','2',1,1],
- 'jenga':['arcade','2–4',1,1],'neun-welten':['karten','2–4',1,0],'chomp-klassik':['arcade','1',0,0],'fixer-fritz':['arcade','1',0,0],'netrunner-aergere-dich-nicht':['wuerfel','2–6',1,1]};
+ 'jenga':['arcade','2–4',1,1],'neun-welten':['karten','2–4',1,0],'fixer-fritz':['arcade','1',0,0],'netrunner-aergere-dich-nicht':['wuerfel','2–6',1,1]};
 const CATS=[['brett','🧩 Brett','🧩 Board'],['karten','🃏 Karten','🃏 Cards'],['wuerfel','🎲 Würfel','🎲 Dice'],['denken','🧠 Denken','🧠 Puzzle'],['arcade','🕹 Arcade','🕹 Arcade']];
 let favs=[],cat='all',query='';try{favs=JSON.parse(localStorage.getItem('html-games-favs')||'[]');cat=localStorage.getItem('html-games-cat')||'all';}catch(e){}
 cards.forEach((c,i)=>{

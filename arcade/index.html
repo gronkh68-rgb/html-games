@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Arcade</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<style>
+html,body{overscroll-behavior:none}
+.wrap{max-width:1000px;padding:14px 14px 22px}
+body.playing{user-select:none;-webkit-user-select:none;touch-action:none}
+/* Hub */
+.hubp{color:var(--muted);margin:-4px 0 14px}
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.ag{position:relative;display:flex;flex-direction:column;gap:6px;padding:14px 14px 12px;border-radius:14px;background:var(--card);border:1px solid var(--border);border-top:3px solid var(--c,var(--accent));
+  color:var(--text);text-decoration:none;cursor:pointer;text-align:left;font:inherit;transition:transform .15s,box-shadow .15s,border-color .15s}
+.ag:hover{transform:translateY(-3px);box-shadow:0 10px 26px color-mix(in srgb,var(--c,var(--accent)) 28%,transparent);border-color:var(--c,var(--accent))}
+.ag .ic{font-size:2rem;line-height:1}
+.ag h2{margin:0;font-size:1.05rem;letter-spacing:.03em}
+.ag p{margin:0;color:var(--muted);font-size:.85rem;line-height:1.4}
+.ag .hs{margin-top:auto;padding-top:6px;font:400 .78rem ui-monospace,Consolas,monospace;color:var(--muted)}
+.ag .hs b{color:var(--c,var(--accent2))}
+.ag .go{position:absolute;right:12px;top:12px;font-size:.72rem;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
+/* Spiel */
+#play{display:none}
+body.playing #hub{display:none}body.playing #play{display:block}
+.hud{display:flex;gap:8px;margin:0 0 8px;flex-wrap:wrap;align-items:stretch}
+.hud .panel{margin:0;padding:6px 12px;flex:1;min-width:70px;text-align:center}
+.hud span{display:block;color:var(--muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.1em}
+.hud b{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.hud .tb{flex:none;display:flex;gap:6px;align-items:center;background:none;border:0;box-shadow:none;padding:0}
+.hud .tb .btn{padding:8px 11px}
+#stage{position:relative;margin:0 auto;width:min(100%,calc((100vh - 230px)*var(--ar)));max-width:100%;line-height:0}
+#cv{display:block;width:100%;height:auto;background:#05070d;border:2px solid var(--border);border-radius:6px;touch-action:none;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+#ov{position:absolute;inset:0;display:grid;place-items:center;background:rgba(5,7,16,.72);border-radius:6px;line-height:1.3;padding:12px}
+#ov .box{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:22px 26px;text-align:center;max-width:340px}
+#ov h2{margin:0 0 6px;font-size:1.5rem}#ov p{margin:0 0 14px;color:var(--muted);font-size:.9rem}
+#ov .k{font-size:.78rem;color:var(--muted);margin:10px 0 0}
+.hint{color:var(--muted);font-size:.8rem;text-align:center;margin:8px 0 0}
+#pad{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:rgba(10,12,22,.94);border-top:1px solid var(--border)}
+#pad .g{display:flex;gap:8px}
+#pad button{font-size:1.6rem;line-height:1;width:74px;height:66px;padding:0;border-radius:16px;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none}
+#pad button.on{background:var(--accent);color:#fff;transform:scale(.96)}
+#pad button.f{background:var(--accent);color:#fff;width:96px}
+@media (pointer:coarse){body.playing #pad{display:flex}body.playing{padding-bottom:92px}#stage{width:min(100%,calc((100vh - 330px)*var(--ar)))}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" id="back" href="../">← Spiele</a><h1 id="h1">Arcade</h1></div>
+
+  <div id="hub">
+    <p class="hubp" id="hubp"></p>
+    <div class="agrid" id="agrid"></div>
+  </div>
+
+  <div id="play">
+    <div class="hud">
+      <div class="panel"><span id="lS"></span><b id="sc">0</b></div>
+      <div class="panel"><span id="lB"></span><b id="hi">0</b></div>
+      <div class="panel" id="pLv"><span id="lL"></span><b id="lv">1</b></div>
+      <div class="panel" id="pLe"><span id="lE"></span><b id="le">3</b></div>
+      <div class="panel tb"><button class="btn alt" id="bPause" title="Pause (P)">⏸</button><button class="btn alt" id="bMute" title="Ton">🔊</button><button class="btn alt" id="bMenu" title="Menü (Esc)">☰</button></div>
+    </div>
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="ov"><div class="box"><h2 id="ovT"></h2><p id="ovP"></p><button class="btn" id="ovB"></button><p class="k" id="ovK"></p></div></div>
+    </div>
+    <p class="hint" id="hint"></p>
+  </div>
+</div>
+<div id="pad"></div>
+
+<script>window.ARC={games:[],add:function(d){this.games.push(d);}};</script>
+<script src="games/snake.js"></script>
+<script src="games/galaxy.js"></script>
+<script src="games/barrels.js"></script>
+<script src="games/breakout.js"></script>
+<script src="games/asteroids.js"></script>
+<script src="games/hopper.js"></script>
+<script>
+(function () {
+'use strict';
+const T = (d, e) => (window.SITE && SITE.T) ? SITE.T(d, e) : d, $ = id => document.getElementById(id);
+const ARC = window.ARC, GAMES = ARC.games;
+// Spiele, die in eigenen Seiten laufen (Ordner neben dieser Datei)
+const LINKS = [
+  { id: 'tetris', href: 'tetris/', icon: '🧱', c: '#00cfff', name: ['Tetris', 'Tetris'], desc: ['Der Klassiker mit Hold, Vorschau, Schatten-Stein und Level. Auch in 3D.', 'The classic with hold, preview, ghost piece and levels. Also in 3D.'], best: 'tetris-best' },
+  { id: 'chomp-klassik', href: 'chomp-klassik/', icon: '🟡', c: '#ffd400', name: ['Chomp Klassik', 'Chomp Classic'], desc: ['Das klassische Labyrinth: Punkte fressen, vier Geister, Früchte, Tunnel und Level.', 'The classic maze: eat dots, four ghosts, fruit, tunnels and levels.'], best: 'chomp-klassik-best' }
+];
+const bestKey = id => 'arcade-best-' + id;
+const getBest = k => { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } };
+const setBest = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) {} };
+
+// ---------- Hub ----------
+function paintHub() {
+  $('h1').textContent = 'Arcade';
+  $('hubp').textContent = T('Klassische Spielhallen-Spiele für zwischendurch. Highscores werden auf diesem Gerät gespeichert.', 'Classic arcade games for a quick round. High scores are stored on this device.');
+  const cards = GAMES.map(g => ({ id: g.id, icon: g.icon, c: g.color, name: T(g.name[0], g.name[1]), desc: T(g.desc[0], g.desc[1]), best: getBest(bestKey(g.id)), go: '#' + g.id }))
+    .concat(LINKS.map(l => ({ id: l.id, icon: l.icon, c: l.c, name: T(l.name[0], l.name[1]), desc: T(l.desc[0], l.desc[1]), best: getBest(l.best), go: l.href })));
+  $('agrid').innerHTML = cards.map(c => '<a class="ag" style="--c:' + c.c + '" href="' + c.go + '" data-id="' + c.id + '"><span class="go">' + (c.go[0] === '#' ? '▶' : '↗') + '</span><div class="ic">' + c.icon + '</div><h2>' + c.name + '</h2><p>' + c.desc + '</p><div class="hs">' + T('Highscore', 'High score') + ': <b>' + c.best + '</b></div></a>').join('');
+}
+
+// ---------- Audio ----------
+let actx = null, muted = false;
+try { muted = localStorage.getItem('arcade-mute') === '1'; } catch (e) {}
+function tone(f, d, type, vol, slide) {
+  if (muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    o.type = type || 'square'; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, slide), t + d);
+    g.gain.setValueAtTime(vol || .06, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + .02);
+  } catch (e) {}
+}
+const SFX = {
+  coin: () => tone(880, .09, 'square', .05, 1320), hit: () => tone(180, .16, 'sawtooth', .07, 60), shoot: () => tone(740, .08, 'square', .035, 300),
+  boom: () => tone(120, .35, 'sawtooth', .09, 40), jump: () => tone(300, .14, 'square', .05, 620), lose: () => tone(400, .6, 'triangle', .09, 70),
+  win: () => { tone(523, .12, 'square', .05); setTimeout(() => tone(659, .12, 'square', .05), 110); setTimeout(() => tone(784, .2, 'square', .05), 220); },
+  tick: () => tone(220, .04, 'square', .03), bounce: () => tone(420, .05, 'square', .04)
+};
+
+// ---------- Eingabe ----------
+const KEYMAP = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ' ': 'fire', z: 'fire', Z: 'fire', x: 'fire', X: 'fire', Enter: 'fire' };
+const A = {
+  W: 0, H: 0, dt: 1 / 60, t: 0, score: 0, lives: 0, level: 1, state: 'menu', def: null,
+  down: { left: 0, right: 0, up: 0, down: 0, fire: 0 }, edge: { left: 0, right: 0, up: 0, down: 0, fire: 0 }, ptr: { x: 0, y: 0, in: false, down: false },
+  hit(a) { if (this.edge[a]) { this.edge[a] = 0; return true; } return false; },
+  sfx(n) { if (SFX[n]) SFX[n](); },
+  add(n) { this.score += n | 0; },
+  over() { if (this.state === 'play') { this.state = 'over'; SFX.lose(); showOv(); } },
+  rnd(a, b) { return a + Math.random() * (b - a); }
+};
+function press(a) { if (!A.down[a]) A.edge[a] = 1; A.down[a] = 1; }
+function release(a) { A.down[a] = 0; }
+function clearInput() { for (const k in A.down) { A.down[k] = 0; A.edge[k] = 0; } A.ptr.down = false; }
+addEventListener('keydown', e => {
+  if (!A.def) return;
+  if (e.key === 'Escape') { e.preventDefault(); toMenu(); return; }
+  if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePause(); return; }
+  const a = KEYMAP[e.key]; if (!a) return;
+  e.preventDefault();
+  if (A.state !== 'play') { if (a === 'fire' && !e.repeat && (A.state === 'menu' || A.state === 'over')) startGame(); else if (a === 'fire' && A.state === 'pause') togglePause(); return; }
+  if (!e.repeat) press(a);
+});
+addEventListener('keyup', e => { const a = KEYMAP[e.key]; if (a) release(a); });
+addEventListener('blur', () => { clearInput(); if (A.state === 'play') togglePause(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && A.state === 'play') togglePause(true); });
+
+const cv = $('cv'), ctx = cv.getContext('2d');
+function ptrPos(e) { const r = cv.getBoundingClientRect(); A.ptr.x = (e.clientX - r.left) * A.W / r.width; A.ptr.y = (e.clientY - r.top) * A.H / r.height; }
+let sw = null;
+cv.addEventListener('pointermove', e => { ptrPos(e); A.ptr.in = true; A.ptr.mouse = e.pointerType === 'mouse'; if (sw && A.def && A.def.swipe && A.state === 'play') swipeCheck(e); });
+cv.addEventListener('pointerleave', () => { A.ptr.in = A.ptr.down; });
+cv.addEventListener('pointerdown', e => {
+  ptrPos(e); A.ptr.in = true; A.ptr.down = true; sw = { x: e.clientX, y: e.clientY, t: Date.now(), done: false };
+  try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+  if (A.state === 'menu' || A.state === 'over') return;
+});
+cv.addEventListener('pointerup', e => {
+  A.ptr.down = false;
+  if (sw && !sw.done && A.state === 'play' && A.def && A.def.tap && Math.hypot(e.clientX - sw.x, e.clientY - sw.y) < 14) press(A.def.tap), setTimeout(() => release(A.def && A.def.tap), 60);
+  sw = null;
+});
+cv.addEventListener('pointercancel', () => { A.ptr.down = false; sw = null; });
+function swipeCheck(e) {
+  const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+  if (Math.hypot(dx, dy) < 22) return;
+  sw.done = true;
+  const a = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+  press(a); setTimeout(() => release(a), 70);
+  sw.x = e.clientX; sw.y = e.clientY;
+}
+// Touch-Leiste
+const ICON = { left: '◀', right: '▶', up: '▲', down: '▼', fire: '●' };
+function buildPad(def) {
+  const dirs = def.pad.filter(a => a !== 'fire'), fire = def.pad.indexOf('fire') >= 0;
+  $('pad').innerHTML = '<div class="g">' + dirs.map(a => '<button class="btn alt" data-a="' + a + '">' + ICON[a] + '</button>').join('') + '</div>' + (fire ? '<div class="g"><button class="btn f" data-a="fire">' + (def.fireIcon || '●') + '</button></div>' : '');
+}
+$('pad').addEventListener('pointerdown', e => { const b = e.target.closest('[data-a]'); if (!b) return; e.preventDefault(); b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (x) {} if (A.state === 'menu' || A.state === 'over') startGame(); else if (A.state === 'pause') togglePause(); else press(b.dataset.a); });
+const padUp = e => { const b = e.target.closest('[data-a]'); if (!b) return; b.classList.remove('on'); release(b.dataset.a); };
+$('pad').addEventListener('pointerup', padUp); $('pad').addEventListener('pointercancel', padUp);
+$('pad').addEventListener('contextmenu', e => e.preventDefault());
+
+// ---------- Ablauf ----------
+let raf = 0, last = 0, acc = 0, shown = {};
+function fit(def) {
+  cv.width = def.w; cv.height = def.h; A.W = def.w; A.H = def.h;
+  $('stage').style.setProperty('--ar', def.w / def.h);
+}
+function open(id) {
+  const def = GAMES.find(g => g.id === id); if (!def) return toMenu(true);
+  A.def = def; A.state = 'menu'; clearInput(); fit(def); buildPad(def);
+  document.body.classList.add('playing'); $('h1').textContent = T(def.name[0], def.name[1]); $('back').textContent = '← Arcade';
+  $('back').onclick = e => { e.preventDefault(); toMenu(); };
+  $('lS').textContent = T('Punkte', 'Score'); $('lB').textContent = 'Best'; $('lE').textContent = T('Leben', 'Lives'); $('lL').textContent = 'Level';
+  $('pLe').style.display = def.noLives ? 'none' : '';
+  $('hint').textContent = T(def.keys[0], def.keys[1]);
+  A.score = 0; A.lives = 0; A.level = 1; def.preview && def.preview(A);
+  showOv(); paintHud(true); loopStart();
+}
+function toMenu(replace) {
+  loopStop(); A.def = null; A.state = 'menu'; clearInput();
+  document.body.classList.remove('playing'); $('back').textContent = '← ' + T('Spiele', 'Games'); $('back').onclick = null; paintHub();
+  if (location.hash) { if (replace) history.replaceState(null, '', location.pathname + location.search); else history.pushState(null, '', location.pathname + location.search); }
+  document.title = 'Arcade';
+}
+function startGame() {
+  const def = A.def; if (!def) return;
+  clearInput(); A.score = 0; A.lives = 3; A.level = 1; A.t = 0; A.state = 'play'; acc = 0;
+  def.start(A); $('ov').hidden = true; paintHud(true);
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function togglePause(force) {
+  if (A.state === 'play') { A.state = 'pause'; clearInput(); showOv(); }
+  else if (A.state === 'pause' && !force) { A.state = 'play'; $('ov').hidden = true; last = performance.now(); }
+}
+function showOv() {
+  const def = A.def, ov = $('ov'); if (!def) return; ov.hidden = false;
+  const best = getBest(bestKey(def.id));
+  if (A.state === 'menu') { $('ovT').textContent = T(def.name[0], def.name[1]); $('ovP').textContent = T(def.desc[0], def.desc[1]); $('ovB').textContent = T('Spiel starten', 'Start game'); $('ovK').textContent = T('Highscore', 'High score') + ': ' + best; }
+  else if (A.state === 'pause') { $('ovT').textContent = T('Pause', 'Paused'); $('ovP').textContent = T('Mit P oder Leertaste geht es weiter.', 'Press P or Space to continue.'); $('ovB').textContent = T('Weiter', 'Resume'); $('ovK').textContent = ''; }
+  else if (A.state === 'over') {
+    let nb = false; if (A.score > best) { setBest(bestKey(def.id), A.score); nb = true; }
+    $('ovT').textContent = 'Game Over'; $('ovP').textContent = T('Punkte', 'Score') + ': ' + A.score + (nb ? ' · 🏆 ' + T('Neuer Highscore!', 'New high score!') : '');
+    $('ovB').textContent = T('Nochmal', 'Again'); $('ovK').textContent = T('Highscore', 'High score') + ': ' + Math.max(best, A.score);
+  }
+}
+$('ovB').onclick = () => { if (A.state === 'pause') togglePause(); else startGame(); };
+$('bPause').onclick = () => togglePause(); $('bMenu').onclick = () => toMenu();
+function paintMute() { $('bMute').textContent = muted ? '🔇' : '🔊'; }
+$('bMute').onclick = () => { muted = !muted; try { localStorage.setItem('arcade-mute', muted ? '1' : '0'); } catch (e) {} paintMute(); };
+paintMute();
+function paintHud(force) {
+  const v = { sc: A.score, hi: Math.max(getBestCached(), A.score), le: A.lives, lv: A.level };
+  for (const k in v) if (force || shown[k] !== v[k]) { shown[k] = v[k]; $(k).textContent = v[k]; }
+}
+let bc = 0, bcId = ''; function getBestCached() { if (A.def && bcId !== A.def.id + A.state) { bcId = A.def.id + A.state; bc = getBest(bestKey(A.def.id)); } return bc; }
+
+function frame(now) {
+  raf = requestAnimationFrame(frame);
+  const def = A.def; if (!def) return;
+  let d = (now - last) / 1000; last = now; if (d > .25) d = .25;
+  if (A.state === 'play') {
+    acc += d; let n = 0;
+    while (acc >= A.dt && n++ < 6 && A.state === 'play') { def.update(A); A.t += A.dt; acc -= A.dt; for (const k in A.edge) A.edge[k] = 0; }
+    if (n >= 6) acc = 0;
+  }
+  ctx.save(); ctx.fillStyle = '#05070d'; ctx.fillRect(0, 0, A.W, A.H); def.draw(A, ctx); ctx.restore();
+  paintHud();
+}
+function loopStart() { cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+function loopStop() { cancelAnimationFrame(raf); raf = 0; }
+
+function route() { const id = location.hash.replace('#', ''); if (id && GAMES.some(g => g.id === id)) { if (!A.def || A.def.id !== id) open(id); } else if (A.def) toMenu(true); }
+addEventListener('hashchange', route);
+// Das Spiel darf nicht versehentlich verlassen werden
+if (window.SITE && SITE.guard) SITE.guard(() => A.state === 'play' && A.score > 0);
+document.addEventListener('site-lang', paintHub);
+window.ARC_ENGINE = A;
+paintHub(); route();
+if (!A.def) document.title = 'Arcade';
+})();
+</script>
+</body>
+</html>

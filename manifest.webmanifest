@@ -69,8 +69,8 @@
    ]
   },
   {
-   "name": "Tetris",
-   "url": "tetris/",
+   "name": "Arcade",
+   "url": "arcade/",
    "icons": [
     {
      "src": "icons/icon-192.png",
