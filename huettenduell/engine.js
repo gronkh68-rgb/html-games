@@ -18,12 +18,17 @@
     sprint: ['Läufer', '💨', 'Wechselt am Zugende die Bahn.'],
     fledge: ['Jungtier', '🐣', 'Entwickelt sich nach einem Zug weiter.'],
     guard: ['Wächter', '🛡️', 'Springt in eine leere Bahn, wenn dort ein Gegner erscheint.'],
-    hoard: ['Sammler', '🎒', 'Beim Ausspielen darfst du eine Karte aus dem Wald ziehen.']
+    hoard: ['Sammler', '🎒', 'Beim Ausspielen kommt eine Karte aus dem Wald auf die Hand.'],
+    lives: ['Neun Leben', '❤️', 'Als Opfer stirbt sie nicht gleich: Sie verliert nur ein Leben. Im Kampf kehrt sie mit einem Leben weniger auf die Hand zurück.'],
+    dam: ['Dammbauer', '🪵', 'Beim Ausspielen entsteht in jeder freien Nachbarbahn ein Damm (0/2).'],
+    submerge: ['Abtauchen', '🌊', 'Taucht während des Gegnerzugs ab: Angriffe gehen an ihr vorbei auf die Waage.'],
+    ant: ['Ameise', '🐜', 'Der Angriff entspricht der Zahl deiner Ameisen auf dem Feld.'],
+    tail: ['Abgeworfener Schwanz', '🦎', 'Wird sie angegriffen, bleibt ein Schwanz (0/2) zurück und sie weicht in eine freie Nachbarbahn aus (einmal).']
   };
   // Karten: Name, Angriff, Leben, Kosten {b: Opfer, o: Knochen}, Fähigkeiten, Symbol, Entwicklung
   var C = {
     squirrel: ['Eichhörnchen', 0, 1, {}, [], '🐿️'],
-    stoat: ['Hermelin', 1, 3, { b: 1 }, [], '🦦'],
+    stoat: ['Hermelin', 1, 3, { b: 1 }, [], '🦡'],
     wolf_cub: ['Wolfswelpe', 1, 1, { b: 1 }, ['fledge'], '🐺', 'wolf'],
     wolf: ['Wolf', 3, 2, { b: 2 }, [], '🐺'],
     frog: ['Ochsenfrosch', 1, 2, { b: 1 }, ['leap'], '🐸'],
@@ -44,12 +49,33 @@
     packrat: ['Packratte', 2, 2, { b: 2 }, ['hoard'], '🐀'],
     ouro: ['Ouroboros', 1, 1, { b: 2 }, ['unkill'], '🐍'],
     ox: ['Ur', 3, 4, { b: 2, o: 2 }, ['worthy'], '🐂'],
-    vulture: ['Geier', 3, 3, { b: 2, o: 2 }, ['airborne'], '🦅']
+    vulture: ['Geier', 3, 3, { b: 2, o: 2 }, ['airborne'], '🦅'],
+    cat: ['Katze', 0, 1, { b: 1 }, ['lives'], '🐈'],
+    opossum: ['Opossum', 1, 1, { o: 2 }, [], '🐁'],
+    beaver: ['Biber', 1, 3, { b: 2 }, ['dam'], '🦫'],
+    otter: ['Fischotter', 1, 1, { b: 1 }, ['submerge'], '🦦'],
+    kingfisher: ['Eisvogel', 1, 1, { b: 1 }, ['airborne', 'submerge'], '🐦'],
+    shark: ['Weißer Hai', 4, 7, { b: 3 }, ['submerge'], '🦈'],
+    tadpole: ['Kaulquappe', 0, 1, { b: 1 }, ['submerge', 'fledge'], '🐟', 'frog'],
+    raven_egg: ['Rabenei', 0, 2, { b: 1 }, ['fledge'], '🥚', 'raven'],
+    ant: ['Arbeiterameise', 0, 2, { b: 1 }, ['ant'], '🐜'],
+    ant_queen: ['Ameisenkönigin', 0, 3, { b: 2 }, ['ant', 'fecund'], '🐜'],
+    mole_man: ['Maulwurfsmann', 0, 6, { b: 1 }, ['leap', 'burrow'], '🐹'],
+    cockroach: ['Kakerlake', 1, 1, { o: 4 }, ['unkill'], '🪳'],
+    direwolf: ['Schreckenswolf', 2, 5, { b: 3 }, ['bi'], '🐺'],
+    goat: ['Schwarze Ziege', 0, 1, { b: 1 }, ['worthy'], '🐐'],
+    skink: ['Skink', 1, 2, { b: 1 }, ['tail'], '🦎'],
+    dam: ['Damm', 0, 2, {}, [], '🪵'],
+    skink_tail: ['Schwanz', 0, 2, {}, [], '🦎']
   };
   // Opfer-Tier (Waldstapel)
   HD.CARDS = {}; Object.keys(C).forEach(function (id) { var c = C[id]; HD.CARDS[id] = { id: id, n: c[0], atk: c[1], hp: c[2], cost: c[3], sig: c[4], art: c[5], evo: c[6] || null }; });
   var uid = 1;
-  HD.make = function (id) { var d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1 }; return c; };
+  HD.make = function (id) { var d = HD.CARDS[id], c = { id: id, uid: uid++, n: d.n, atk: d.atk, hp: d.hp, max: d.hp, sig: d.sig.slice(), art: d.art, cost: d.cost, age: 0, dir: 1, lives: d.sig.indexOf('lives') >= 0 ? 9 : 1, sub: false }; return c; };
+  HD.TOKENS = { dam: 1, skink_tail: 1, squirrel: 1 };
+  function dies(c) { return !(HD.has(c, 'lives') && c.lives > 1); }
+  // Ameisen: Angriff = Zahl der eigenen Ameisen
+  HD.refresh = function (G) { for (var s = 0; s < 2; s++) { var b = G.p[s].board, n = 0, i; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) n++; for (i = 0; i < LANES; i++) if (HD.has(b[i], 'ant')) b[i].atk = n; } };
   HD.has = function (c, s) { return c && c.sig.indexOf(s) >= 0; };
   function shuffle(a, rnd) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor((rnd || Math.random)() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   HD.shuffle = shuffle;
@@ -83,17 +109,18 @@
     if (sac.length > 1 && got - worth(P.board[sac[sac.length - 1]]) >= need) { /* überzählige Opfer sind erlaubt, aber unnötig */ }
     if ((c.cost.o || 0) > P.bones) return 'Zu wenig Knochen';
     if (lane < 0 || lane >= LANES) return 'Ungültige Bahn';
-    if (P.board[lane] && sac.indexOf(lane) < 0) return 'Bahn besetzt';
+    if (P.board[lane] && !(sac.indexOf(lane) >= 0 && dies(P.board[lane]))) return 'Bahn besetzt';
     return null;
   };
   HD.play = async function (G, s, idx, lane, sac, hook) {
     var err = HD.check(G, s, idx, lane, sac); if (err) return err;
     var P = G.p[s], c = P.hand.splice(idx, 1)[0]; sac = sac || [];
-    sac.forEach(function (l) { kill(G, s, l, true); });
+    sac.forEach(function (l) { var o = P.board[l]; if (dies(o)) kill(G, s, l, true); else o.lives--; });
     P.bones -= (c.cost.o || 0); P.board[lane] = c; c.age = 0;
     if (HD.has(c, 'fecund')) P.hand.push(HD.make(c.id));
     if (HD.has(c, 'hoard') && P.deck.length) P.hand.push(P.deck.pop());
-    onEnter(G, s, lane);
+    if (HD.has(c, 'dam')) [lane - 1, lane + 1].forEach(function (a) { if (a >= 0 && a < LANES && !P.board[a]) P.board[a] = HD.make('dam'); });
+    onEnter(G, s, lane); HD.refresh(G);
     if (hook) await hook({ k: 'play', s: s, l: lane });
     return null;
   };
@@ -101,6 +128,7 @@
     var P = G.p[s], c = P.board[l]; if (!c) return;
     P.board[l] = null; P.bones++;
     if (!sacrificed && HD.has(c, 'unkill')) P.hand.push(HD.make(c.id));
+    if (!sacrificed && HD.has(c, 'lives') && c.lives > 1) { var n = HD.make(c.id); n.lives = c.lives - 1; P.hand.push(n); }
   }
   // Wächter der Gegenseite wechseln in leere Bahnen, wenn ein Gegner dort erscheint
   function onEnter(G, s, lane) {
@@ -117,10 +145,13 @@
       if (hook) await hook({ k: 'atk', s: s, l: l });
       for (var t = 0; t < tg.length && G.over === null; t++) {
         var tl = tg[t]; if (tl < 0 || tl >= LANES || P.board[l] !== c) continue;
+        HD.refresh(G); if (c.atk <= 0) break;
         var d = O.board[tl];
         if (!d) { // Wühler wechselt in die leere Bahn
           for (var b = 0; b < LANES; b++) if (HD.has(O.board[b], 'burrow')) { O.board[tl] = O.board[b]; O.board[b] = null; d = O.board[tl]; break; }
         }
+        if (d && d.sub) d = null;
+        if (d && HD.has(d, 'tail') && !d.tailUsed) { var adj = [tl - 1, tl + 1].filter(function (a) { return a >= 0 && a < LANES && !O.board[a]; })[0]; if (adj !== undefined) { d.tailUsed = true; O.board[adj] = d; d = O.board[tl] = HD.make('skink_tail'); } }
         if (d && HD.has(c, 'airborne') && !HD.has(d, 'leap')) d = null;
         if (d) {
           d.hp -= c.atk; var dead = d.hp <= 0 || HD.has(c, 'death');
@@ -145,12 +176,14 @@
         if (j >= 0 && j < LANES && !P.board[j]) { P.board[j] = c; P.board[i] = null; onEnter(G, s, j); i = j; }
       }
     }
+    for (var z = 0; z < LANES; z++) if (P.board[z] && HD.has(P.board[z], 'submerge')) P.board[z].sub = true;
     for (var k = 0; k < LANES; k++) {
       var f = P.board[k];
-      if (f && HD.has(f, 'fledge') && f.age >= 1) { var n = HD.make(HD.CARDS[f.id].evo); n.age = f.age; n.dir = f.dir; P.board[k] = n; }
+      if (f && HD.has(f, 'fledge') && f.age >= 1) { var n = HD.make(HD.CARDS[f.id].evo); n.age = f.age; n.dir = f.dir; n.sub = f.sub && HD.has(n, 'submerge'); P.board[k] = n; }
     }
+    HD.refresh(G);
   };
-  HD.startTurn = function (G, s) { G.turn = s; G.phase = 'draw'; G.p[s].drew = false; if (s === 0) G.n++; };
+  HD.startTurn = function (G, s) { G.p[s].board.forEach(function (c) { if (c) c.sub = false; }); HD.refresh(G); G.turn = s; G.phase = 'draw'; G.p[s].drew = false; if (s === 0) G.n++; };
   // ---------- Computergegner ----------
   // Rückt die Warteschlange vor (Gegner-NPC)
   HD.advanceQueue = function (G, s) {
