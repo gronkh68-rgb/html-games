@@ -272,7 +272,7 @@ function updatePreview(){
   el.innerHTML=ev.words.map(w=>`<button type="button" class="wd ${bad.includes(w.w)?'bad':'ok'}" data-w="${esc(w.w)}" title="${T('Bedeutung anzeigen','Show meaning')}">${esc(w.w)}</button>`).join(' · ')+` = <b>${ev.score}</b> ${T('Punkte','points')}${ev.bingo?' 🎉 +50':''}${bad.length?` <span class="bad">(${T('nicht im Wörterbuch','not in dictionary')})</span>`:''}`;
 }
 // Gelegte Wörter im Protokoll ('WORT (12)') antippbar machen
-function linkWords(txt){return esc(txt).replace(/(^|[\s,(])([A-ZÄÖÜẞ]{2,15}) \((\d+)\)/g,(m,a,w,n)=>`${a}<button type="button" class="wd ok" data-w="${w}" title="${T('Bedeutung anzeigen','Show meaning')}">${w}</button> (${n})`);}
+function linkWords(txt){return esc(txt).replace(/(^|[\s,(])([A-ZÄÖÜẞ]{2,15}) \((\d+)\)/g,(m,a,w,n)=>`${a}<button type="button" class="wd ${DICT&&V&&DICT.lang===V.lang?(WGDict.has(DICT.d,w)?'ok':'bad'):'ok'}" data-w="${w}" title="${T('Bedeutung anzeigen','Show meaning')}">${w}</button> (${n})`);}
 // ---------- Bedeutung eines Wortes (Wiktionary) ----------
 const defCache={};
 async function lookup(word,lang){
@@ -288,11 +288,15 @@ async function lookup(word,lang){
   }catch(e){out=undefined;return {title:word,text:'',err:true,url:`https://${lang==='en'?'en':'de'}.wiktionary.org/wiki/${encodeURIComponent(cap)}`};}
   return (defCache[key]=out);
 }
+async function dictState(word){      // true/false = im Spielwörterbuch, null = nicht prüfbar
+  try{const lang=V?V.lang:'de';if(!DICT||DICT.lang!==lang){const d=await WGDict.load(lang);DICT={lang,d};}return !!WGDict.has(DICT.d,word);}catch(e){return null;}
+}
 async function showDef(word){
   const el=$('wdef');el.hidden=false;el.hidden=false;el.innerHTML=`<span class="x" data-x>✕</span><b>${esc(word)}</b> · ${T('Bedeutung wird gesucht …','Looking up the meaning …')}`;try{el.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(e){}
-  const d=await lookup(word,V?V.lang:'de');if(el.hidden)return;
+  const [d,inDict]=await Promise.all([lookup(word,V?V.lang:'de'),dictState(word)]);if(el.hidden)return;
+  const chk=inDict===null?'':inDict?`<span style="color:#8dffb0">✔ ${T('Steht im Spielwörterbuch','In the game dictionary')}</span>\n`:`<span style="color:#ff8a8a">✘ ${T('Steht nicht im Spielwörterbuch','Not in the game dictionary')}${V&&V.opts&&V.opts.free?T(' (in dieser Partie ohne Prüfung gelegt)',' (played in this game without checking)'):''}</span>\n`;
   const body=d.err?T('Keine Verbindung zum Wörterbuch (Wiktionary).','No connection to the dictionary (Wiktionary).'):d.text?esc(d.text):T('Dazu gibt es keinen Eintrag. Das Wort kann trotzdem im Spielwörterbuch stehen, etwa als gebeugte Form.','No entry found. The word can still be in the game dictionary, e.g. as an inflected form.');
-  el.innerHTML=`<span class="x" data-x>✕</span><b>${esc(d.title)}</b>\n${body}\n<a href="${d.url}" target="_blank" rel="noopener">${T('Auf Wiktionary öffnen ↗','Open on Wiktionary ↗')}</a>`;
+  el.innerHTML=`<span class="x" data-x>✕</span><b>${esc(d.title)}</b>\n${chk}${body}\n<a href="${d.url}" target="_blank" rel="noopener">${T('Auf Wiktionary öffnen ↗','Open on Wiktionary ↗')}</a>`;
 }
 document.addEventListener('click',e=>{const b=e.target.closest('.wd');if(b)showDef(b.dataset.w);});
 $('wdef').addEventListener('click',e=>{if(e.target.closest('[data-x]'))$('wdef').hidden=true;});
