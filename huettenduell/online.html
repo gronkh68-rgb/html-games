@@ -245,7 +245,7 @@ function render(v, prev) {
 }
 function fx(d) {
   if (!d || d.k !== 'ev' || !V || V.wait) return; const ev = d.ev, s = V.me < 0 ? (ev.s === 0 ? 0 : 1) : (ev.s === V.me ? 0 : 1), e2 = Object.assign({}, ev, { s });
-  if (v3on && window.V3 && V3.ready) V3.fx(e2); else { const el = document.querySelector('.slot[data-row="' + (s === 0 ? 'pb' : 'ob') + '"][data-l="' + ev.l + '"] .card'); if (el) el.classList.add(ev.k === 'atk' ? 'atk-a' : ev.k === 'hit' ? 'hit' : ''); }
+  if (v3on && window.V3 && V3.ready) V3.fx(e2); else { const el = document.querySelector('.slot[data-row="' + (s === 0 ? 'pb' : 'ob') + '"][data-l="' + ev.l + '"] .card'); const cl = ev.k === 'atk' ? 'atk-a' : ev.k === 'hit' ? 'hit' : ''; if (el && cl) el.classList.add(cl); }
 }
 // ---------- Eingabe ----------
 function ui(spec) {
