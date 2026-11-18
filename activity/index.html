@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Rate-Party</title>
+<link rel="stylesheet" href="../common.css">
+<script src="../theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script>window.Peer||document.write('<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"><\/script>')</script>
+<script src="../net-config.js"></script>
+<script src="../net.js"></script>
+<script src="../mplobby.js"></script>
+<script src="../hostkit.js"></script>
+<script src="words.js"></script>
+<style>
+.wrap{max-width:1200px}
+body{touch-action:manipulation}
+.stagebox{position:relative;border:2px solid var(--border);border-radius:16px;background:var(--card);overflow:hidden}
+#cv,#lcv{display:block;width:100%;aspect-ratio:4/3;background:#fff;touch-action:none;cursor:crosshair}
+html[data-style="cyber"] #cv,html[data-style="cyber"] #lcv{background:#f4fbff}
+.tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px;background:var(--card-hover);border-top:1px solid var(--border)}
+.tools .sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}
+.tools .sw.on{border-color:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+.tools .btn{padding:6px 10px}
+.catbox{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:var(--card);border:1px solid var(--border);border-top:3px solid var(--accent)}
+.catbox .ci{font-size:2.4rem;line-height:1}.catbox b{font-size:1.15rem}.catbox small{color:var(--muted);display:block}
+.wordbox{font:900 clamp(1.5rem,5vw,2.4rem)/1.1 var(--disp,system-ui);text-align:center;padding:14px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;letter-spacing:.04em;text-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pat{font:700 1.8rem ui-monospace,Consolas,monospace;letter-spacing:.35em;text-align:center;padding:10px;color:var(--text)}
+.picks{display:flex;flex-direction:column;gap:8px}
+.picks .btn{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;font-size:1.05rem}
+.picks .btn span{opacity:.85;font-size:.85rem;white-space:nowrap}
+.guessrow{display:flex;gap:8px}.guessrow input{flex:1;font:inherit;font-size:1.05rem;padding:10px 12px;border-radius:12px;border:2px solid var(--border);background:var(--bg);color:var(--text)}
+#feed{max-height:180px;overflow:auto;font-size:.9rem;line-height:1.5;color:var(--muted)}#feed b{color:var(--text)}#feed .ok{color:#39ff14;font-weight:700}
+.ps{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:2px solid transparent}
+.ps.turn{border-color:#ffd23f;background:rgba(255,210,63,.12)}.ps small{color:var(--muted)}.ps b{font-size:1.2rem}
+#timer{font:900 1.6rem ui-monospace,monospace;text-align:center}#timer.low{color:#ff5c5c}
+.row2{display:flex;gap:8px;flex-wrap:wrap}
+/* An einem Gerät */
+#loc{display:none}body.loc #loc{display:block}body.loc #setup,body.loc #game{display:none!important}
+#loc .panel{max-width:760px;margin:0 auto 14px}
+.tn{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.tn input{font:inherit;padding:8px 10px;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--text)}
+.lscore{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px}.lscore .t{padding:6px 12px;border-radius:12px;background:var(--card);border:2px solid var(--border)}.lscore .t.cur{border-color:#ffd23f;box-shadow:0 0 12px rgba(255,210,63,.4)}
+.big{font-size:1.15rem;padding:14px 22px}
+.center{text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" id="back" href="../">← Spiele</a><h1 id="ttl"></h1></div>
+  <div id="setup" class="panel"></div>
+
+  <div id="game" hidden>
+    <div class="hk-layout">
+      <div class="hk-main">
+        <div id="hkBanner"></div>
+        <div id="hkStatus"></div>
+        <div class="catbox" id="catbox"></div>
+        <div id="timer"></div>
+        <div id="wordArea"></div>
+        <div class="stagebox" id="stage"><canvas id="cv" width="800" height="600"></canvas><div class="tools" id="tools"></div></div>
+        <div id="guessArea"></div>
+      </div>
+      <div class="hk-side">
+        <div class="panel"><div id="scores"></div><div id="info" style="margin-top:8px;color:var(--muted);font-size:.88rem"></div></div>
+        <div class="panel"><div id="feed"></div></div>
+        <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
+        <div style="display:flex;gap:8px"><button class="btn alt" id="snd" style="flex:1"></button><button class="btn alt" id="again" style="flex:1"></button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loc"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const T = (d, e) => SITE.T(d, e), L2 = HK.L2, esc = HK.esc, tx = HK.tx;
+const TT = 'Rate-Party'; document.title = TT; $('ttl').textContent = TT;
+const lang = () => (window.SITE && SITE.lang === 'en') ? 1 : 0;
+const catName = c => ACT_CATS[c].n[lang()];
+const RULES = () => `<ul>
+<li>${T('Eine Person stellt einen Begriff dar, alle anderen raten. Die Kategorie wird ausgelost: <b>Zeichnen</b>, <b>Pantomime</b> oder <b>Erklären</b>.', 'One person presents a word, everyone else guesses. The category is drawn: <b>drawing</b>, <b>mime</b> or <b>explaining</b>.')}</li>
+<li>${T('Der Darsteller wählt aus drei Wörtern: 1, 2 oder 3 Punkte. Je schwerer, desto mehr Punkte.', 'The presenter picks one of three words: 1, 2 or 3 points. The harder, the more points.')}</li>
+<li>${T('Zeichnen: keine Buchstaben und Zahlen. Pantomime: keine Worte, keine Geräusche. Erklären: Das Wort und seine Teile sind tabu.', 'Drawing: no letters or numbers. Mime: no words or sounds. Explaining: the word and its parts are taboo.')}</li>
+<li>${T('Online tippen die anderen ihre Tipps ein (Groß-/Kleinschreibung und Artikel egal, ein Tippfehler ist erlaubt). Wer zuerst richtig liegt, bekommt die Punkte, der Darsteller auch.', 'Online the others type their guesses (case and articles do not matter, one typo is allowed). The first correct guesser gets the points, and so does the presenter.')}</li></ul>`;
+$('setup').innerHTML = `<h2>🎭 ${T('Rate-Party', 'Charades party')}</h2>
+<p style="margin:0 0 10px;color:var(--muted)">${T('Das Partyspiel im Activity-Stil: Zeichnen, Pantomime und Erklären. Online mit Zeichenfläche und Tipp-Eingabe, oder an einem Gerät in Teams.', 'The party game in the style of Activity: drawing, mime and explaining. Online with a drawing canvas and typed guesses, or on one device in teams.')}</p>
+<div class="row"><label for="rounds">${T('Runden', 'Rounds')}</label><select id="rounds"><option value="1">${T('Jeder zeichnet 1×', 'Everyone presents 1×')}</option><option value="2" selected>${T('Jeder 2×', 'Everyone 2×')}</option><option value="3">${T('Jeder 3×', 'Everyone 3×')}</option></select>
+<label for="tm" style="min-width:auto">${T('Zeit', 'Time')}</label><select id="tm"><option value="60">60 s</option><option value="90" selected>90 s</option><option value="120">120 s</option></select></div>
+<div class="row"><button class="btn" id="online">🌐 ${T('Online spielen', 'Play online')}</button><button class="btn alt" id="rejoinBtn" hidden>↩ ${T('Wieder ins laufende Spiel', 'Back into the running game')}</button><button class="btn alt" id="local">👥 ${T('An einem Gerät (Teams)', 'On one device (teams)')}</button></div>
+<details class="rules" style="margin-top:14px"><summary><b>${T('Regeln', 'Rules')}</b></summary>${RULES()}</details>`;
+$('rulesT').textContent = T('Regeln', 'Rules'); $('rulesSide').innerHTML = RULES(); $('again').textContent = T('Zur Auswahl', 'Back to menu');
+const readOpts = () => ({ rounds: +$('rounds').value, tm: +$('tm').value });
+
+// ---------- Zeichenfläche (gemeinsam für Online und Einzelgerät) ----------
+const COLORS = ['#111111', '#e53935', '#1e88e5', '#43a047', '#f9a825', '#8e24aa', '#6d4c41', '#ffffff'];
+function mkCanvas(cv, tools, onChange) {
+  const g = cv.getContext('2d'); let strokes = [], cur = null, color = COLORS[0], width = 6, on = false, undone = [];
+  const pos = e => { const r = cv.getBoundingClientRect(); return [Math.round((e.clientX - r.left) / r.width * 1000), Math.round((e.clientY - r.top) / r.height * 1000)]; };
+  function paint(list) {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.lineCap = 'round'; g.lineJoin = 'round';
+    (list || strokes).forEach(s => {
+      g.strokeStyle = s.c; g.fillStyle = s.c; g.lineWidth = s.w * cv.width / 1000 * 1.6; const p = s.p; if (!p.length) return;
+      if (p.length === 2) { g.beginPath(); g.arc(p[0] * cv.width / 1000, p[1] * cv.height / 1000, g.lineWidth / 2, 0, 7); g.fill(); return; }
+      g.beginPath(); g.moveTo(p[0] * cv.width / 1000, p[1] * cv.height / 1000); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i] * cv.width / 1000, p[i + 1] * cv.height / 1000); g.stroke();
+    });
+  }
+  cv.onpointerdown = e => { if (!on) return; e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (x) {} cur = { c: color, w: width, p: pos(e) }; strokes.push(cur); undone = []; paint(); onChange && onChange(); };
+  cv.onpointermove = e => { if (!on || !cur) return; const q = pos(e), p = cur.p; if (Math.abs(q[0] - p[p.length - 2]) + Math.abs(q[1] - p[p.length - 1]) < 4) return; p.push(q[0], q[1]); paint(); onChange && onChange(); };
+  cv.onpointerup = cv.onpointercancel = () => { cur = null; onChange && onChange(true); };
+  function buildTools() {
+    tools.innerHTML = COLORS.map(c => `<button class="sw${c === color ? ' on' : ''}" data-c="${c}" style="background:${c};${c === '#ffffff' ? 'border-color:#999' : ''}" title="${c === '#ffffff' ? T('Radierer', 'Eraser') : ''}"></button>`).join('') +
+      `<button class="btn alt" data-w="3">${T('dünn', 'thin')}</button><button class="btn alt" data-w="6">${T('mittel', 'mid')}</button><button class="btn alt" data-w="14">${T('dick', 'thick')}</button><button class="btn alt" data-a="undo">↶</button><button class="btn alt" data-a="clear">🗑</button>`;
+  }
+  tools.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.c) { color = b.dataset.c; buildTools(); } else if (b.dataset.w) width = +b.dataset.w;
+    else if (b.dataset.a === 'undo') { if (strokes.length) { undone.push(strokes.pop()); paint(); onChange && onChange(true, true); } }
+    else if (b.dataset.a === 'clear') { strokes = []; paint(); onChange && onChange(true, true); }
+  };
+  buildTools();
+  return { get strokes() { return strokes; }, set enabled(v) { on = v; cv.style.cursor = v ? 'crosshair' : 'default'; tools.style.display = v ? '' : 'none'; }, reset() { strokes = []; cur = null; paint(); }, show(list) { strokes = list ? list.map(s => ({ c: s.c, w: s.w, p: s.p.slice() })) : []; paint(); } };
+}
+
+// ---------- Online (HostKit) ----------
+let K, V = null, pick = null, drawer = null, sent = 0, sendT = 0, lastGuess = 0;
+const myTurn = () => !!(V && !V.wait && V.me === V.drawer && V.drawer >= 0);
+// Host-seitig: aktuelle Runde
+let endRound = null;
+function pickWords(g) {
+  const cat = ['draw', 'mime', 'explain'][HK.rnd(3)], W = ACT_WORDS[cat], used = g.used || (g.used = []);
+  const opts = [0, 1, 2].map(t => { let w, k = 0; do { w = W[t][HK.rnd(W[t].length)]; } while (used.indexOf(w) >= 0 && k++ < 30); return { w, pts: t + 1 }; });
+  return { cat, opts };
+}
+function view(g, s) {
+  const names = g.seats.map(x => x.name), types = g.seats.map(x => x.type), isD = s === g.drawer;
+  const word = (isD || g.phase === 'end' || g.phase === 'over') ? g.word : null;
+  return { me: s, names, types, scores: g.scores, drawer: g.drawer, cat: g.cat, pts: g.pts, phase: g.phase, round: g.turn + 1, total: g.order.length, left: g.endAt ? Math.max(0, Math.ceil((g.endAt - Date.now()) / 1000)) : 0, tm: g.opts.tm,
+    word, wlen: g.word ? actNorm(g.word).length : 0, hint: (g.phase === 'play' && g.hintOn && g.word) ? g.word.charAt(0) : '', pat: g.word ? g.word.replace(/[^ ]/g, '_') : '', strokes: (isD ? [] : g.strokes), guesses: g.guesses.slice(-14), solved: g.solved, log: K.logFor(s), opts: (isD && g.phase === 'pick') ? g.options : null, over: g.over };
+}
+function valid(spec, a) { return spec.k === 'pick' && a && Number.isInteger(a.i) && a.i >= 0 && a.i < 3; }
+function hostMsg(p, m) {
+  const g = K.G; if (!g || g.phase !== 'play') return;
+  if (m.k === 'g') onGuess(p, String(m.t || '').slice(0, 60));
+  else if (m.k === 's' && p === g.drawer && g.cat === 'draw') onStrokes(m);
+  else if (m.k === 'a' && p === g.drawer && m.a === 'skip' && g.skips < 1) { g.skips++; const o = pickWords(g); g.word = o.opts[0].w; g.pts = 1; K.say(-1, L2(K.nm(p) + ' wechselt zu einem leichten Wort (1 Punkt).', K.nm(p) + ' switches to an easy word (1 point).')); g.strokes = []; K.push(); }
+}
+function onStrokes(m) {
+  const g = K.G; if (!Array.isArray(m.st) || !Number.isInteger(m.from) || m.from < 0 || m.from > g.strokes.length) return;
+  const st = m.st.slice(0, 60).filter(s => s && typeof s.c === 'string' && Array.isArray(s.p) && s.p.length <= 4000).map(s => ({ c: String(s.c).slice(0, 9), w: Math.max(1, Math.min(30, s.w | 0)), p: s.p.map(n => Math.max(0, Math.min(1000, n | 0))) }));
+  g.strokes = g.strokes.slice(0, m.from).concat(st); K.push();
+}
+function onGuess(p, t) {
+  const g = K.G; if (!t.trim() || p === g.drawer || g.solved || g.phase !== 'play') return;
+  if (actMatch(t, g.word)) {
+    g.solved = { p, word: g.word }; g.scores[p] += g.pts; g.scores[g.drawer] += g.pts;
+    g.guesses.push({ p, t: g.word, ok: 1 }); K.say(-1, L2(K.nm(p) + ' errät „' + g.word + '“! +' + g.pts + ' für ' + K.nm(p) + ' und ' + K.nm(g.drawer) + '.', K.nm(p) + ' guesses "' + g.word + '"! +' + g.pts + ' for ' + K.nm(p) + ' and ' + K.nm(g.drawer) + '.')); K.sfx('win');
+    if (endRound) endRound('solved');
+  } else { g.guesses.push({ p, t }); K.sfx('tick'); K.push(); }
+}
+function setup(seats, opts) {
+  const humans = seats.map((s, i) => s.type === 'cpu' ? -1 : i).filter(i => i >= 0), order = []; for (let r = 0; r < opts.rounds; r++) humans.forEach(i => order.push(i));
+  return { seats, opts, log: [], scores: seats.map(() => 0), turn: 0, order, drawer: -1, cat: 'draw', options: null, word: '', pts: 0, strokes: [], guesses: [], solved: null, phase: 'pick', endAt: 0, skips: 0, used: [], hintOn: false, over: null };
+}
+async function main() {
+  const g = K.G;
+  while (g.turn < g.order.length) {
+    const d = g.order[g.turn];
+    if (g.phase === 'end') { g.turn++; g.phase = 'pick'; continue; }
+    if (g.phase === 'pick') {
+      g.drawer = d; const o = pickWords(g); g.cat = o.cat; g.options = o.opts; g.strokes = []; g.guesses = []; g.solved = null; g.skips = 0; g.hintOn = false; g.endAt = 0; g.word = '';
+      K.say(-1, L2(K.nm(d) + ' ist dran: ' + ACT_CATS[g.cat].n[0] + '.', K.nm(d) + ' is up: ' + ACT_CATS[g.cat].n[1] + '.')); K.snap('turn'); K.push();
+      const a = await K.ask(d, { k: 'pick', cat: g.cat, opts: g.options }, () => ({ i: 0 }));
+      const ch = g.options[a && a.i != null ? a.i : 0]; g.word = ch.w; g.pts = ch.pts; g.used.push(ch.w); g.phase = 'play'; g.endAt = Date.now() + g.opts.tm * 1000;
+    }
+    if (g.phase === 'play') {
+      K.snap('turn'); K.push();
+      await new Promise(res => {
+        const tok = K.token, t0 = Date.now(); let fin = false;
+        const done = why => { if (fin) return; fin = true; clearInterval(iv); endRound = null; res(why); };
+        endRound = done;
+        const iv = setInterval(() => { if (tok !== K.token) { clearInterval(iv); return; } const left = g.endAt - Date.now(); if (left <= 0) done('time'); else { if (!g.hintOn && left < g.opts.tm * 500) g.hintOn = true; K.push(); } }, 1000);
+      });
+      g.phase = 'end'; if (!g.solved) K.say(-1, L2('Zeit abgelaufen. Das Wort war „' + g.word + '“.', 'Time is up. The word was "' + g.word + '".')); K.push(); K.sfx(g.solved ? 'win' : 'bad'); await K.sleep(3800);
+      g.turn++; g.phase = 'pick';
+    }
+  }
+  g.phase = 'over'; const top = Math.max(...g.scores), w = g.scores.indexOf(top); g.over = { w }; K.push(); K.sfx('win');
+  const again = await K.vote(q => ({ ico: '🏆', title: q === w ? L2('Du hast gewonnen!', 'You won!') : L2(g.seats[w].name + ' gewinnt!', g.seats[w].name + ' wins!'), html: L2(g.seats.map((s, i) => esc(s.name) + ': <b>' + g.scores[i] + '</b>').join('<br>') + '<br><br><b>Abstimmung:</b> Noch eine Partie?', g.seats.map((s, i) => esc(s.name) + ': <b>' + g.scores[i] + '</b>').join('<br>') + '<br><br><b>Vote:</b> play again?'), btns: [L2('Nochmal spielen', 'Play again'), L2('Beenden', 'Quit')] }));
+  if (again) startGame(g.seats.map(s => ({ type: s.type, name: s.name, seat: s.seat, orig: s.orig, away: s.away })), g.opts); else K.exit(false);
+}
+function startGame(seats, opts) { K.reset(); K.G = setup(seats, opts); K.say(-1, L2('Neues Spiel. Alle sind einmal oder mehrfach dran.', 'New game. Everyone gets a turn.')); K.push(); K.run(main); }
+
+// Anzeige
+let cvApi = null, lastKey = '';
+function render(v, prev) {
+  V = v; $('setup').hidden = true; $('game').hidden = false; document.body.classList.remove('loc');
+  if (!cvApi) cvApi = mkCanvas($('cv'), $('tools'), (fin, force) => { if (!myTurn()) return; clearTimeout(sendT); sendT = setTimeout(sendStrokes, fin ? 30 : 250); });
+  const mine = myTurn(), cat = ACT_CATS[v.cat || 'draw'], playing = v.phase === 'play', pickingMe = mine && v.phase === 'pick';
+  $('catbox').innerHTML = `<div class="ci">${cat.ico}</div><div><b>${esc(cat.n[lang()])}</b><small>${esc(v.drawer >= 0 ? (mine ? cat.hint[lang()] : (v.names[v.drawer] + T(' ist dran', ' is up'))) : '')}</small></div>`;
+  const b = $('hkBanner');
+  if (v.phase === 'over') { b.className = ''; b.textContent = '🏆 ' + v.names[v.over.w] + T(' gewinnt!', ' wins!'); }
+  else if (mine && v.phase === 'pick') { b.className = 'me'; b.textContent = T('▶ DU BIST DRAN: Wähle ein Wort', '▶ YOUR TURN: choose a word'); }
+  else if (mine && playing) { b.className = 'me'; b.textContent = T('▶ Stelle den Begriff dar!', '▶ Present the word!'); }
+  else if (v.phase === 'end') { b.className = ''; b.textContent = v.solved ? '✅ ' + v.names[v.solved.p] + T(' hat es erraten!', ' got it!') : T('⌛ Zeit abgelaufen', '⌛ Time is up'); }
+  else { b.className = ''; b.textContent = playing ? T('🤔 Rate mit! ', '🤔 Guess! ') + (v.drawer >= 0 ? v.names[v.drawer] : '') : T('⏳ ', '⏳ ') + (v.drawer >= 0 ? v.names[v.drawer] + T(' wählt ein Wort …', ' is choosing a word …') : ''); }
+  document.title = mine ? T('▶ Du bist dran! – ', '▶ Your turn! – ') + TT : TT;
+  $('timer').textContent = playing ? '⏱ ' + v.left + ' s' : ''; $('timer').className = playing && v.left <= 10 ? 'low' : '';
+  // Wort / Auswahl
+  let wa = '';
+  if (pickingMe) wa = `<div class="picks">${v.opts.map((o, i) => `<button class="btn" data-pick="${i}"><b>${esc(o.w)}</b><span>${o.pts} ${T('Punkt(e)', 'pt(s)')}</span></button>`).join('')}</div><p style="color:var(--muted);text-align:center;margin:6px 0 0">${T('Wähle schwer für mehr Punkte. Dann geht es sofort los.', 'Pick a harder word for more points. The clock starts right away.')}</p>`;
+  else if (mine && playing) wa = `<div class="wordbox">${esc(v.word)} <small style="font-size:.5em;opacity:.85">· ${v.pts} ${T('Pkt', 'pt')}</small></div><div class="row2" style="margin-top:6px"><button class="btn alt" data-skip>↷ ${T('Leichteres Wort (1×)', 'Easier word (1×)')}</button></div>`;
+  else if (playing) wa = `<div class="pat">${esc(v.pat.split('').map((c, i) => (i === 0 && v.hint) ? v.hint.toUpperCase() : c).join(' '))}</div><div style="text-align:center;color:var(--muted)">${v.pts ? v.pts + ' ' + T('Punkt(e)', 'pt(s)') : ''}</div>`;
+  else if (v.phase === 'end' || v.phase === 'over') wa = `<div class="wordbox">${esc(v.word || '')}</div>`;
+  $('wordArea').innerHTML = wa;
+  // Zeichenfläche
+  const showCv = v.cat === 'draw' && (playing || v.phase === 'end'), tools = mine && playing && v.cat === 'draw';
+  $('stage').style.display = showCv ? '' : 'none';
+  if (showCv) { cvApi.enabled = tools; if (!mine) cvApi.show(v.strokes); else if (lastKey !== v.round + ':' + v.cat) { cvApi.reset(); sent = 0; } }
+  lastKey = v.round + ':' + v.cat;
+  // Tippen
+  const canGuess = playing && !mine && v.me >= 0 && !v.solved;
+  $('guessArea').innerHTML = canGuess ? `<div class="guessrow"><input id="gin" autocomplete="off" maxlength="60" placeholder="${T('Dein Tipp …', 'Your guess …')}"><button class="btn" id="gbtn">${T('Raten', 'Guess')}</button></div>` : '';
+  if (canGuess) { const i = $('gin'); i.onkeydown = e => { if (e.key === 'Enter') submitGuess(); }; $('gbtn').onclick = submitGuess; if (!prev || !prev.phase || prev.phase !== 'play' || prev.round !== v.round) setTimeout(() => i.focus(), 50); }
+  $('scores').innerHTML = v.names.map((n, i) => `<div class="ps${i === v.drawer && v.phase !== 'over' ? ' turn' : ''}"><span>${i === v.me ? T('Du', 'You') : esc(n)}${v.types[i] === 'cpu' ? ' 🤖' : ''}${i === v.drawer && v.phase !== 'over' ? ' ' + cat.ico : ''}</span><b>${v.scores[i]}</b></div>`).join('');
+  $('info').textContent = T('Runde ', 'Turn ') + Math.min(v.round, v.total) + '/' + v.total;
+  $('feed').innerHTML = v.guesses.slice().reverse().map(x => `<div class="${x.ok ? 'ok' : ''}"><b>${esc(v.names[x.p])}</b>: ${esc(x.t)}${x.ok ? ' ✔' : ''}</div>`).join('') + v.log.slice(0, 8).map(l => `<div>${esc(tx(l))}</div>`).join('');
+  $('hkStatus').textContent = '';
+}
+function submitGuess() { const i = $('gin'); if (!i) return; const t = i.value.trim(); if (!t || Date.now() - lastGuess < 400) return; lastGuess = Date.now(); i.value = ''; sendGuess(t); i.focus(); }
+function sendGuess(t) { if (K.ROLE === 'host' || K.ROLE === 'local') onGuess(K.ME, t); else K.L.send({ k: 'g', t }); }
+function sendStrokes() {
+  if (!myTurn() || !cvApi || V.phase !== 'play') return; const st = cvApi.strokes, fromIdx = Math.max(0, st.length - 1 - 8);
+  const m = { k: 's', from: Math.min(sent, st.length), st: st.slice(Math.min(sent, st.length)) };
+  if (m.st.length > 60) { m.from = 0; m.st = st.slice(0, 60); }
+  if (K.ROLE === 'host' || K.ROLE === 'local') { if (K.G && K.G.phase === 'play' && K.G.drawer === K.ME) onStrokes(m); } else K.L.send(m);
+  sent = Math.max(0, st.length - 1);      // das letzte (evtl. noch wachsende) Teilstück wird beim nächsten Mal erneut geschickt
+}
+function ui(spec) {
+  return new Promise(res => { if (spec.k === 'pick') { pick = res; K.apply(); } else res(null); });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-pick]'); if (b && pick) { const r = pick; pick = null; r({ i: +b.dataset.pick }); return; }
+  if (e.target.closest('[data-skip]')) { const m = { k: 'a', a: 'skip' }; if (K.ROLE === 'host' || K.ROLE === 'local') hostMsg(K.ME, m); else K.L.send(m); }
+});
+K = HK.init({
+  spectators: true, prefix: 'act-v1-', title: L2('Rate-Party', 'Charades party'), minPlayers: 2,
+  seats: [{ name: '1', color: '#e53935' }, { name: '2', color: '#1e88e5' }, { name: '3', color: '#43a047' }, { name: '4', color: '#f9a825' }, { name: '5', color: '#8e24aa' }, { name: '6', color: '#00acc1' }],
+  cpuNames: ['Bot'], view, valid, render, ui, hostMsg,
+  cancelUi() { pick = null; },
+  start: s => startGame(s, readOpts()),
+  resume() { K.run(main); },
+  onGame() { $('setup').hidden = true; $('game').hidden = false; },
+  onSetup() { pick = null; $('game').hidden = true; $('setup').hidden = false; document.title = TT; }
+});
+K.sndBtn($('snd'));
+$('again').onclick = () => K.exit(true);
+
+// ---------- An einem Gerät: Teams ----------
+const L = { teams: [], cur: 0, goal: 15, tm: 90, cat: 'draw', opts: [], word: null, pts: 0, skipped: false, timer: 0, left: 0, cv: null };
+function locShow(html) { $('loc').innerHTML = html; }
+function locScore() { return `<div class="lscore">${L.teams.map((t, i) => `<div class="t${i === L.cur ? ' cur' : ''}"><b>${esc(t.n)}</b> · ${t.s}</div>`).join('')}</div>`; }
+$('local').onclick = () => {
+  document.body.classList.add('loc'); $('back').onclick = e => { e.preventDefault(); locExit(); };
+  locShow(`<div class="panel"><h2>👥 ${T('An einem Gerät', 'On one device')}</h2><p style="color:var(--muted)">${T('Teams spielen reihum. Der Darsteller hält das Gerät, sein Team rät laut. Wer „Erraten“ drückt, bringt die Punkte.', 'Teams take turns. The presenter holds the device, their team guesses aloud. Press “Guessed” to score.')}</p>
+  <div class="row"><label for="ln">${T('Teams', 'Teams')}</label><select id="ln"><option>2</option><option>3</option><option>4</option></select><label for="lg" style="min-width:auto">${T('Ziel', 'Goal')}</label><select id="lg"><option value="10">10</option><option value="15" selected>15</option><option value="25">25</option></select><label for="lt" style="min-width:auto">${T('Zeit', 'Time')}</label><select id="lt"><option value="60">60 s</option><option value="90" selected>90 s</option><option value="120">120 s</option></select></div>
+  <div class="tn" id="tn"></div><div class="row"><button class="btn big" id="lgo">${T('Los geht’s', 'Start')}</button><button class="btn alt" id="lback">${T('Zurück', 'Back')}</button></div></div>`);
+  const names = () => { const n = +$('ln').value; $('tn').innerHTML = Array.from({ length: n }, (_, i) => `<input maxlength="14" value="${T('Team ', 'Team ')}${i + 1}">`).join(''); }; names(); $('ln').onchange = names;
+  $('lback').onclick = locExit;
+  $('lgo').onclick = () => { L.teams = [...$('tn').querySelectorAll('input')].map((e, i) => ({ n: e.value.trim() || 'Team ' + (i + 1), s: 0 })); L.cur = 0; L.goal = +$('lg').value; L.tm = +$('lt').value; L.used = []; locPass(); };
+};
+function locExit() { clearInterval(L.timer); document.body.classList.remove('loc'); $('back').onclick = null; }
+function locPass() {
+  const t = L.teams[L.cur]; L.cat = ['draw', 'mime', 'explain'][HK.rnd(3)]; const c = ACT_CATS[L.cat];
+  locShow(`${locScore()}<div class="panel center"><div class="catbox" style="justify-content:center"><div class="ci">${c.ico}</div><div><b>${esc(c.n[lang()])}</b></div></div><h2 style="margin-top:14px">${esc(t.n)} ${T('ist dran', 'is up')}</h2><p style="color:var(--muted)">${T('Ein Mitglied des Teams nimmt das Gerät. Die anderen schauen weg!', 'One team member takes the device. The others look away!')}</p><button class="btn big" id="lreveal">👁 ${T('Wörter ansehen', 'See the words')}</button></div>`);
+  $('lreveal').onclick = locChoose;
+}
+function locChoose() {
+  const W = ACT_WORDS[L.cat], used = L.used; L.opts = [0, 1, 2].map(t => { let w, k = 0; do { w = W[t][HK.rnd(W[t].length)]; } while (used.indexOf(w) >= 0 && k++ < 30); return { w, pts: t + 1 }; });
+  const c = ACT_CATS[L.cat];
+  locShow(`${locScore()}<div class="panel"><div class="catbox"><div class="ci">${c.ico}</div><div><b>${esc(c.n[lang()])}</b><small>${esc(c.hint[lang()])}</small></div></div><h3>${T('Wähle ein Wort', 'Choose a word')}</h3><div class="picks">${L.opts.map((o, i) => `<button class="btn" data-lp="${i}"><b>${esc(o.w)}</b><span>${o.pts} ${T('Punkt(e)', 'pt(s)')}</span></button>`).join('')}</div></div>`);
+  $('loc').onclick = e => { const b = e.target.closest('[data-lp]'); if (b) locPlay(L.opts[+b.dataset.lp]); };
+}
+function locPlay(o) {
+  L.word = o.w; L.pts = o.pts; L.used.push(o.w); L.skipped = false; L.left = L.tm; const c = ACT_CATS[L.cat];
+  locShow(`${locScore()}<div class="panel"><div id="ltimer" class="center" style="font:900 1.8rem ui-monospace,monospace"></div><div class="wordbox" id="lword"></div>
+  <div class="stagebox" id="lstage" style="margin-top:10px;${L.cat === 'draw' ? '' : 'display:none'}"><canvas id="lcv" width="800" height="600"></canvas><div class="tools" id="ltools"></div></div>
+  <div class="row center" style="justify-content:center;margin-top:10px"><button class="btn big" id="lok">✔ ${T('Erraten', 'Guessed')} (+${L.pts})</button><button class="btn alt" id="lskip">↷ ${T('Leichteres Wort (1×)', 'Easier word (1×)')}</button><button class="btn alt" id="lno">✘ ${T('Aufgeben', 'Give up')}</button></div></div>`);
+  const paintWord = () => { $('lword').innerHTML = `${esc(L.word)} <small style="font-size:.5em;opacity:.85">· ${L.pts} ${T('Pkt', 'pt')} · ${c.ico}</small>`; $('lok').textContent = '✔ ' + T('Erraten', 'Guessed') + ' (+' + L.pts + ')'; }; paintWord();
+  if (L.cat === 'draw') { L.cv = mkCanvas($('lcv'), $('ltools'), null); L.cv.enabled = true; }
+  const tick = () => { $('ltimer').textContent = '⏱ ' + L.left + ' s'; $('ltimer').className = L.left <= 10 ? 'low center' : 'center'; if (L.left <= 0) { clearInterval(L.timer); locTime(); } L.left--; };
+  clearInterval(L.timer); tick(); L.timer = setInterval(tick, 1000);
+  $('lok').onclick = () => { clearInterval(L.timer); locScoreTurn(true); };
+  $('lno').onclick = () => { clearInterval(L.timer); locScoreTurn(false); };
+  $('lskip').onclick = () => { if (L.skipped) return; L.skipped = true; const w = ACT_WORDS[L.cat][0]; let n, k = 0; do { n = w[HK.rnd(w.length)]; } while (L.used.indexOf(n) >= 0 && k++ < 30); L.word = n; L.pts = 1; L.used.push(n); if (L.cv) L.cv.reset(); paintWord(); $('lskip').disabled = true; };
+}
+function locTime() {
+  locShow(`${locScore()}<div class="panel center"><h2>⌛ ${T('Zeit abgelaufen', 'Time is up')}</h2><p>${T('Das Wort war', 'The word was')}: <b>${esc(L.word)}</b></p><p>${T('Hat das Team es noch rechtzeitig erraten?', 'Did the team guess it in time?')}</p><div class="row" style="justify-content:center"><button class="btn big" id="ly">✔ ${T('Ja', 'Yes')} (+${L.pts})</button><button class="btn alt big" id="ln2">✘ ${T('Nein', 'No')}</button></div></div>`);
+  $('ly').onclick = () => locScoreTurn(true); $('ln2').onclick = () => locScoreTurn(false);
+}
+function locScoreTurn(ok) {
+  const t = L.teams[L.cur]; if (ok) t.s += L.pts;
+  if (t.s >= L.goal) { const top = [...L.teams].sort((a, b) => b.s - a.s); locShow(`${locScore()}<div class="panel center"><h2>🏆 ${esc(top[0].n)} ${T('gewinnt!', 'wins!')}</h2><p>${T('Das Wort war', 'The word was')}: <b>${esc(L.word)}</b></p><div class="row" style="justify-content:center"><button class="btn big" id="lagain">${T('Nochmal', 'Again')}</button><button class="btn alt" id="lend">${T('Zum Menü', 'Menu')}</button></div></div>`); $('lagain').onclick = () => { L.teams.forEach(x => x.s = 0); L.cur = 0; L.used = []; locPass(); }; $('lend').onclick = locExit; return; }
+  locShow(`${locScore()}<div class="panel center"><h2>${ok ? '✅ +' + L.pts : '❌'}</h2><p>${T('Das Wort war', 'The word was')}: <b>${esc(L.word)}</b></p><button class="btn big" id="lnext">${T('Nächstes Team', 'Next team')}</button></div>`);
+  $('lnext').onclick = () => { L.cur = (L.cur + 1) % L.teams.length; locPass(); };
+}
+if (window.SITE && SITE.guard) SITE.guard(() => document.body.classList.contains('loc') && L.teams.length && !!L.timer);
+</script>
+</body>
+</html>
