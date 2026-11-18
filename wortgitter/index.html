@@ -51,6 +51,10 @@ html[data-style="cyber"] .rack{background:#0b1626;border:1px solid #00f0ff55}
 .btns .btn{padding:8px 14px}
 .preview{min-height:1.4em;font-weight:700;color:#e8f2ff;text-align:center}
 .preview .bad{color:#ff8a8a}.preview .ok{color:#8dffb0}
+.preview .wd{font:inherit;font-weight:700;background:none;border:0;border-bottom:1px dotted currentColor;padding:0 1px;cursor:pointer}
+.preview .wd::after{content:" ℹ";font-size:.8em;opacity:.7}
+#wdef{margin:6px auto 0;max-width:560px;padding:8px 12px;border-radius:10px;background:var(--card-hover);border:1px solid var(--border);color:var(--text);font-size:.88rem;line-height:1.45;text-align:left;white-space:pre-wrap}
+#wdef b{color:var(--accent2)}#wdef a{color:var(--accent2)}#wdef .x{float:right;cursor:pointer;color:var(--muted)}
 .ps{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:10px;border:2px solid transparent}
 .ps.turn{border-color:#ffd23f;background:rgba(255,210,63,.1)}
 .ps b{font-size:1.2rem}.ps small{color:var(--muted)}
@@ -71,6 +75,7 @@ html[data-style="cyber"] .rack{background:#0b1626;border:1px solid #00f0ff55}
         <div class="bw"><div class="grid" id="grid"></div></div>
         <div class="rackbar">
           <div class="preview" id="preview"></div>
+          <div id="wdef" hidden></div>
           <div class="rack" id="rack"></div>
           <div class="btns" id="btns"></div>
         </div>
@@ -257,12 +262,35 @@ function render(v,prev){
 }
 function updatePreview(){
   const el=$('preview');
-  if(!tent.length||!V){el.innerHTML='';return;}
+  if(!tent.length||!V){el.innerHTML='';$('wdef').hidden=true;return;}
   const ev=WGE.evaluate(V.board,tent.map(t=>({x:t.x,y:t.y,l:t.l,v:t.v,id:t.id})),V.first);
   if(ev.err){el.innerHTML=`<span class="bad">${esc(tx(ev.err))}</span>`;return;}
   let bad=[];if(DICT&&DICT.lang===V.lang&&!(V.opts&&V.opts.free))bad=ev.words.filter(w=>!WGDict.has(DICT.d,w.w)).map(w=>w.w);
-  el.innerHTML=ev.words.map(w=>`<span class="${bad.includes(w.w)?'bad':'ok'}">${esc(w.w)}</span>`).join(' · ')+` = <b>${ev.score}</b> ${T('Punkte','points')}${ev.bingo?' 🎉 +50':''}${bad.length?` <span class="bad">(${T('nicht im Wörterbuch','not in dictionary')})</span>`:''}`;
+  el.innerHTML=ev.words.map(w=>`<button type="button" class="wd ${bad.includes(w.w)?'bad':'ok'}" data-w="${esc(w.w)}" title="${T('Bedeutung anzeigen','Show meaning')}">${esc(w.w)}</button>`).join(' · ')+` = <b>${ev.score}</b> ${T('Punkte','points')}${ev.bingo?' 🎉 +50':''}${bad.length?` <span class="bad">(${T('nicht im Wörterbuch','not in dictionary')})</span>`:''}`;
 }
+// ---------- Bedeutung eines Wortes (Wiktionary) ----------
+const defCache={};
+async function lookup(word,lang){
+  const key=lang+':'+word;if(defCache[key]!==undefined)return defCache[key];
+  const w=word.toLowerCase(),cap=w.charAt(0).toUpperCase()+w.slice(1),titles=[...new Set([cap,w,word])].join('|');
+  const url=`https://${lang==='en'?'en':'de'}.wiktionary.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=extracts&explaintext=1&exsectionformat=plain&exlimit=max&titles=${encodeURIComponent(titles)}`;
+  let out=null;
+  try{
+    const r=await fetch(url);const j=await r.json();const pgs=Object.values((j.query&&j.query.pages)||{}).filter(p=>p.extract&&!('missing' in p));
+    pgs.sort((a,b)=>(b.title===cap)-(a.title===cap));
+    if(pgs.length){const p=pgs[0];let t=p.extract.replace(/\n{3,}/g,'\n\n').trim();if(t.length>900)t=t.slice(0,900).replace(/\s+\S*$/,'')+' …';out={title:p.title,text:t,url:`https://${lang==='en'?'en':'de'}.wiktionary.org/wiki/${encodeURIComponent(p.title)}`};}
+    else out={title:word,text:'',url:`https://${lang==='en'?'en':'de'}.wiktionary.org/wiki/${encodeURIComponent(cap)}`};
+  }catch(e){out=undefined;return {title:word,text:'',err:true,url:`https://${lang==='en'?'en':'de'}.wiktionary.org/wiki/${encodeURIComponent(cap)}`};}
+  return (defCache[key]=out);
+}
+async function showDef(word){
+  const el=$('wdef');el.hidden=false;el.innerHTML=`<span class="x" data-x>✕</span><b>${esc(word)}</b> · ${T('Bedeutung wird gesucht …','Looking up the meaning …')}`;
+  const d=await lookup(word,V?V.lang:'de');if(el.hidden)return;
+  const body=d.err?T('Keine Verbindung zum Wörterbuch (Wiktionary).','No connection to the dictionary (Wiktionary).'):d.text?esc(d.text):T('Dazu gibt es keinen Eintrag. Das Wort kann trotzdem im Spielwörterbuch stehen, etwa als gebeugte Form.','No entry found. The word can still be in the game dictionary, e.g. as an inflected form.');
+  el.innerHTML=`<span class="x" data-x>✕</span><b>${esc(d.title)}</b>\n${body}\n<a href="${d.url}" target="_blank" rel="noopener">${T('Auf Wiktionary öffnen ↗','Open on Wiktionary ↗')}</a>`;
+}
+$('preview').addEventListener('click',e=>{const b=e.target.closest('.wd');if(b)showDef(b.dataset.w);});
+$('wdef').addEventListener('click',e=>{if(e.target.closest('[data-x]'))$('wdef').hidden=true;});
 function fx(d){if(d.k==='play'&&d.bingo)K.toast(T('🎉 Alle 7 Steine! +50','🎉 All 7 tiles! +50'),2000);}
 // ---------- Eingabe ----------
 function ui(spec){return new Promise(res=>{if(spec.k==='turn'){inp={res};hintTxt=spec.err?'⚠ '+tx(spec.err):'';if(spec.err)K.sfx('bad');K.apply();}else res(null);});}
