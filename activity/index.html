@@ -12,6 +12,7 @@
 <script src="../net.js"></script>
 <script src="../mplobby.js"></script>
 <script src="../hostkit.js"></script>
+<script src="../cam.js"></script>
 <script src="words.js"></script>
 <style>
 .wrap{max-width:1200px}
@@ -62,6 +63,7 @@ html[data-style="cyber"] #cv,html[data-style="cyber"] #lcv{background:#f4fbff}
         <div id="guessArea"></div>
       </div>
       <div class="hk-side">
+        <div class="panel" id="camBox"></div>
         <div class="panel"><div id="scores"></div><div id="info" style="margin-top:8px;color:var(--muted);font-size:.88rem"></div></div>
         <div class="panel"><div id="feed"></div></div>
         <details class="panel rules"><summary><b id="rulesT"></b></summary><div id="rulesSide"></div></details>
@@ -191,10 +193,17 @@ async function main() {
 }
 function startGame(seats, opts) { K.reset(); K.G = setup(seats, opts); K.say(-1, L2('Neues Spiel. Alle sind einmal oder mehrfach dran.', 'New game. Everyone gets a turn.')); K.push(); K.run(main); }
 
+// Video-Chat (statt Discord): Kamera und Mikro direkt zwischen den Mitspielern
+let camReady = false;
+function mountCam() {
+  if (!window.Cam || !K.L) return; camReady = true;
+  Cam.mount($('camBox'), { prefix: 'act-v1-', code: () => K.L.role === 'host' && K.L.room ? K.L.room.code : K.L.joinCode, me: () => (V && V.me >= 0 ? V.me : K.ME),
+    others: () => V && !V.wait ? V.names.map((n, i) => ({ i, name: n })).filter(o => o.i !== V.me && V.types[o.i] !== 'cpu') : [] });
+}
 // Anzeige
 let cvApi = null, lastKey = '';
 function render(v, prev) {
-  V = v; $('setup').hidden = true; $('game').hidden = false; document.body.classList.remove('loc');
+  V = v; if (!camReady) mountCam(); else if (window.Cam) Cam.sync(); $('setup').hidden = true; $('game').hidden = false; document.body.classList.remove('loc');
   if (!cvApi) cvApi = mkCanvas($('cv'), $('tools'), (fin, force) => { if (!myTurn()) return; clearTimeout(sendT); sendT = setTimeout(sendStrokes, fin ? 30 : 250); });
   const mine = myTurn(), cat = ACT_CATS[v.cat || 'draw'], playing = v.phase === 'play', pickingMe = mine && v.phase === 'pick';
   $('catbox').innerHTML = `<div class="ci">${cat.ico}</div><div><b>${esc(cat.n[lang()])}</b><small>${esc(v.drawer >= 0 ? (mine ? cat.hint[lang()] : (v.names[v.drawer] + T(' ist dran', ' is up'))) : '')}</small></div>`;
